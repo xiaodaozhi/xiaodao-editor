@@ -1,0 +1,2082 @@
+/* ===========================================================================
+ * Block Editor — internal stylesheet
+ *
+ * All CSS rules needed by the Block Editor component (BlockEditor.vue and
+ * the Vue components under src/view/ui/ + block renderers under src/view/).
+ *
+ * This file is self-contained: copy src/ into another project and import
+ * `style.css` (alongside the Vue components) to get a working editor.
+ * Playground chrome (layout, title, debug panel) lives in
+ * playground/playground.css and is intentionally NOT part of this file.
+ * ========================================================================= */
+
+/* --- CSS variables (design tokens used by every be-* rule) ---------------- */
+
+:root {
+  --be-bg: #ffffff;
+  --be-border: #ebebea;
+  --be-text: #37352f;
+  --be-muted: #9b9a97;
+  --be-accent: #2383e2;
+  --be-hover: #f7f6f3;
+  --be-active: #eef1ff;
+  --be-danger: #e03e3e;
+  --be-shadow: 0 0 0 1px rgb(15 15 15 / 0.05), 0 3px 6px rgb(15 15 15 / 0.1),
+    0 9px 24px rgb(15 15 15 / 0.2);
+  --be-radius: 6px;
+  --be-fg: #1f2328;
+
+  /* Text color presets — light mode */
+  --be-color-gray: #6e7781;
+  --be-color-brown: #9a6744;
+  --be-color-orange: #d97706;
+  --be-color-yellow: #ca8a04;
+  --be-color-green: #2f9e44;
+  --be-color-blue: #1c7ed6;
+  --be-color-purple: #845ef7;
+  --be-color-pink: #d63384;
+  --be-color-red: #e03131;
+
+  /* Background swatch presets — light mode (semi-transparent tints) */
+  --be-swatch-bg-gray: rgba(110, 120, 130, 0.14);
+  --be-swatch-bg-brown: rgba(140, 100, 65, 0.16);
+  --be-swatch-bg-orange: rgba(220, 130, 30, 0.16);
+  --be-swatch-bg-yellow: rgba(200, 160, 20, 0.16);
+  --be-swatch-bg-green: rgba(50, 150, 70, 0.16);
+  --be-swatch-bg-blue: rgba(30, 120, 200, 0.16);
+  --be-swatch-bg-purple: rgba(130, 90, 220, 0.16);
+  --be-swatch-bg-pink: rgba(210, 60, 130, 0.16);
+  --be-swatch-bg-red: rgba(220, 50, 50, 0.13);
+}
+
+/* Dark mode tokens — applied when either:
+   1. The BlockEditor root carries `.theme-dark` (for inline editor content), OR
+   2. <body> carries `.theme-dark` (set by BlockEditor's watcher so that
+      Teleport-ed popovers — PlusMenu, BlockSettingsMenu, HoverToolbar —
+      which are rendered directly under <body> — also inherit the tokens).
+   Light mode remains the default (inherited from :root above). */
+.block-editor.theme-dark,
+body.theme-dark {
+  --be-bg: #1e1f22;
+  --be-border: #2d2f33;
+  --be-text: #e6e5e1;
+  --be-muted: #8b8a87;
+  --be-accent: #57a6ff;
+  --be-hover: #2b2d31;
+  --be-active: #3a4663;
+  --be-danger: #ff6b6b;
+  --be-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 3px 6px rgb(0 0 0 / 0.5),
+    0 9px 24px rgb(0 0 0 / 0.7);
+  --be-fg: #e6e5e1;
+  color-scheme: dark;
+
+  /* Text color presets — dark mode (brighter for readability) */
+  --be-color-gray: #98a1b3;
+  --be-color-brown: #d8b4a0;
+  --be-color-orange: #ffa94d;
+  --be-color-yellow: #ffe066;
+  --be-color-green: #69db7c;
+  --be-color-blue: #74c0fc;
+  --be-color-purple: #b197fc;
+  --be-color-pink: #faa2c1;
+  --be-color-red: #ff8787;
+
+  /* Background swatch presets — dark mode (brighter base, higher opacity) */
+  --be-swatch-bg-gray: rgba(150, 160, 170, 0.22);
+  --be-swatch-bg-brown: rgba(200, 150, 110, 0.24);
+  --be-swatch-bg-orange: rgba(240, 160, 60, 0.22);
+  --be-swatch-bg-yellow: rgba(240, 200, 50, 0.20);
+  --be-swatch-bg-green: rgba(90, 190, 110, 0.22);
+  --be-swatch-bg-blue: rgba(70, 150, 230, 0.22);
+  --be-swatch-bg-purple: rgba(170, 120, 240, 0.22);
+  --be-swatch-bg-pink: rgba(230, 90, 160, 0.22);
+  --be-swatch-bg-red: rgba(240, 80, 80, 0.20);
+}
+
+/* Explicit light class — same as :root but pinned to the body/editor so
+   that switching back from dark does not leave stale variables. */
+body.theme-light {
+  --be-bg: #ffffff;
+  --be-border: #ebebea;
+  --be-text: #37352f;
+  --be-muted: #9b9a97;
+  --be-accent: #2383e2;
+  --be-hover: #f7f6f3;
+  --be-active: #eef1ff;
+  --be-danger: #e03e3e;
+  --be-fg: #1f2328;
+  color-scheme: light;
+
+  /* Text color presets — light mode */
+  --be-color-gray: #6e7781;
+  --be-color-brown: #9a6744;
+  --be-color-orange: #d97706;
+  --be-color-yellow: #ca8a04;
+  --be-color-green: #2f9e44;
+  --be-color-blue: #1c7ed6;
+  --be-color-purple: #845ef7;
+  --be-color-pink: #d63384;
+  --be-color-red: #e03131;
+
+  /* Background swatch presets — light mode */
+  --be-swatch-bg-gray: rgba(110, 120, 130, 0.14);
+  --be-swatch-bg-brown: rgba(140, 100, 65, 0.16);
+  --be-swatch-bg-orange: rgba(220, 130, 30, 0.16);
+  --be-swatch-bg-yellow: rgba(200, 160, 20, 0.16);
+  --be-swatch-bg-green: rgba(50, 150, 70, 0.16);
+  --be-swatch-bg-blue: rgba(30, 120, 200, 0.16);
+  --be-swatch-bg-purple: rgba(130, 90, 220, 0.16);
+  --be-swatch-bg-pink: rgba(210, 60, 130, 0.16);
+  --be-swatch-bg-red: rgba(220, 50, 50, 0.13);
+}
+
+/* --- Editor shell + block list ------------------------------------------- */
+
+.block-editor {
+  outline: none;
+  position: relative;
+  color: var(--be-text);
+  /* Background is intentionally left to the consumer (host page) so the
+     editor can blend into the surrounding UI.  Set --be-bg or a background
+     on the .block-editor element from the host stylesheet if needed. */
+}
+
+.block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Block host: left gutter for handle + right area for content */
+
+.block-host {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding-left: 48px; /* gutter: handle lives here */
+  min-height: 1.7em;
+}
+
+.block-host-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Block handle (plus/grip buttons on the left) ------------------------ */
+
+.block-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  width: 44px;
+  height: 24px;
+}
+
+.block-handle.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.block-handle.dragging {
+  pointer-events: auto;
+}
+
+.handle-btn {
+  background: transparent;
+  border: 0;
+  color: var(--be-muted);
+  width: 20px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.handle-btn:hover {
+  background: var(--be-hover);
+  color: var(--be-text);
+}
+
+.handle-btn:active {
+  background: var(--be-active);
+}
+
+.handle-grip {
+  cursor: grab;
+}
+
+.block-handle.dragging .handle-grip {
+  cursor: grabbing;
+}
+
+/* --- Block content: contenteditable root + inline marks ------------------ */
+
+.block-content {
+  outline: none;
+  min-height: 1.5em;
+  line-height: 1.6;
+  padding: 3px 2px;
+  border-radius: 3px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* Semantic HTML tags rendered by inlineToHtml() map 1:1 to mark types. */
+
+.block-content b,
+.block-content strong {
+  font-weight: 700;
+}
+.block-content i,
+.block-content em {
+  font-style: italic;
+}
+.block-content u {
+  text-decoration: underline;
+}
+.block-content s,
+.block-content strike,
+.block-content del {
+  text-decoration: line-through;
+}
+.block-content code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas,
+    "Liberation Mono", Menlo, monospace;
+  background: rgb(135 131 120 / 0.15);
+  color: var(--be-danger);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+.block-content code:hover {
+  background: rgb(135 131 120 / 0.2);
+}
+
+/* --- Link mark --- */
+
+.block-content a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--be-accent);
+  text-underline-offset: 2px;
+  cursor: text;
+}
+.block-content a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* --- Link popover --- */
+
+.link-popover {
+  position: fixed;
+  z-index: 65;
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius);
+  box-shadow: var(--be-shadow);
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  max-width: 360px;
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.link-popover.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.link-popover-view {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.link-popover-url {
+  color: var(--be-accent);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.link-popover-url:hover {
+  background: var(--be-hover);
+}
+.link-popover-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.link-popover-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--be-fg);
+  border-radius: 3px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  min-width: 28px;
+  min-height: 28px;
+}
+.link-popover-btn:hover {
+  background: var(--be-hover);
+}
+.link-popover-btn:active {
+  background: var(--be-active);
+}
+.link-popover-danger {
+  color: var(--be-danger);
+}
+.link-popover-danger:hover {
+  background: rgb(224 62 62 / 0.1);
+}
+.link-popover-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+}
+.link-popover-input {
+  border: 1px solid var(--be-border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 13px;
+  outline: none;
+  background: var(--be-bg);
+  color: var(--be-text);
+  width: 100%;
+  box-sizing: border-box;
+}
+.link-popover-input:focus {
+  border-color: var(--be-accent);
+}
+.link-popover-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.link-popover-save {
+  background: var(--be-accent);
+  color: #fff;
+  padding: 4px 12px;
+}
+.link-popover-save:hover {
+  opacity: 0.9;
+  background: var(--be-accent);
+}
+.link-popover-cancel {
+  padding: 4px 12px;
+}
+
+/* Placeholder shown when the block is empty and focused. Uses ::after so it
+   never collides with list markers (::before on the same .block-content). */
+
+.block-content[data-empty="true"]:focus:after {
+  content: attr(data-placeholder);
+  color: var(--be-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* --- Block type styles --------------------------------------------------- */
+
+/* .block-paragraph intentionally has no styles — it inherits defaults. */
+
+.block-heading {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.block-heading-h1 {
+  font-size: 2rem;
+  margin-top: 1.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.block-heading-h2 {
+  font-size: 1.5rem;
+  margin-top: 1.2rem;
+  margin-bottom: 0.3rem;
+}
+
+.block-heading-h3 {
+  font-size: 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.block-heading-h4 {
+  font-size: 1.1rem;
+  margin-top: 0.8rem;
+  margin-bottom: 0.2rem;
+}
+
+.block-heading-h5 {
+  font-size: 1rem;
+  margin-top: 0.6rem;
+  margin-bottom: 0.15rem;
+}
+
+.block-heading-h6 {
+  font-size: 0.9rem;
+  color: var(--be-muted);
+  margin-top: 0.5rem;
+  margin-bottom: 0.1rem;
+}
+
+/* Lists (bullet / ordered / todo)
+ * --------------------------------------------------------------------------
+ * The marker (bullet / number) is absolutely positioned in a fixed-width
+ * column to the left of the text. This keeps it OUT of the document flow so
+ * the caret always lands at the text start (after padding-left), not before
+ * the marker. Wrapped lines align under the text because padding-left
+ * reserves the marker column for every line.
+ */
+
+.block-bullet-list {
+  position: relative;
+  padding-left: calc(1.9em + 2px);
+}
+
+.block-bullet-list::before {
+  content: "•";
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  width: 1.9em;
+  height: 1.6em;
+  display: flex;
+  align-items: flex-start;
+  justify-content: left;
+  font-weight: 700;
+  font-size: 0.95em;
+  color: inherit;
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+/* Ordered list: a flex wrapper holds a clickable number marker (.ol-marker)
+ * next to the actual BlockContent (.block-ordered-list-content). */
+
+.block-ordered-list-wrapper {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.ol-marker {
+  flex: 0 0 auto;
+  width: calc(1.9em + 2px);
+  height: 1.6em;
+  line-height: 1.6;
+  margin-top: 3px;
+  padding-left: 2px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: left;
+  font-weight: 500;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.ol-marker:hover {
+  background: rgba(28, 126, 214, 0.12);
+  color: #1c7ed6;
+}
+
+.ol-marker:active {
+  background: rgba(28, 126, 214, 0.2);
+}
+
+.block-ordered-list-content {
+  /* Marker is a flex sibling; content no longer needs left padding. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Todo list: checkbox wrapper + cross-through when checked. */
+
+.block-todo-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.block-todo-checkbox {
+  margin-top: 0.7em;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--be-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.block-todo-list.todo-checked {
+  color: var(--be-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: from-font;
+}
+
+/* --- Quote / Code blocks ------------------------------------------------- */
+
+.block-quote {
+  border-left: 3px solid var(--be-border);
+  padding-left: 14px;
+  color: var(--be-muted);
+  font-style: italic;
+}
+
+.block-code-wrapper {
+  position: relative;
+  background: var(--be-hover);
+  border: 1px solid var(--be-border);
+  border-radius: 6px;
+  padding: 8px 12px 8px 12px;
+}
+
+.block-code-lang {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--be-muted);
+  text-transform: uppercase;
+  user-select: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.block-code-lang:hover {
+  background: var(--be-hover);
+  color: var(--be-accent);
+}
+
+.block-code {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 0.92em;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 18px 2px 2px;
+}
+
+/* --- Plus / Slash menu (PlusMenu.vue) ------------------------------------ */
+
+.plus-menu-header {
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid var(--be-border);
+  margin-bottom: 4px;
+}
+
+.plus-menu-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--be-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.slash-menu {
+  position: fixed;
+  z-index: 50;
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  box-shadow: var(--be-shadow);
+  padding: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  animation: slash-fade-in 0.14s ease;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.slash-menu.menu-closing {
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 0.18s ease 0.12s,
+    transform 0.18s ease 0.12s,
+    visibility 0s linear 0.3s;
+}
+
+@keyframes slash-fade-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.slash-menu-scroll {
+  overflow: hidden;
+  max-height: var(--scroll-max-height, 360px);
+  flex: 1;
+  min-height: 0;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item.active {
+  background: var(--be-hover);
+}
+
+.slash-menu-item.active {
+  background: var(--be-active);
+}
+
+.slash-menu-item:hover .slash-menu-icon,
+.slash-menu-item.active .slash-menu-icon {
+  border-color: color-mix(in srgb, var(--be-accent) 25%, var(--be-border));
+}
+
+.slash-menu-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--be-border);
+  border-radius: 4px;
+  background: var(--be-bg);
+  color: var(--be-text);
+  flex-shrink: 0;
+}
+
+.slash-menu-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.slash-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slash-menu-title {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--be-text);
+}
+
+.slash-menu-desc {
+  font-size: 0.78rem;
+  color: var(--be-muted);
+  line-height: 1.2;
+}
+
+.slash-menu-empty {
+  padding: 16px 12px;
+  color: var(--be-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Slash menu: grouped sections */
+
+.slash-menu-group {
+  padding: 2px 0;
+}
+
+.slash-menu-group-label {
+  padding: 6px 12px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--be-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.slash-menu-group + .slash-menu-group {
+  border-top: 1px solid var(--be-border);
+  margin-top: 2px;
+}
+
+/* --- Shared menu scroll buttons (replace native scrollbars) -------------- */
+
+.menu-scroll-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  color: var(--be-muted);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 4px;
+  margin: 2px 0;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.menu-scroll-btn:hover {
+  background: var(--be-hover);
+  color: var(--be-text);
+}
+
+.menu-scroll-up {
+  border-bottom: 1px solid var(--be-border);
+  margin-bottom: 2px;
+}
+
+.menu-scroll-down {
+  border-top: 1px solid var(--be-border);
+  margin-top: 2px;
+}
+
+/* --- Block settings menu (⋮⋮ handle menu, BlockSettingsMenu.vue) --------- */
+
+.block-settings-menu {
+  position: fixed;
+  z-index: 60;
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  box-shadow: var(--be-shadow);
+  padding: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.88rem;
+  animation: bsm-fade-in 0.14s ease;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.block-settings-menu.menu-closing {
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 0.18s ease 0.12s,
+    transform 0.18s ease 0.12s,
+    visibility 0s linear 0.3s;
+}
+
+@keyframes bsm-fade-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bsm-scroll {
+  overflow: hidden;
+  max-height: var(--scroll-max-height, 520px);
+  flex: 1;
+  min-height: 0;
+}
+
+.bsm-group {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.bsm-label {
+  padding: 4px 10px;
+  color: var(--be-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bsm-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--be-text);
+  font: inherit;
+  text-align: left;
+}
+
+.bsm-item:hover,
+.bsm-item.active {
+  background: var(--be-hover);
+}
+
+.bsm-item.active {
+  background: var(--be-active);
+}
+
+.bsm-item.danger {
+  color: var(--be-danger);
+}
+
+.bsm-item.danger:hover,
+.bsm-item.danger.active {
+  background: var(--be-hover);
+}
+
+.bsm-icon {
+  width: 18px;
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.bsm-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.bsm-shortcut {
+  color: var(--be-muted);
+  font-size: 0.72rem;
+  margin-left: 12px;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Kill SVG baseline gap so icons sit properly inside their flex row. */
+.bsm-action-icon > svg,
+.bsm-action-icon svg,
+.bsm-shortcut svg {
+  display: block;
+}
+
+/* Full-width action rows (icon + title + shortcut) */
+
+.bsm-action {
+  width: 100%;
+}
+
+.bsm-action-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--be-muted);
+}
+
+.bsm-action:hover .bsm-action-icon,
+.bsm-action.active .bsm-action-icon {
+  color: var(--be-text);
+}
+
+.bsm-action.danger .bsm-action-icon {
+  color: var(--be-danger);
+}
+
+.bsm-sep {
+  height: 1px;
+  background: var(--be-border);
+  margin: 4px 6px;
+}
+
+/* Collapsible section headers */
+
+.bsm-collapse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--be-text);
+  font: inherit;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.bsm-collapse-header:hover {
+  background: var(--be-hover);
+}
+
+.bsm-collapse-header.bsm-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.bsm-collapse-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.bsm-collapse-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.bsm-collapse-header.expanded .bsm-collapse-chevron {
+  transform: rotate(180deg);
+}
+
+.bsm-collapse-body {
+  padding-top: 6px;
+}
+
+/* Turn-into: icon-only 6-column grid */
+
+.bsm-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.bsm-icon-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--be-text);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.bsm-icon-cell:hover {
+  background: var(--be-hover);
+}
+
+.bsm-icon-cell.active {
+  background: var(--be-accent);
+  border-color: var(--be-accent);
+  color: #ffffff;
+}
+
+.bsm-icon-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.bsm-icon-svg svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Align: icon-only button row */
+
+.bsm-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px 8px;
+}
+
+.bsm-icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--be-text);
+  width: 32px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bsm-icon-btn:hover {
+  background: var(--be-hover);
+}
+
+.bsm-icon-btn.active {
+  background: var(--be-accent);
+  border-color: var(--be-accent);
+  color: #ffffff;
+}
+
+.bsm-icon-btn.bsm-disabled,
+.bsm-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Color swatch grid */
+
+.bsm-colors {
+  padding-bottom: 6px;
+}
+
+.bsm-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 8px 4px;
+}
+
+.bsm-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--be-border);
+  cursor: pointer;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.bsm-swatch:hover {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--be-accent) 30%, transparent);
+}
+
+.bsm-swatch.active {
+  box-shadow: 0 0 0 2px var(--be-accent);
+  border-color: var(--be-accent);
+}
+
+/* --- Block common attributes: align / color / bgColor / indent ---------- */
+
+.be-align-left    { text-align: left; }
+.be-align-center  { text-align: center; }
+.be-align-right   { text-align: right; }
+.be-align-justify { text-align: justify; }
+
+/* Text color presets — uses theme-aware CSS variables */
+.be-color-gray    { color: var(--be-color-gray); }
+.be-color-brown   { color: var(--be-color-brown); }
+.be-color-orange  { color: var(--be-color-orange); }
+.be-color-yellow  { color: var(--be-color-yellow); }
+.be-color-green   { color: var(--be-color-green); }
+.be-color-blue    { color: var(--be-color-blue); }
+.be-color-purple  { color: var(--be-color-purple); }
+.be-color-pink    { color: var(--be-color-pink); }
+.be-color-red     { color: var(--be-color-red); }
+
+/* Background color presets — uses theme-aware CSS variables with opacity */
+.be-bg-gray    { background-color: var(--be-swatch-bg-gray); border-radius: 4px; }
+.be-bg-brown   { background-color: var(--be-swatch-bg-brown); border-radius: 4px; }
+.be-bg-orange  { background-color: var(--be-swatch-bg-orange); border-radius: 4px; }
+.be-bg-yellow  { background-color: var(--be-swatch-bg-yellow); border-radius: 4px; }
+.be-bg-green   { background-color: var(--be-swatch-bg-green); border-radius: 4px; }
+.be-bg-blue    { background-color: var(--be-swatch-bg-blue); border-radius: 4px; }
+.be-bg-purple  { background-color: var(--be-swatch-bg-purple); border-radius: 4px; }
+.be-bg-pink    { background-color: var(--be-swatch-bg-pink); border-radius: 4px; }
+.be-bg-red     { background-color: var(--be-swatch-bg-red); border-radius: 4px; }
+
+/* Block indent: each level is list-marker width (calc(1.9em + 2px)) */
+.be-indent-1  { margin-left: calc(1.9em + 2px); }
+.be-indent-2  { margin-left: calc(2 * (1.9em + 2px)); }
+.be-indent-3  { margin-left: calc(3 * (1.9em + 2px)); }
+.be-indent-4  { margin-left: calc(4 * (1.9em + 2px)); }
+.be-indent-5  { margin-left: calc(5 * (1.9em + 2px)); }
+.be-indent-6  { margin-left: calc(6 * (1.9em + 2px)); }
+.be-indent-7  { margin-left: calc(7 * (1.9em + 2px)); }
+.be-indent-8  { margin-left: calc(8 * (1.9em + 2px)); }
+.be-indent-9  { margin-left: calc(9 * (1.9em + 2px)); }
+.be-indent-10 { margin-left: calc(10 * (1.9em + 2px)); }
+
+/* --- Hover toolbar (selection popover, HoverToolbar.vue) ---------------- */
+
+.hover-toolbar-shell {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.hover-toolbar-shell.visible {
+  pointer-events: none;
+}
+
+.hover-toolbar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #1f1f1f;
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 0 0 1px rgba(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.18),
+    0 6px 16px rgb(0 0 0 / 0.28);
+  position: absolute;
+  /* Hidden state: faded out + scaled down. */
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  transition-delay: 0s;
+}
+
+/* Scrollable content area — wraps all buttons. overflow: hidden by default;
+   when a dropdown is open we switch to overflow: visible so the dropdown
+   isn't clipped. */
+.ht-content {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  overflow-x: scroll;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ht-content::-webkit-scrollbar {
+  display: none;
+}
+
+.ht-content.dropdown-open {
+  overflow: visible;
+}
+
+/* Left/right nav buttons for horizontal scroll (narrow viewports). */
+.ht-nav-btn {
+  pointer-events: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  width: 22px;
+  height: 30px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s ease;
+}
+
+.ht-nav-btn:hover {
+  background: rgba(255 255 255 / 0.12);
+}
+
+.ht-nav-btn.disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ht-nav-left {
+  margin-right: 2px;
+}
+
+.ht-nav-right {
+  margin-left: 2px;
+}
+
+/* Visible state: fade in immediately. `visibility: visible` with zero delay
+   is critical so the toolbar becomes interactive on the first frame. */
+.hover-toolbar-shell.visible .hover-toolbar {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.14s ease 0s, transform 0.14s ease 0s, visibility 0s linear 0s;
+}
+
+/* Hidden state: delay the fade-out so brief re-hides (e.g. clicking a mark
+   button) don't cause flicker.  All descendants must be pointer-events:none
+   with !important because individual .ht-btn have their own pointer-events
+   declarations; otherwise the "invisible toolbar still has a hand cursor"
+   bug resurfaces.  visibility is a discrete transition that flips at the
+   END of its combined delay+duration, guaranteeing zero hit-test once the
+   visual fade completes. */
+.hover-toolbar-shell:not(.visible) .hover-toolbar,
+.hover-toolbar-shell:not(.visible) .hover-toolbar * {
+  pointer-events: none !important;
+  cursor: default !important;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  transition:
+    opacity 0.18s ease 0.12s,
+    transform 0.18s ease 0.12s,
+    visibility 0s linear 0.3s;
+}
+
+@keyframes ht-fade-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.hover-toolbar.above::after {
+  content: "";
+  position: absolute;
+  left: var(--ht-arrow-x, 50%);
+  bottom: -5px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-top-color: #1f1f1f;
+  transform: translateX(-50%);
+}
+
+.hover-toolbar.below::after {
+  content: "";
+  position: absolute;
+  left: var(--ht-arrow-x, 50%);
+  top: -5px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-bottom-color: #1f1f1f;
+  transform: translateX(-50%);
+}
+
+.ht-btn {
+  pointer-events: auto;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.1s ease;
+}
+
+.ht-btn:hover {
+  background: rgba(255 255 255 / 0.12);
+}
+
+.ht-btn.disabled,
+.ht-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ht-btn.active {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.ht-icon-only {
+  padding: 0;
+  width: 30px;
+}
+
+.ht-type-btn {
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0 6px 0 10px;
+}
+
+.ht-type-btn.open {
+  background: rgba(255 255 255 / 0.15);
+}
+
+.ht-type-label {
+  white-space: nowrap;
+}
+
+.ht-caret {
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.ht-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255 255 255 / 0.15);
+  margin: 0 3px;
+}
+
+.ht-danger:hover {
+  background: rgba(224 62 62 / 0.85) !important;
+  color: #fff;
+}
+
+/* Hover toolbar: block-type dropdown */
+
+.ht-dropdown-wrap {
+  position: relative;
+}
+
+.ht-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: var(--be-bg);
+  color: var(--be-text);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  box-shadow: var(--be-shadow);
+  padding: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  animation: ht-dropdown-in 0.12s ease;
+}
+
+.ht-dropdown-scroll {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.ht-dropdown.above {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+@keyframes ht-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ht-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--be-text);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  width: 100%;
+  transition: background 0.08s ease;
+}
+
+.ht-dropdown-item:hover {
+  background: var(--be-hover);
+}
+
+.ht-dropdown-item.active {
+  color: var(--be-accent);
+  font-weight: 500;
+}
+
+.ht-dropdown-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ht-dropdown-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ht-check {
+  margin-left: auto;
+  color: var(--be-accent);
+  flex-shrink: 0;
+}
+
+/* Hover toolbar: align dropdown items (icon + label + check) */
+.ht-align-item {
+  gap: 10px;
+}
+
+/* Hover toolbar: color swatch dropdown */
+
+.ht-color-dropdown {
+  min-width: 200px;
+  padding: 8px 10px;
+  left: auto;
+  right: 0;
+}
+
+.ht-color-section + .ht-color-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--be-border);
+}
+
+.ht-color-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--be-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.ht-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+}
+
+.ht-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--be-border);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.ht-swatch:hover {
+  transform: scale(1.15);
+  border-color: var(--be-muted);
+}
+
+.ht-swatch.active {
+  border-color: var(--be-accent);
+  box-shadow: 0 0 0 2px var(--be-accent);
+}
+
+/* --- Ordered-list marker click menu + start-number picker ---------------- */
+
+.ordered-list-menu {
+  position: fixed;
+  z-index: 65;
+  min-width: 230px;
+  background: var(--be-bg);
+  color: var(--be-text);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--be-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: olm-fade-in 0.12s ease;
+}
+
+@keyframes olm-fade-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.olm-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 7px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.4;
+  font-family: inherit;
+  transition: background-color 0.1s ease;
+}
+
+.olm-item:hover {
+  background: var(--be-hover);
+}
+
+.olm-item.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.olm-item.disabled:hover {
+  background: transparent;
+}
+
+.olm-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* --- Number value picker popup (start number) --------------------------- */
+
+.number-picker {
+  position: fixed;
+  z-index: 70;
+  background: var(--be-bg);
+  color: var(--be-text);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  padding: 7px;
+  box-shadow: var(--be-shadow);
+  animation: olm-fade-in 0.12s ease;
+}
+
+.np-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.np-input {
+  width: 90px;
+  padding: 5px 8px;
+  border: 1px solid var(--be-border);
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  color: var(--be-text);
+  background: var(--be-bg);
+  transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.np-input:focus {
+  border-color: var(--be-accent);
+  box-shadow: 0 0 0 3px rgb(28 126 214 / 0.14);
+}
+
+.np-ok {
+  background: var(--be-accent);
+  color: #fff;
+  border: 0;
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.1s ease;
+}
+
+.np-ok:hover {
+  background: var(--be-accent);
+  filter: brightness(1.1);
+}
+
+/* --- Code language picker popup ----------------------------------------- */
+
+.code-lang-picker {
+  position: fixed;
+  z-index: 70;
+  background: var(--be-bg);
+  color: var(--be-text);
+  border: 1px solid var(--be-border);
+  border-radius: 8px;
+  padding: 7px;
+  box-shadow: var(--be-shadow);
+  animation: olm-fade-in 0.12s ease;
+}
+
+.clp-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.clp-input {
+  flex: 1 1 auto;
+  min-width: 80px;
+  padding: 5px 8px;
+  border: 1px solid var(--be-border);
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  text-transform: lowercase;
+  outline: none;
+  color: var(--be-text);
+  background: var(--be-bg);
+  transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.clp-input:focus {
+  border-color: var(--be-accent);
+  box-shadow: 0 0 0 3px rgb(28 126 214 / 0.14);
+}
+
+.clp-ok {
+  background: var(--be-accent);
+  color: #fff;
+  border: 0;
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.1s ease;
+}
+
+.clp-ok:hover {
+  background: var(--be-accent);
+  filter: brightness(1.1);
+}
+
+/* --- Block drag & drop styles -------------------------------------------- */
+
+.block-host.block-dragging > .block-host-content > :first-child,
+.block-host.block-menu-active > .block-host-content > :first-child {
+  background: var(--be-active) !important;
+  border-radius: 4px;
+  transition: background-color 0.12s ease;
+}
+
+.block-host.block-drop-target > .block-host-content > :first-child {
+  background: var(--be-hover) !important;
+  border-radius: 4px;
+}
+
+.block-host.block-drop-before::before {
+  content: "";
+  position: absolute;
+  left: 48px;
+  right: 0;
+  top: -2px;
+  height: 3px;
+  background: var(--be-accent);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.block-host.block-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 48px;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: var(--be-accent);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* When dragging, the SOURCE block keeps its layout size (preserves document
+   flow, no reflow jumping) but its content area becomes invisible, so to the
+   user the block appears to be "lifted up" and following the cursor. */
+.block-host.block-being-dragged > .block-host-content > :first-child {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Drag ghost: fixed-position clone of the content.  Appears under the pointer
+   with slight transparency + elevation shadow, exactly matching the lifted
+   block's content width. */
+.drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.85;
+  transform: rotate(-0.6deg);
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin: -2px -8px;
+  box-shadow: var(--be-shadow);
+  overflow: hidden;
+}
+.drag-ghost > * {
+  /* Unset any margin on the cloned renderer root so the padding above is
+     the only spacing we have inside the ghost card. */
+  margin: 0 !important;
+}
+
+/* Drop indicators for first / last position: show a full-width placeholder
+   band on the block-list container when dropTargetBlockId is null AND the
+   dropPosition is first / last. */
+.block-list.drop-indicator-first::before,
+.block-list.drop-indicator-last::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin: 4px 0 4px 48px;
+  background: #1c7ed6;
+  border-radius: 2px;
+}
+
+/* Cross-block text selection overlay.
+   Each block is an independent contenteditable, so the native Selection
+   cannot highlight across blocks. We render highlight rectangles in a
+   fixed-position overlay using viewport coordinates from Range.getClientRects(). */
+.cross-block-selection-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.cross-block-selection-rect {
+  position: absolute;
+  background: rgba(35, 95, 215, 0.18);
+  border-radius: 1px;
+}
+
+/* --- Spinner animation (image upload pending) ---------------------------- */
+
+@keyframes be-spinner-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.be-spinner-arc {
+  transform-origin: 12px 12px;
+  animation: be-spinner-rotate 0.85s linear infinite;
+  color: var(--be-accent);
+}
+
+/* --- Image block (Image.ts renderer) ------------------------------------- */
+
+.block-image-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 6px 0;
+  padding: 4px;
+  border-radius: 6px;
+  user-select: none;
+}
+
+.block-image-wrapper:hover {
+  background: var(--be-hover);
+}
+
+/* Toolbar overlay on the top-right of the image wrapper. */
+.image-block-toolbar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--be-border);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.10);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 5;
+}
+
+.block-image-wrapper:hover .image-block-toolbar,
+.image-block-toolbar-visible {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.theme-dark .image-block-toolbar,
+body.theme-dark .image-block-toolbar {
+  background: rgba(34, 36, 40, 0.94);
+}
+
+.image-block-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--be-text);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.image-block-btn:hover {
+  background: var(--be-hover);
+  color: var(--be-accent);
+}
+
+/* Upload pending overlay — covers the entire wrapper with a semi-transparent
+   card that shows spinner + progress bar + percent. */
+.image-block-upload-overlay {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--be-border);
+  border-radius: 6px;
+  z-index: 4;
+  text-align: center;
+}
+
+.theme-dark .image-block-upload-overlay,
+body.theme-dark .image-block-upload-overlay {
+  background: rgba(34, 36, 40, 0.94);
+}
+
+.image-block-spinner {
+  color: var(--be-accent);
+  display: flex;
+}
+
+.image-block-upload-label {
+  font-size: 13px;
+  color: var(--be-text);
+  font-weight: 500;
+}
+
+.image-block-progress-track {
+  width: 100%;
+  max-width: 260px;
+  height: 6px;
+  background: var(--be-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.image-block-progress-bar {
+  height: 100%;
+  background: var(--be-accent);
+  border-radius: 3px;
+  transition: width 0.15s ease;
+}
+
+.image-block-progress-pct {
+  font-size: 12px;
+  color: var(--be-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Upload error overlay */
+.image-block-error-overlay {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+  background: rgba(255, 240, 240, 0.96);
+  border: 1px solid rgba(224, 62, 62, 0.28);
+  border-radius: 6px;
+  z-index: 4;
+  text-align: center;
+}
+
+.theme-dark .image-block-error-overlay,
+body.theme-dark .image-block-error-overlay {
+  background: rgba(74, 30, 30, 0.88);
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
+.image-block-error-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--be-danger);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.image-block-error-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--be-danger);
+}
+
+.image-block-error-msg {
+  font-size: 12px;
+  color: var(--be-muted);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-block-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  margin-top: 4px;
+  background: var(--be-accent);
+  color: white;
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+
+.image-block-retry-btn:hover {
+  filter: brightness(1.08);
+}
+
+/* Empty-state placeholder (no image yet, not uploading).
+   Rendered as a dashed-border invite. */
+.image-block-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 140px;
+  padding: 24px 20px;
+  border: 2px dashed var(--be-border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--be-muted);
+  background: var(--be-hover);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.image-block-empty:hover {
+  background: var(--be-active);
+  border-color: var(--be-accent);
+  color: var(--be-accent);
+}
+
+.image-block-empty-icon {
+  color: inherit;
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.image-block-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--be-text);
+}
+
+.image-block-empty:hover .image-block-empty-title {
+  color: inherit;
+}
+
+.image-block-empty-sub {
+  font-size: 12px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* The actual <img> element. */
+.image-block-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Resize handle (bottom-right corner). */
+.image-block-resize-handle {
+  position: absolute;
+  right: 6px;
+  bottom: 22px; /* leave space for caption */
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--be-accent) 50%);
+  border: 1px solid var(--be-bg);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 3;
+}
+
+.block-image-wrapper:hover .image-block-resize-handle,
+.block-host.block-menu-active .image-block-resize-handle {
+  opacity: 1;
+}
+
+/* Caption (rendered under the image). Uses contenteditable so user can type. */
+.image-block-caption {
+  width: 100%;
+  margin-top: 8px;
+  padding: 2px 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--be-muted);
+  text-align: center;
+  outline: none;
+  min-height: 1.2em;
+  border-radius: 3px;
+}
+
+.image-block-caption:focus {
+  color: var(--be-text);
+  background: var(--be-hover);
+}
+
+.image-block-caption:empty::before {
+  content: attr(data-placeholder);
+  color: var(--be-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+

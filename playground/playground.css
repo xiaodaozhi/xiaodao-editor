@@ -1,0 +1,161 @@
+/* ===========================================================================
+ * Playground chrome — layout, title bar, debug panel.
+ *
+ * Styles for the Block Editor component itself now live in src/style.css
+ * (imported by BlockEditor.vue). Only page-level (non-editor) styles.
+ * ========================================================================= */
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  color: #37352f;
+  background: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* --- Playground theme variables ----------------------------------------- *
+ * The playground chrome (title bar, debug panel) needs its own color tokens
+ * so it can match whichever theme the user has selected. These are separate
+ * from the editor's --be-* tokens (which only apply inside .block-editor and
+ * its Teleport-ed popovers). */
+
+/* As the consumer of <BlockEditor>, the playground is responsible for the
+ * editor's background. --be-bg is already defined per-theme by style.css
+ * (:root for light, .theme-dark / body.theme-dark for dark), so we just
+ * wire it to the editor element here. */
+.playground .block-editor {
+  background: var(--be-bg);
+}
+
+.playground {
+  --pg-bg: #ffffff;
+  --pg-text: #37352f;
+  --pg-muted: #9b9a97;
+  --pg-border: #ebebea;
+  --pg-hover: #f1f0ed;
+  --pg-active: #e7e6e3;
+}
+
+.playground.pg-theme-dark {
+  --pg-bg: #1e1f22;
+  --pg-text: #e6e5e1;
+  --pg-muted: #8b8a87;
+  --pg-border: #2d2f33;
+  --pg-hover: #2b2d31;
+  --pg-active: #35373c;
+}
+
+/* --- Title bar ---------------------------------------------------------- */
+
+.playground-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  margin: 0;
+  background: var(--pg-bg);
+  border-bottom: 1px solid var(--pg-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.pg-title-text {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--pg-text);
+  letter-spacing: 0.01em;
+}
+
+.pg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Segmented switch group: [ 中文 | EN ]  or  [ ☀ | ☾ ] */
+
+.pg-switch {
+  display: inline-flex;
+  align-items: center;
+  background: var(--pg-hover);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 0;
+}
+
+.pg-switch-btn {
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--pg-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.pg-switch-btn:hover {
+  color: var(--pg-text);
+}
+
+.pg-switch-btn.active {
+  background: var(--pg-active);
+  color: var(--pg-text);
+  font-weight: 500;
+}
+
+.pg-switch-btn-icon {
+  padding: 5px 7px;
+}
+
+.pg-switch-btn-icon svg {
+  display: block;
+}
+
+/* --- Debug panel -------------------------------------------------------- */
+
+.playground-debug {
+  margin-top: 0;
+  border-top: 1px solid var(--pg-border);
+  padding-top: 0;
+  background: var(--pg-bg);
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.playground-debug summary {
+  cursor: pointer;
+  color: var(--pg-muted);
+  font-size: 0.85rem;
+  padding: 8px 16px;
+}
+
+.playground-debug pre {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--pg-muted);
+  overflow-x: auto;
+  padding: 0 16px 12px;
+  margin: 0;
+}

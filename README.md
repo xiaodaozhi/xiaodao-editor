@@ -1,0 +1,252 @@
+# xiaodao-editor
+
+Notion-style **block editor** for Vue 3 + TypeScript. Ships as a single
+zero-runtime-dependency package: a framework-agnostic core plus a Vue view
+layer. Every block type (paragraph, heading, list, code, …) is contributed
+by an **extension**, so the core never switches on a block type.
+
+## Features
+
+- **8 built-in block types** — paragraph, h1–h6 (heading), bullet list,
+  ordered list, to-do, quote, code block, **image** (10 extensions total
+  including Keymap and History behavior extensions)
+- **Inline marks** — bold, italic, underline, strikethrough, inline code,
+  **link** (`Mod-K`, URL pasting, auto-link, popover with view/edit/copy/remove,
+  href sanitization to block `javascript:` / XSS), per-selection text color
+  and background color
+- **Block-level attrs** — alignment (left/center/right/justify), text color,
+  background color, indentation (0–10); image additionally carries
+  `src`, `alt`, `title`, `width`, `height`, `caption`, `fileId`
+- **Slash menu** — `/` opens a searchable command palette; input rules
+  (`# `, `> `, `[] `, ```` ``` ````) convert blocks on the fly; `/image`
+  opens the file picker
+- **Block manipulation** — drag handle, hover toolbar, `+` insert button,
+  grip menu with duplicate / copy / cut / move up / move down / delete;
+  image additionally exposes replace / remove / drag-resize corner handle
+  with locked aspect ratio and editable caption
+- **Clipboard** — clean copy/cut/paste of HTML and plain text; multi-block
+  selection overlay; **HTML `<img>` / image-file paste + drag-and-drop
+  automatically create image blocks** and dispatch the upload; selecting text
+  and pasting a URL wraps it as a link
+- **History** — undo/redo with typing grouping (`Mod-Z` / `Mod-Shift-Z`);
+  undo restores blocks but never resurrects transient upload state
+- **i18n** — `zh-CN` (default) and `en-US` via the `locale` prop; zero-dep
+  translation module (no `vue-i18n`)
+- **Theming** — `light` (default) and `dark` via the `theme` prop; CSS
+  variables for all design tokens
+- **Accessible** — keyboard navigation throughout, ARIA roles on menus
+
+## Quick start
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { BlockEditor } from './xiaodao-editor'
+import type { DocumentData } from './xiaodao-editor'
+
+const doc = ref<DocumentData>({ blocks: [] })
+</script>
+
+<template>
+  <BlockEditor v-model="doc" />
+</template>
+```
+
+The editor ships with all 10 built-in extensions by default — no need to pass
+`extensions` unless you want a custom set.
+
+## Props
+
+| Prop           | Type                                   | Default            | Description                                                                   |
+| -------------- | -------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `modelValue`   | `DocumentData`                         | `{ blocks: [] }`   | The document JSON (two-way via `v-model`).                                    |
+| `extensions`   | `readonly Extension[]`                 | `BuiltinExtensions`| Extensions to register. Override to add custom blocks or strip built-ins.     |
+| `editable`     | `boolean`                              | `true`             | Read-only mode when `false`.                                                  |
+| `placeholder`  | `string`                               | locale-aware       | Placeholder for the first empty block. Defaults to a localized string.        |
+| `theme`        | `'light' \| 'dark'`                    | `'light'`          | Color theme. The class is applied to `.block-editor` and synced to `<body>`.  |
+| `locale`       | `'zh-CN' \| 'en-US'`                   | `'zh-CN'`          | UI language. Any non-empty value other than `'zh-CN'` ⇒ `'en-US'`.            |
+| `uploadImage`  | `UploadImageHandler`                   | in-memory mock     | Hook for image uploads. Signature: `(name, file, controller, onProgress) => Promise<ImageUploadResult>`. Consumers **must** provide this if they intend to persist documents (the default mock stores `blob:` URLs which are not serialisable). |
+
+### Emits
+
+| Event                    | Payload        | When                                                                                  |
+| ------------------------ | -------------- | ------------------------------------------------------------------------------------- |
+| `update:modelValue`      | `DocumentData` | Document changed (debounced on blur).                                                 |
+| `cleanup:image-file`     | `number`       | `fileId` reference count dropped to 0 (last image block referencing it was removed or its src replaced). Payload is the `fileId`; 0 is never emitted. Consumer may reclaim cloud storage.
+
+### Expose
+
+| Member   | Type     | Description                              |
+| -------- | -------- | ---------------------------------------- |
+| `editor` | `Editor` | The framework-agnostic `Editor` instance.|
+
+## Theming
+
+All design tokens are CSS variables. Light values live under `:root`; dark
+values are defined on `.block-editor.theme-dark` and `body.theme-dark` (the
+latter so `<Teleport>`-ed popovers inherit them too).
+
+```css
+/* Override tokens in your app */
+:root {
+  --be-accent: #6366f1;
+  --be-radius: 4px;
+}
+```
+
+The `.block-editor` element intentionally has **no background** — the host
+page controls the editor's background so it blends into the surrounding UI.
+Set it explicitly if needed:
+
+```css
+.block-editor {
+  background: var(--be-bg); /* or any color you want */
+}
+```
+
+## Built-in extensions
+
+`BuiltinExtensions` bundles these **10 extensions** (8 block types + 2 behavior extensions):
+
+| Extension             | Block type      | Notes                                                            |
+| --------------------- | --------------- | ---------------------------------------------------------------- |
+| `ParagraphExtension`  | `paragraph`     | Default block type.                                              |
+| `HeadingExtension`    | `heading`       | h1–h6 via `attrs.level` (1–6).                                   |
+| `BulletListExtension` | `bulletList`    | Unordered list.                                                  |
+| `OrderedListExtension`| `orderedList`   | Auto-numbered; `attrs.startNumber` for explicit override.        |
+| `TodoListExtension`   | `todoList`      | Checkbox via `attrs.checked`.                                    |
+| `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
+| `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating — Enter inserts a newline.           |
+| `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `uploadImage` prop + `cleanup:image-file`. |
+| `KeymapExtension`     | —               | Enter / Backspace / ArrowUp / ArrowDown bindings.                |
+| `HistoryExtension`    | —               | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` undo/redo keymap.              |
+
+To use a **custom subset**, pass `extensions` explicitly:
+
+```ts
+import {
+  ParagraphExtension, HeadingExtension,
+  KeymapExtension, HistoryExtension,
+} from './xiaodao-editor'
+
+const extensions = [
+  ParagraphExtension, HeadingExtension,
+  KeymapExtension, HistoryExtension,
+]
+```
+
+## Document model
+
+```ts
+interface Block {
+  id: BlockId
+  type: BlockType
+  attrs: Attrs              // e.g. { level: 2, align: 'center', color: 'red' }
+  content: InlineSeq        // text runs with optional marks
+  children: BlockId[]       // nesting (future: toggle, columns)
+}
+
+interface DocumentData {
+  id?: string
+  blocks: BlockData[]       // nested JSON; normalized on import
+}
+```
+
+Example document:
+
+```ts
+const doc: DocumentData = {
+  blocks: [
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Title' }] },
+    { type: 'paragraph', content: [
+      { type: 'text', text: 'Normal ' },
+      { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+      { type: 'text', text: ' and a ' },
+      { type: 'text', text: 'link', marks: [{ type: 'link', attrs: { href: 'https://example.com' } }] },
+      { type: 'text', text: '.' },
+    ]},
+    { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'const x = 1' }] },
+    { type: 'image', attrs: {
+        src: 'https://cdn.example.com/hero.png', alt: 'Hero',
+        width: 1200, height: 630, caption: 'Fig. 1 — Architecture overview', fileId: 42,
+      }, content: [] },
+  ],
+}
+```
+
+## Custom extensions
+
+A block-type extension provides a `name`, a `schema` (block type, content kind,
+and attrs with defaults + validators), and a `renderer` (a Vue component that
+receives `block` and `placeholder` props). Extensions can also contribute
+input rules, slash commands, keymap bindings, and Markdown/HTML
+serialization. A minimal block-type extension provides a schema and a Vue
+renderer:
+
+```ts
+import { defineComponent, h } from 'vue'
+import type { Extension } from './xiaodao-editor'
+import BlockContent from './xiaodao-editor/BlockContent.vue'
+
+const CalloutBlock = defineComponent({
+  props: ['block', 'placeholder'],
+  setup(props) {
+    return () => h(BlockContent, {
+      block: props.block,
+      placeholder: props.placeholder,
+      class: 'block-callout',
+    })
+  },
+})
+
+export const CalloutExtension: Extension = {
+  name: 'callout',
+  schema: {
+    type: 'callout',
+    content: 'text',
+    attrs: {
+      color: { default: 'default' },
+      bgColor: { default: 'yellow' },
+    },
+  },
+  renderer: { component: CalloutBlock },
+}
+```
+
+Register it alongside the built-ins:
+
+```ts
+import { BuiltinExtensions, BlockEditor } from './xiaodao-editor'
+import { CalloutExtension } from './callout'
+
+const extensions = [...BuiltinExtensions, CalloutExtension]
+```
+
+## Architecture
+
+- **`src/core/`** — framework-agnostic engine (zero Vue imports, enforced by
+  ESLint). Owns the document model, transactions, history, commands, schema,
+  and extension registries.
+- **`src/view/`** — Vue bridge: `BlockEditor.vue` (root), `BlockList`,
+  `BlockHost`, `BlockContent` (per-block `contenteditable`), and the UI
+  components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
+  `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`).
+- **`src/extensions/`** — the 10 built-in extensions plus `_commonAttrs.ts`
+  (shared align/color/bgColor/indent specs and color presets, plus
+  `ImageExtension`'s upload-side-channel renderer logic).
+- **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
+  provide/inject so popovers rendered through `<Teleport>` stay reactive.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev          # playground at http://localhost:5173
+pnpm typecheck    # vue-tsc --noEmit
+pnpm build        # vue-tsc --noEmit && vite build
+pnpm lint         # eslint --fix
+```
+
+## License
+
+MIT
