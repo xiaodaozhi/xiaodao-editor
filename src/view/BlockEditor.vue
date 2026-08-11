@@ -50,7 +50,7 @@
       :dragging-block-id="draggingBlockId"
       :drop-target-block-id="dropTargetBlockId"
       :drop-position="dropPosition"
-      :menu-open-block-id="settingsMenu.blockId"
+      :menu-open-block-id="settingsMenu.visible ? settingsMenu.blockId : null"
       @open-settings-menu="onOpenSettingsMenu"
       @open-plus-menu="onOpenPlusMenu"
       @slash-trigger="onSlashTrigger"
@@ -718,6 +718,17 @@ function closeLinkPopover(): void {
   linkPopover.visible = false;
 }
 
+// When the link popover opens, close the HoverToolbar to avoid both being
+// visible simultaneously and to ensure clean focus/selection handling.
+watch(
+  () => linkPopover.visible,
+  (v) => {
+    if (v) {
+      hoverToolbar.visible = false;
+    }
+  },
+);
+
 /**
  * Find the link mark covering the character at `offset` in a block.
  * Returns { from, to, href, text } or null if no link covers the offset.
@@ -795,6 +806,13 @@ function openLinkPopover(blockId: BlockId, from: number, to: number): void {
   }
 
   const hasSelection = from < to;
+  // Close other floating panels before opening link popover (consistent with
+  // how ol-menu / code-lang-picker / number-picker open).
+  closePlusMenu();
+  closeSettingsMenu();
+  closeOlMenu();
+  closeNumberPicker();
+  closeCodeLangPicker();
   linkPopover.blockId = blockId;
   linkPopover.from = from;
   linkPopover.to = to;
@@ -840,27 +858,8 @@ function onLinkShortcut(): void {
  * Handle link button click from HoverToolbar.
  * Opens the link popover for the current text selection.
  */
-function onHoverToolbarLinkClick(): void {
-  const sel = editor.getState().selection;
-  if (sel.kind === 'text' && !isCrossBlockText(sel)) {
-    openLinkPopover(sel.focus.blockId, sel.anchor.offset, sel.focus.offset);
-  } else if (sel.kind === 'caret') {
-    // If cursor is in a link, open in view mode.
-    const linkInfo = findLinkAtOffset(sel.blockId, sel.offset);
-    if (linkInfo) {
-      linkPopover.blockId = sel.blockId;
-      linkPopover.from = linkInfo.from;
-      linkPopover.to = linkInfo.to;
-      linkPopover.href = linkInfo.href;
-      linkPopover.text = linkInfo.text;
-      const blockEl = rootEl.value?.querySelector(`[data-block-id="${sel.blockId}"]`);
-      const linkEl = blockEl?.querySelector('a');
-      linkPopover.anchorRect = linkEl?.getBoundingClientRect() ?? blockEl?.getBoundingClientRect() ?? null;
-      linkPopover.initialMode = 'view';
-      linkPopover.showTextInput = false;
-      linkPopover.visible = true;
-    }
-  }
+function onHoverToolbarLinkClick(blockId: BlockId, from: number, to: number): void {
+  openLinkPopover(blockId, from, to);
 }
 
 /**
@@ -1243,7 +1242,14 @@ function onKeyDown(event: KeyboardEvent): void {
     return; // let the browser handle native contenteditable editing
   }
 
-  syncSelectionFromDom();
+  // During cross-block text selection, the native DOM selection is empty
+  // (we use a custom overlay). Syncing from DOM here would overwrite the
+  // cross-block selection with a caret, breaking Ctrl+C/Ctrl+X and other
+  // operations that rely on the editor state. Skip sync in that case.
+  const preSyncSel = editor.getState().selection;
+  if (!(preSyncSel.kind === 'text' && isCrossBlockText(preSyncSel))) {
+    syncSelectionFromDom();
+  }
 
   // If a cross-block text selection is active, editable keys must first
   // delete the selection. Backspace/Delete/Mod-a are handled by the keymap
@@ -1274,6 +1280,32 @@ function onKeyDown(event: KeyboardEvent): void {
       // For Enter / Tab, the backspace already collapsed the selection to a
       // caret; let the next keystroke handle split/indent. We return here
       // because preventDefault already stopped the original event.
+      return;
+    }
+    // Ctrl/Cmd+C and Ctrl/Cmd+X: copy/cut cross-block selection.
+    // The browser won't fire copy/cut events because the native selection
+    // is empty during cross-block mode, so we must handle them here.
+    if ((event.ctrlKey || event.metaKey) && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+      const data = serializeCrossBlockSelection(preSel);
+      if (data) {
+        event.preventDefault();
+        // Use the async Clipboard API to write text/html.
+        const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+        if (ClipboardItemCtor) {
+          const clipboardItem = new ClipboardItemCtor({
+            'text/plain': new Blob([data.text], { type: 'text/plain' }),
+            'text/html': new Blob([data.html], { type: 'text/html' }),
+          });
+          navigator.clipboard.write([clipboardItem]).catch(() => {
+            navigator.clipboard.writeText(data.text).catch(() => {});
+          });
+        } else {
+          navigator.clipboard.writeText(data.text).catch(() => {});
+        }
+        if (k === 'x' || k === 'X') {
+          editor.commands.backspace?.();
+        }
+      }
       return;
     }
     // Arrow keys collapse the selection to its start (Left/Up) or end
@@ -1899,7 +1931,10 @@ function onOpenSettingsMenu(blockId: BlockId, anchor: HTMLElement): void {
 function closeSettingsMenu(): void {
   settingsMenu.visible = false;
   settingsMenu.anchorEl = null;
-  settingsMenu.blockId = null;
+  // Note: do NOT clear blockId here. The fade-out animation (shouldRender)
+  // keeps the menu mounted for ~300ms; clearing blockId would make
+  // isImageBlock flip to false, causing hidden text-block sections to
+  // briefly flash before the menu disappears.
 }
 
 /**
@@ -1917,7 +1952,11 @@ function onOpenPlusMenu(sourceBlockId: BlockId, anchor: HTMLElement): void {
   closePlusMenu();
 
   const src = editor.getState().doc.blocks.get(sourceBlockId);
-  const isEmpty = !src || inlineText(src.content).length === 0;
+  if (!src) return;
+
+  const schema = editor.registries.schema.get(src.type);
+  const supportsText = schema?.content === 'text';
+  const isEmpty = supportsText && inlineText(src.content).length === 0;
 
   if (isEmpty) {
     // Convert the current block in place.
@@ -2343,6 +2382,7 @@ function onOlMarkerClick(e: Event): void {
   closePlusMenu();
   closeSettingsMenu();
   closeNumberPicker();
+  closeLinkPopover();
   hoverToolbar.visible = false;
   olMenu.visible = true;
   olMenu.blockId = bid;
@@ -2415,6 +2455,7 @@ function onCodeLangClick(e: Event): void {
   closeSettingsMenu();
   closeNumberPicker();
   closeOlMenu();
+  closeLinkPopover();
   hoverToolbar.visible = false;
   codeLangPicker.visible = true;
   codeLangPicker.blockId = bid;
@@ -2437,24 +2478,29 @@ function onCodeLangPickerConfirm(value: string): void {
   closeCodeLangPicker();
 }
 
-// Close ol-menu / number picker / code-lang picker on outside click or touch.
+// Close ol-menu / number picker / code-lang picker / link-popover on outside click or touch.
 function onWindowOutsideDown(e: Event): void {
   const target = e.target as Node;
-  // OrderedListMenu + NumberPicker + CodeLangPicker are teleported to body.
+  // OrderedListMenu + NumberPicker + CodeLangPicker + LinkPopover are teleported to body.
   const olMenuEl = document.querySelector('.ordered-list-menu');
   const npEl = document.querySelector('.number-picker');
   const clpEl = document.querySelector('.code-lang-picker');
+  const lpEl = document.querySelector('.link-popover');
   if (olMenuEl && olMenuEl.contains(target)) return;
   if (npEl && npEl.contains(target)) return;
   if (clpEl && clpEl.contains(target)) return;
+  if (lpEl && lpEl.contains(target)) return;
   // Clicked on an ordered-list marker? Let the bubbled CustomEvent open it.
   if (target instanceof Node && (target as HTMLElement).closest?.('.ol-marker')) return;
   // Clicked on a code-block language label? Let the bubbled CustomEvent open it.
   if (target instanceof Node && (target as HTMLElement).closest?.('.block-code-lang')) return;
+  // Clicked on an inline <a> (link mark)? The bubbled CustomEvent decides.
+  if (target instanceof Node && (target as HTMLElement).closest?.('a[href]')) return;
   // Otherwise close all.
   closeOlMenu();
   closeNumberPicker();
   closeCodeLangPicker();
+  closeLinkPopover();
 }
 
 // --- Lifecycle ----------------------------------------------------------

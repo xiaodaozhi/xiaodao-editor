@@ -48,27 +48,29 @@
         class="bsm-scroll"
         @scroll="updateScrollState"
       >
-        <!-- 1. Turn into (no label) -->
-        <div class="bsm-group">
-          <div class="bsm-icon-grid">
-            <button
-              v-for="it in turnIntoActions"
-              :key="it.id"
-              class="bsm-icon-cell"
-              :class="{ active: isActive(it.id) }"
-              :title="it.title"
-              role="menuitem"
-              @mousedown.prevent="onPick(it)"
-              @mouseenter="activeId = it.id"
-            >
-              <SafeHtml
-                class="bsm-icon-svg"
-                :html="it.iconHtml"
-              />
-            </button>
+        <!-- 1. Turn into (no label) — hidden for non-text blocks like image -->
+        <template v-if="!isImageBlock">
+          <div class="bsm-group">
+            <div class="bsm-icon-grid">
+              <button
+                v-for="it in turnIntoActions"
+                :key="it.id"
+                class="bsm-icon-cell"
+                :class="{ active: isActive(it.id) }"
+                :title="it.title"
+                role="menuitem"
+                @mousedown.prevent="onPick(it)"
+                @mouseenter="activeId = it.id"
+              >
+                <SafeHtml
+                  class="bsm-icon-svg"
+                  :html="it.iconHtml"
+                />
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="bsm-sep" />
+          <div class="bsm-sep" />
+        </template>
 
         <!-- 2. Align & Indent (collapsible) -->
         <div class="bsm-group">
@@ -78,7 +80,7 @@
             role="menuitem"
             @mousedown.prevent="toggleSection('alignIndent')"
           >
-            <span class="bsm-collapse-title">{{ t('bsm.section.alignIndent') }}</span>
+            <span class="bsm-collapse-title">{{ isImageBlock ? t('bsm.section.align') : t('bsm.section.alignIndent') }}</span>
             <svg
               class="bsm-collapse-chevron"
               viewBox="0 0 12 12"
@@ -236,7 +238,10 @@
                 </svg>
               </button>
             </div>
-            <div class="bsm-row">
+            <div
+              v-if="!isImageBlock"
+              class="bsm-row"
+            >
               <button
                 class="bsm-icon-btn"
                 :disabled="outdentDisabled"
@@ -281,8 +286,11 @@
           </div>
         </div>
 
-        <!-- 3. Text color (collapsible) -->
-        <div class="bsm-group bsm-colors">
+        <!-- 3. Text color (collapsible) — hidden for non-text blocks like image -->
+        <div
+          v-if="!isImageBlock"
+          class="bsm-group bsm-colors"
+        >
           <button
             class="bsm-collapse-header"
             :class="{ 'bsm-disabled': colorsDisabled, 'expanded': expandedSections.textColor }"
@@ -326,8 +334,11 @@
           </div>
         </div>
 
-        <!-- 4. Background color (collapsible) -->
-        <div class="bsm-group bsm-colors">
+        <!-- 4. Background color (collapsible) — hidden for non-text blocks like image -->
+        <div
+          v-if="!isImageBlock"
+          class="bsm-group bsm-colors"
+        >
           <button
             class="bsm-collapse-header"
             :class="{ 'bsm-disabled': colorsDisabled, 'expanded': expandedSections.bgColor }"
@@ -559,6 +570,9 @@ const alignDisabled = computed<boolean>(() => {
   return !('align' in schema.attrs);
 });
 
+/** 图片块等非文本块：不显示"转为"、文字颜色、背景颜色，缩进也不可用 */
+const isImageBlock = computed<boolean>(() => currentBlock.value?.type === 'image');
+
 /** 当前块是否支持颜色属性（代码块不支持 color / bgColor）。 */
 const colorsDisabled = computed<boolean>(() => {
   const b = currentBlock.value;
@@ -704,12 +718,18 @@ watch(
   { immediate: true },
 );
 
-const alignActions = computed<(SettingsItem & { value: AlignValue })[]>(() => [
-  { id: 'align-left', value: 'left', title: t('align.left'), run: () => setAlign('left') },
-  { id: 'align-center', value: 'center', title: t('align.center'), run: () => setAlign('center') },
-  { id: 'align-right', value: 'right', title: t('align.right'), run: () => setAlign('right') },
-  { id: 'align-justify', value: 'justify', title: t('align.justify'), run: () => setAlign('justify') },
-]);
+const alignActions = computed<(SettingsItem & { value: AlignValue })[]>(() => {
+  const base: (SettingsItem & { value: AlignValue })[] = [
+    { id: 'align-left', value: 'left', title: t('align.left'), run: () => setAlign('left') },
+    { id: 'align-center', value: 'center', title: t('align.center'), run: () => setAlign('center') },
+    { id: 'align-right', value: 'right', title: t('align.right'), run: () => setAlign('right') },
+  ];
+  // Image blocks don't support justify alignment.
+  if (!isImageBlock.value) {
+    base.push({ id: 'align-justify', value: 'justify', title: t('align.justify'), run: () => setAlign('justify') });
+  }
+  return base;
+});
 
 function setAlign(a: AlignValue): void {
   void editor.commands.setBlockAlign?.({ id: props.blockId, align: a });

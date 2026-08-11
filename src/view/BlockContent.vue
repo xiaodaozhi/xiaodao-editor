@@ -543,11 +543,11 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
       // is a single plain-text run that looks like a URL, apply a link mark
       // to the SELECTED TEXT (not replace it) using the pasted URL as href.
       if (
-        schema.inlineMarks &&
-        lo < hi &&
-        pastedContent.length === 1 &&
-        pastedContent[0]!.type === 'text' &&
-        !pastedContent[0]!.marks
+        schema.inlineMarks
+        && lo < hi
+        && pastedContent.length === 1
+        && pastedContent[0]!.type === 'text'
+        && !pastedContent[0]!.marks
       ) {
         const pastedText = pastedContent[0]!.text;
         if (looksLikeUrl(pastedText)) {
@@ -666,7 +666,10 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   // Find the index of the last text block.
   let lastTextIdx = -1;
   for (let i = blocks.length - 1; i >= 0; i--) {
-    if (blocks[i]!.type !== 'image') { lastTextIdx = i; break; }
+    if (blocks[i]!.type !== 'image') {
+      lastTextIdx = i;
+      break;
+    }
   }
 
   // Process first block — it merges into the current block if it's text.
@@ -682,19 +685,57 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
     editor.commands.setText?.({ id: props.block.id, content });
     prevId = props.block.id;
   } else {
-    // First block is an image → current block becomes [before] only.
-    editor.commands.setText?.({ id: props.block.id, content: before });
-    // Insert the image after the current block.
+    // First block is an image.
+    const currentIsEmpty = before.length === 0 && after.length === 0;
     const imgSrc = (firstBlock.attrs as { src: string }).src;
     const imgAlt = (firstBlock.attrs as { alt?: string }).alt ?? '';
-    const file = await srcToFile(imgSrc, imgAlt || undefined);
-    if (file) {
-      const bid = await beginImageUpload(file, {
-        relativeToBlockId: prevId,
-        position: 'after',
-        convertIfEmpty: false,
-      });
-      if (bid) prevId = bid;
+    if (currentIsEmpty) {
+      // Current block is empty → replace it with the image block.
+      const file = await srcToFile(imgSrc, imgAlt || undefined);
+      if (file) {
+        const bid = await beginImageUpload(file, {
+          relativeToBlockId: prevId,
+          position: 'after',
+          convertIfEmpty: true,
+        });
+        if (bid) prevId = bid;
+      } else {
+        const coercedAttrs = editor.registries.schema.coerceAttrsFor(
+          firstBlock.type,
+          firstBlock.attrs,
+        );
+        editor.commands.replaceBlock?.({
+          id: props.block.id,
+          type: firstBlock.type,
+          attrs: coercedAttrs,
+        });
+        prevId = props.block.id;
+      }
+    } else {
+      // Current block has content → keep it, insert image after.
+      editor.commands.setText?.({ id: props.block.id, content: before });
+      const file = await srcToFile(imgSrc, imgAlt || undefined);
+      if (file) {
+        const bid = await beginImageUpload(file, {
+          relativeToBlockId: prevId,
+          position: 'after',
+          convertIfEmpty: false,
+        });
+        if (bid) prevId = bid;
+      } else {
+        const coercedAttrs = editor.registries.schema.coerceAttrsFor(
+          firstBlock.type,
+          firstBlock.attrs,
+        );
+        editor.commands.insertBlock?.({
+          after: prevId,
+          type: firstBlock.type,
+          attrs: coercedAttrs,
+          content: [],
+        });
+        const state = editor.getState();
+        if (state.selection.kind === 'caret') prevId = state.selection.blockId;
+      }
     }
   }
 
@@ -714,6 +755,19 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
           convertIfEmpty: false,
         });
         if (bid) prevId = bid;
+      } else {
+        const coercedAttrs = editor.registries.schema.coerceAttrsFor(
+          b.type,
+          b.attrs,
+        );
+        editor.commands.insertBlock?.({
+          after: prevId,
+          type: b.type,
+          attrs: coercedAttrs,
+          content: [],
+        });
+        const state = editor.getState();
+        if (state.selection.kind === 'caret') prevId = state.selection.blockId;
       }
     } else {
       // Text block → insertBlock.
@@ -767,8 +821,9 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
         selection: caretSelection(prevId, inlineText(after).length),
       });
     }
-  } else if (lastTextIdx === -1) {
-    // No after text and last block was image → insert empty paragraph.
+  } else if (lastTextIdx === -1 && (before.length > 0 || after.length > 0)) {
+    // No after text and last block was image, but current block had
+    // content → insert empty paragraph so user can continue typing.
     editor.commands.insertBlock?.({
       after: prevId!,
       type: 'paragraph' as const,

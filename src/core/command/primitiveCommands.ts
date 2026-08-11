@@ -481,6 +481,12 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
         return true;
       }
 
+      // Caret at offset 0 in an empty non-paragraph block: convert to
+      // paragraph instead of merging or deleting.
+      if (ctx.registries.schema.isEmpty(block) && block.type !== ctx.registries.defaultBlockType) {
+        return convertBlockCommand(ctx).run({ id: block.id, type: ctx.registries.defaultBlockType })(state, dispatch);
+      }
+
       // Caret at offset 0: merge with the previous block (document order).
       const prev = blockBefore(state.doc, block.id);
       if (!prev) return false; // at the very start of the document

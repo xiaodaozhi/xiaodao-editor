@@ -22,9 +22,14 @@
       :style="popoverStyle"
       role="dialog"
       :aria-label="t('link.popoverLabel')"
+      @mousedown.stop
+      @touchstart.stop
     >
       <!-- View mode -->
-      <div v-if="mode === 'view'" class="link-popover-view">
+      <div
+        v-if="mode === 'view'"
+        class="link-popover-view"
+      >
         <a
           :href="safeHref"
           target="_blank"
@@ -42,7 +47,12 @@
             :aria-label="t('link.open')"
             @mousedown.prevent.stop="onOpenLink"
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden="true"
+            >
               <path
                 d="M6 3H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2"
                 fill="none"
@@ -67,7 +77,12 @@
             :aria-label="t('link.copy')"
             @mousedown.prevent.stop="onCopyLink"
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden="true"
+            >
               <rect
                 x="5"
                 y="5"
@@ -93,7 +108,12 @@
             :aria-label="t('link.edit')"
             @mousedown.prevent.stop="switchToEdit"
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden="true"
+            >
               <path
                 d="M11.5 2.5l2 2L6 12l-2.5.5L4 10l7.5-7.5z"
                 fill="none"
@@ -110,7 +130,12 @@
             :aria-label="t('link.remove')"
             @mousedown.prevent.stop="onRemoveLink"
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden="true"
+            >
               <path
                 d="M3.5 4.5H12.5M6.5 4.5V3C6.5 2.45 6.95 2 7.5 2H8.5C9.05 2 9.5 2.45 9.5 3V4.5M5 4.5L5.5 13C5.55 13.55 6 14 6.55 14H9.45C10 14 10.45 13.55 10.5 13L11 4.5"
                 fill="none"
@@ -124,16 +149,28 @@
         </div>
       </div>
       <!-- Edit mode -->
-      <div v-else class="link-popover-edit">
+      <div
+        v-else
+        class="link-popover-edit"
+      >
         <input
           ref="urlInputEl"
           v-model="editUrl"
           class="link-popover-input"
+          :class="{ 'link-popover-input-error': urlError }"
           type="text"
           :placeholder="t('link.urlPlaceholder')"
           @keydown.enter="onSave"
           @keydown.escape="onCancelEdit"
-        />
+          @input="onUrlInput"
+        >
+        <div
+          v-if="urlError"
+          class="link-popover-error"
+          role="alert"
+        >
+          {{ urlError }}
+        </div>
         <input
           v-if="showTextInput"
           v-model="editText"
@@ -142,7 +179,7 @@
           :placeholder="t('link.textPlaceholder')"
           @keydown.enter="onSave"
           @keydown.escape="onCancelEdit"
-        />
+        >
         <div class="link-popover-edit-actions">
           <button
             class="link-popover-btn link-popover-save"
@@ -168,7 +205,6 @@
 import { ref, watch, nextTick, computed, onBeforeUnmount } from 'vue';
 import { useEditor } from '../context';
 import { useI18n } from '../../i18n';
-import { useMenuDismiss } from './useMenuDismiss';
 import { sanitizeUrl, normalizeUrl } from '../urlUtils';
 import type { BlockId } from '../../core/types';
 
@@ -209,6 +245,7 @@ const mode = ref<PopoverMode>('view');
 const editUrl = ref('');
 const editText = ref('');
 const placement = ref({ top: 0, left: 0 });
+const urlError = ref('');
 
 const showTextInput = computed(() => props.showTextInput ?? false);
 
@@ -300,20 +337,32 @@ watch(
   },
 );
 
-// --- Auto-dismiss ---
-
-useMenuDismiss(popoverEl, () => props.visible, () => emit('close'));
-
 // --- Actions ---
 
 function switchToEdit(): void {
   mode.value = 'edit';
   editUrl.value = props.href;
   editText.value = props.text;
+  urlError.value = '';
   nextTick(() => {
     urlInputEl.value?.focus();
     urlInputEl.value?.select();
   });
+}
+
+function onUrlInput(): void {
+  const value = editUrl.value;
+  if (!value.trim()) {
+    urlError.value = '';
+    return;
+  }
+  const normalized = normalizeUrl(value);
+  const safe = sanitizeUrl(normalized);
+  if (!safe) {
+    urlError.value = t('link.invalidUrl');
+  } else {
+    urlError.value = '';
+  }
 }
 
 function onSave(): void {
@@ -321,10 +370,12 @@ function onSave(): void {
   const normalized = normalizeUrl(editUrl.value);
   const safe = sanitizeUrl(normalized);
   if (!safe) {
-    // Invalid URL — focus the input and keep the popover open.
+    // Invalid URL — show error, focus the input and keep the popover open.
+    urlError.value = t('link.invalidUrl');
     urlInputEl.value?.focus();
     return;
   }
+  urlError.value = '';
 
   // If we have text input and it changed, update the link text too.
   const hasTextChange = showTextInput.value && editText.value !== props.text;

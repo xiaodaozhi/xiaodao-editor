@@ -549,7 +549,12 @@
             :disabled="isMarkBtnDisabled('link')"
             @mousedown.prevent.stop="!isMarkBtnDisabled('link') && onLinkClick()"
           >
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <svg
+              viewBox="0 0 16 16"
+              width="15"
+              height="15"
+              aria-hidden="true"
+            >
               <path
                 d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-1 1"
                 fill="none"
@@ -853,7 +858,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  linkClick: [];
+  linkClick: [blockId: BlockId, from: number, to: number];
 }>();
 
 const { t } = useI18n();
@@ -1039,11 +1044,13 @@ function isMarkBtnDisabled(markId: string): boolean {
     const bt = props.blockType;
     if (bt && editor.registries.schema.isMarkDisallowed(bt as BlockType, 'italic')) return true;
   }
-  // Link button is not disabled by inline code (unlike other formatting marks)
-  // because link and code are handled separately. The link button is only
-  // disabled for code blocks (marksDisabled) or when the block schema
-  // disallows it.
-  if (markId === 'link') return false;
+  // Link button: disabled for cross-block selections because a link mark
+  // can only span a single block.
+  if (markId === 'link') {
+    const sel = editor.getState().selection;
+    if (sel.kind === 'text' && isCrossBlockText(sel)) return true;
+    return false;
+  }
   if (markId !== 'code' && activeMarks.value.has('code')) return true;
   return false;
 }
@@ -1692,8 +1699,14 @@ function onToggleMark(markType: string): void {
 }
 
 function onLinkClick(): void {
-  // Emit to parent — BlockEditor will open the LinkPopover.
-  emit('linkClick');
+  // Pass selection offsets directly to avoid syncSelectionFromDom
+  // which would trigger a re-render and destroy the DOM selection.
+  if (currentBlockId.value) {
+    const range = getSelectionOffsets();
+    if (range) {
+      emit('linkClick', currentBlockId.value, range.from, range.to);
+    }
+  }
 }
 
 function onCopy(): void {

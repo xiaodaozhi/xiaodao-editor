@@ -41,6 +41,7 @@
         :placeholder="placeholder"
         @slash-trigger="onSlashTrigger"
         @input-changed="onInputChanged"
+        @link-click="onLinkClick"
       />
     </div>
   </div>
@@ -75,6 +76,7 @@ const emit = defineEmits<{
   hoverChange: [blockId: BlockId];
   gripPointerDown: [blockId: BlockId, startX: number, startY: number, options: { thresholdPx: number }];
   gripPointerUp: [blockId: BlockId];
+  linkClick: [blockId: BlockId, offset: number];
 }>();
 
 const editor = useEditor();
@@ -120,6 +122,9 @@ function onSlashTrigger(el: HTMLElement, _blockId: BlockId, query: string): void
 }
 function onInputChanged(id: BlockId, text: string): void {
   emit('inputChanged', id, text);
+}
+function onLinkClick(blockId: BlockId, offset: number): void {
+  emit('linkClick', blockId, offset);
 }
 
 const resolvedComponent = computed<Component>(() => {

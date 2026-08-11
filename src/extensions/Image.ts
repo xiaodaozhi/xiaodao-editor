@@ -42,12 +42,14 @@ import {
 } from '../view/imageUpload';
 import { useEditor } from '../view/context';
 import { useI18n } from '../i18n';
+import { COMMON_ATTRS, classesFromAttrs } from './_commonAttrs';
 
 // ---------------------------------------------------------------------------
 // Schema attrs (persisted — nothing transient here)
 // ---------------------------------------------------------------------------
 
 export interface ImageAttrs {
+  readonly align: string;
   readonly src: string;
   readonly alt: string;
   readonly title: string;
@@ -66,6 +68,7 @@ export interface ImageAttrs {
 }
 
 const IMAGE_ATTRS = {
+  align: COMMON_ATTRS.align,
   src: {
     default: '' as const,
     validate: (v: unknown): boolean => typeof v === 'string',
@@ -118,7 +121,9 @@ const ImageBlock = defineComponent({
     const unsub = subscribeUploadState((id, s) => {
       if (id === blockId) uploadState.value = s;
     });
-    onBeforeUnmount(() => { unsub(); });
+    onBeforeUnmount(() => {
+      unsub();
+    });
 
     // Natural-size measurement for resize UX
     const naturalSize = ref<{ w: number; h: number } | null>(null);
@@ -129,7 +134,6 @@ const ImageBlock = defineComponent({
     let resizeStartW = 0;
     let resizeStartH = 0;
     let resizeStartMouseX = 0;
-    let resizeStartMouseY = 0;
     let resizeRatio = 1;
 
     function onImgLoad(): void {
@@ -157,7 +161,6 @@ const ImageBlock = defineComponent({
       resizeStartW = (attrs.width as number) || naturalSize.value?.w || 200;
       resizeStartH = (attrs.height as number) || naturalSize.value?.h || 150;
       resizeStartMouseX = e.clientX;
-      resizeStartMouseY = e.clientY;
       resizeRatio = resizeStartW / Math.max(1, resizeStartH);
       isResizing.value = true;
       document.addEventListener('mousemove', onResizeMove, true);
@@ -165,16 +168,28 @@ const ImageBlock = defineComponent({
       document.addEventListener('selectstart', onResizeSelectStart, true);
     }
 
+    const MAX_IMAGE_HEIGHT = 600;
+
     function onResizeMove(e: MouseEvent): void {
       if (!isResizing.value) return;
       const dx = e.clientX - resizeStartMouseX;
-      const dy = e.clientY - resizeStartMouseY;
-      // Use the larger of the two deltas, preserve aspect ratio by default.
-      // Holding Shift allows free resize; for simplicity we always lock ratio
-      // using the X axis as primary.
+      // Use the X axis as primary, preserve aspect ratio.
       let newW = Math.max(40, Math.round(resizeStartW + dx));
       let newH = Math.max(40, Math.round(newW / resizeRatio));
-      void dy;
+      // Enforce max height constraint.
+      if (newH > MAX_IMAGE_HEIGHT) {
+        newH = MAX_IMAGE_HEIGHT;
+        newW = Math.max(40, Math.round(newH * resizeRatio));
+      }
+      // Enforce max width based on container width.
+      const container = imgEl.value?.closest('.block-image-container') as HTMLElement | null;
+      if (container) {
+        const maxContainerW = container.clientWidth - 8; // minus padding
+        if (newW > maxContainerW) {
+          newW = Math.max(40, maxContainerW);
+          newH = Math.max(40, Math.round(newW / resizeRatio));
+        }
+      }
       editor.commands.setAttrs?.({
         id: blockId,
         attrs: {
@@ -236,7 +251,9 @@ const ImageBlock = defineComponent({
         onSuccess: (result) => {
           const prev = getUploadState(blockId);
           if (prev?.tempPreviewUrl && prev.tempPreviewUrl !== result.url) {
-            try { URL.revokeObjectURL(prev.tempPreviewUrl); } catch { /* ignore */ }
+            try {
+              URL.revokeObjectURL(prev.tempPreviewUrl);
+            } catch { /* ignore */ }
           }
           const baseAttrs = { ...props.block.attrs, src: result.url } as unknown as ImageAttrs;
           const mergedAttrs: ImageAttrs = {
@@ -289,11 +306,10 @@ const ImageBlock = defineComponent({
       const src = effectiveSrc();
       const us = uploadState.value;
       const imageW = attrs.width as number;
-      const imageH = attrs.height as number;
 
       const wrapperStyle: Record<string, string> = {};
-      if (imageW && imageW > 0) wrapperStyle.width = `${imageW}px`;
-
+      const hasError = us?.status === 'error';
+      if (imageW && imageW > 0 && !hasError) wrapperStyle.width = `{imageW}px`;
       const children: any[] = [];
 
       // Toolbar overlay (shown always on hover; forced-visible when the
@@ -311,12 +327,18 @@ const ImageBlock = defineComponent({
           h('button', {
             class: 'image-block-btn',
             title: i18n.t('image.replace'),
-            onClick: (e: MouseEvent) => { e.stopPropagation(); openFilePicker(); },
+            onClick: (e: MouseEvent) => {
+              e.stopPropagation();
+              openFilePicker();
+            },
           }, [h(SafeHtml, { html: ICON_REPLACE })]),
           h('button', {
             class: 'image-block-btn',
             title: i18n.t('image.remove'),
-            onClick: (e: MouseEvent) => { e.stopPropagation(); onRemoveClick(); },
+            onClick: (e: MouseEvent) => {
+              e.stopPropagation();
+              onRemoveClick();
+            },
           }, [h(SafeHtml, { html: ICON_CLOSE })]),
         ]),
       );
@@ -348,7 +370,10 @@ const ImageBlock = defineComponent({
             h('div', { class: 'image-block-error-msg' }, us.error ?? ''),
             h('button', {
               class: 'image-block-retry-btn',
-              onClick: (e: MouseEvent) => { e.stopPropagation(); onRetryClick(); },
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                onRetryClick();
+              },
             }, [
               h(SafeHtml, { html: ICON_RETRY }),
               ' ',
@@ -363,7 +388,10 @@ const ImageBlock = defineComponent({
         children.push(
           h('div', {
             class: 'image-block-empty',
-            onClick: (e: MouseEvent) => { e.stopPropagation(); openFilePicker(); },
+            onClick: (e: MouseEvent) => {
+              e.stopPropagation();
+              openFilePicker();
+            },
           }, [
             h(SafeHtml, { html: ICON_UPLOAD, class: 'image-block-empty-icon' }),
             h('div', { class: 'image-block-empty-title' }, i18n.t('image.emptyTitle')),
@@ -372,12 +400,11 @@ const ImageBlock = defineComponent({
         );
       }
 
-      // --- Actual image element (rendered only when there's a src) ---
-      if (src) {
+      // --- Actual image element (rendered only when there's a src and NOT in error state) ---
+      if (src && us?.status !== 'error') {
         const imgStyle: Record<string, string> = {};
         if (imageW && imageW > 0) imgStyle.width = `${imageW}px`;
-        if (imageH && imageH > 0 && !isResizing.value) imgStyle.height = `${imageH}px`;
-        children.push(
+        const imageArea: any[] = [
           h('img', {
             ref: imgEl,
             class: 'image-block-img',
@@ -398,10 +425,10 @@ const ImageBlock = defineComponent({
               }
             },
           }),
-        );
+        ];
         // Resize handle — only when natural size is known.
         if (naturalSize.value) {
-          children.push(
+          imageArea.push(
             h('div', {
               class: 'image-block-resize-handle',
               onMousedown: onResizeStart,
@@ -409,15 +436,18 @@ const ImageBlock = defineComponent({
             }),
           );
         }
+        children.push(
+          h('div', { class: 'image-block-main' }, imageArea),
+        );
       }
 
       // --- Caption (attr, persisted) ---
       // Always render the caption so users can click the placeholder to add
-      // text. The contenteditable div owns its own focus; click events must
-      // NOT propagate to the wrapper (which would call selectBlock and steal
-      // focus away from the editable caption).
+      // text, but hide it when the upload has failed — there is no image to
+      // caption yet and the error card already fills the block area.
       const caption = (attrs.caption as string) || '';
-      if (caption || src) {
+      const isError = us?.status === 'error';
+      if (!isError && (caption || src)) {
         children.push(
           h('div', {
             class: 'image-block-caption',
@@ -439,14 +469,30 @@ const ImageBlock = defineComponent({
         );
       }
 
+      const wrapperClasses = ['block-image-wrapper'];
+      if (us?.status === 'error') {
+        wrapperClasses.push('image-block-wrapper-error');
+      }
+      if (us?.status === 'pending' && !src && !us.tempPreviewUrl) {
+        wrapperClasses.push('image-block-wrapper-loading');
+      }
+
       return h(
         'div',
         {
-          class: 'block-image-wrapper',
-          style: wrapperStyle,
-          onClick: onBlockClick,
+          class: ['block-image-container', ...classesFromAttrs(attrs)],
         },
-        children,
+        [
+          h(
+            'div',
+            {
+              class: wrapperClasses,
+              style: wrapperStyle,
+              onClick: onBlockClick,
+            },
+            children,
+          ),
+        ],
       );
     };
   },

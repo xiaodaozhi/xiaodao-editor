@@ -132,7 +132,9 @@ export function setUploadState(blockId: BlockId, state: UploadState | null): voi
       // Abort any in-flight upload when the state is cleared (block removed,
       // upload succeeded, editor unmounted, etc.).
       if (prev?.controller) {
-        try { prev.controller.abort(); } catch { /* ignore */ }
+        try {
+          prev.controller.abort();
+        } catch { /* ignore */ }
       }
       uploadStates.delete(blockId);
       notify(blockId, null);
@@ -145,7 +147,9 @@ export function setUploadState(blockId: BlockId, state: UploadState | null): voi
 
 export function subscribeUploadState(fn: StateChangeListener): () => void {
   listeners.add(fn);
-  return () => { listeners.delete(fn); };
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 /** Alias for subscribeUploadState (used by BlockEditor). */
@@ -157,7 +161,9 @@ export function resetAllUploadStates(): void {
   for (const [, s] of uploadStates) {
     if (s?.tempPreviewUrl) URL.revokeObjectURL(s.tempPreviewUrl);
     if (s?.controller) {
-      try { s.controller.abort(); } catch { /* ignore */ }
+      try {
+        s.controller.abort();
+      } catch { /* ignore */ }
     }
   }
   uploadStates.clear();
@@ -176,7 +182,9 @@ export const clearAllUploadStates = resetAllUploadStates;
 const tempUrls = new Set<string>();
 export function revokeAllTempUrls(): void {
   for (const url of tempUrls) {
-    try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    try {
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
   }
   tempUrls.clear();
 }
@@ -378,7 +386,9 @@ export function beginUpload(
         onSuccess: (result) => {
           const prev = getUploadState(blockId);
           if (prev?.tempPreviewUrl && prev.tempPreviewUrl !== result.url) {
-            try { URL.revokeObjectURL(prev.tempPreviewUrl); } catch { /* ignore */ }
+            try {
+              URL.revokeObjectURL(prev.tempPreviewUrl);
+            } catch { /* ignore */ }
             tempUrls.delete(prev.tempPreviewUrl);
           }
           setUploadState(blockId, null);

@@ -44,9 +44,21 @@ export function sanitizeUrl(raw: string): string | null {
   if (schemeMatch) {
     const scheme = schemeMatch[1]!.toLowerCase() + ':';
     if (!SAFE_SCHEMES.includes(scheme)) return null;
+    return url;
   }
 
-  return url;
+  // No explicit scheme. Allow only genuinely relative references:
+  //  • server-root path  (starts with '/')
+  //  • current-dir path (starts with '.')
+  //  • in-page anchor    (starts with '#')
+  //  // protocol-relative URL (starts with '//')
+  // Everything else must look like a real domain (via looksLikeUrl),
+  // otherwise plain words like 'dddd' would slip through as hrefs.
+  const first = url[0];
+  if (first === '/' || first === '.' || first === '#') return url;
+  if (url.startsWith('//')) return url;
+  if (looksLikeUrl(url)) return url;
+  return null;
 }
 
 /**

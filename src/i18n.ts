@@ -66,6 +66,7 @@ const zhCN: Dict = {
   // BlockSettingsMenu: collapsible section titles
   'bsm.section.turnInto': '转换为',
   'bsm.section.alignIndent': '对齐与缩进',
+  'bsm.section.align': '对齐',
   'bsm.section.action': '操作',
   'bsm.section.textColor': '文字颜色',
   'bsm.section.bgColor': '背景颜色',
@@ -142,6 +143,7 @@ const zhCN: Dict = {
   'link.urlPlaceholder': '输入链接地址…',
   'link.textPlaceholder': '链接文本…',
   'link.emptyUrl': '(空链接)',
+  'link.invalidUrl': '请输入有效的链接地址',
   'hoverToolbar.linkBtnTitle': '链接',
 
   // Color preset names (text color + background color)
@@ -197,6 +199,7 @@ const enUS: Dict = {
   // BlockSettingsMenu
   'bsm.section.turnInto': 'Turn into',
   'bsm.section.alignIndent': 'Align & Indent',
+  'bsm.section.align': 'Align',
   'bsm.section.action': 'Actions',
   'bsm.section.textColor': 'Text color',
   'bsm.section.bgColor': 'Background color',
@@ -272,6 +275,7 @@ const enUS: Dict = {
   'link.urlPlaceholder': 'Enter URL...',
   'link.textPlaceholder': 'Link text...',
   'link.emptyUrl': '(empty link)',
+  'link.invalidUrl': 'Please enter a valid URL',
   'hoverToolbar.linkBtnTitle': 'Link',
 
   // Color preset names

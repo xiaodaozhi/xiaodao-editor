@@ -35,6 +35,7 @@
       @hover-change="onHoverChange"
       @grip-pointer-down="onGripPointerDown"
       @grip-pointer-up="onGripPointerUp"
+      @link-click="onLinkClick"
     />
   </div>
 </template>
@@ -67,6 +68,7 @@ const emit = defineEmits<{
   hoverChange: [blockId: BlockId | null];
   gripPointerDown: [blockId: BlockId, startX: number, startY: number, options: { thresholdPx: number }];
   gripPointerUp: [blockId: BlockId];
+  linkClick: [blockId: BlockId, offset: number];
 }>();
 
 const hostRefs = new Map<BlockId, InstanceType<typeof BlockHost>>();
@@ -115,6 +117,10 @@ function onGripPointerDown(blockId: BlockId, startX: number, startY: number, opt
 
 function onGripPointerUp(blockId: BlockId): void {
   emit('gripPointerUp', blockId);
+}
+
+function onLinkClick(blockId: BlockId, offset: number): void {
+  emit('linkClick', blockId, offset);
 }
 
 defineExpose({ setBlockHandleDragging });

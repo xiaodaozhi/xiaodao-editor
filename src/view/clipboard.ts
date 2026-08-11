@@ -34,9 +34,16 @@ const SKIP_TAGS = new Set(['meta', 'style', 'script', 'head', 'title', 'link', '
 function extractImageAttrs(img: HTMLImageElement): { src: string; alt: string; title: string } | null {
   const rawSrc = (img.getAttribute('src') ?? '').trim();
   if (!rawSrc) return null;
-  // Skip extremely long data URIs that are clearly not images (e.g. SVG
-  // embedded as data: — those are rare in clipboard but would be huge).
-  // Normal image data URIs are fine.
+  // Skip "cid:" Content-ID URIs used by Word/Outlook — these reference an
+  // embedded MIME part that the browser cannot resolve and would produce a
+  // permanent dead image block.
+  if (/^cid:/i.test(rawSrc)) return null;
+  // Skip obviously dangerous pseudo-protocols (browsers generally don't load
+  // these in <img> anyway, but defensive filtering is cheap).
+  if (/^(javascript|vbscript|data:text\/)/i.test(rawSrc)) return null;
+  // Skip extremely long data URIs (> 10 MB) — these are rare in clipboard,
+  // would balloon the document size, and are typically not real images.
+  if (rawSrc.length > 10_000_000) return null;
   return {
     src: rawSrc,
     alt: (img.getAttribute('alt') ?? '').trim(),
@@ -54,6 +61,10 @@ function isTrueBlock(tag: string): boolean {
  */
 export function parseClipboard(html: string | null, plainText: string | null): ParsedBlock[] {
   if (html) {
+    const blocks = parseCustomPayload(html);
+    if (blocks.length > 0) return blocks;
+  }
+  if (html) {
     const blocks = parseHtml(html);
     if (blocks.length > 0) return blocks;
   }
@@ -61,6 +72,47 @@ export function parseClipboard(html: string | null, plainText: string | null): P
     return parsePlainText(plainText);
   }
   return [];
+}
+
+/**
+ * Detect and parse the custom "blockeditor:" HTML comment payload that
+ * BlockSettingsMenu.copyBlock writes. Format:
+ *   <!-- blockeditor:{JSON} -->
+ * where JSON = { id, type, attrs, text }.
+ * Returns parsed blocks or empty array if no custom payload is found.
+ */
+function parseCustomPayload(html: string): ParsedBlock[] {
+  const match = html.match(/<!--\s*blockeditor:(.+?)\s*-->/);
+  if (!match) return [];
+  try {
+    const payload = JSON.parse(match[1]!);
+    const type = payload.type as BlockType;
+    const attrs = payload.attrs as Attrs | undefined;
+    const text = payload.text as string | undefined;
+    if (!type) return [];
+
+    // For blocks that support text content, use the stored text.
+    // For non-text blocks (like image), create a block with empty content.
+    const textBlocks: ParsedBlock[] = [];
+    if (text && text.length > 0) {
+      textBlocks.push({
+        type,
+        attrs: attrs ?? {},
+        content: inlineFromString(text),
+      });
+    } else {
+      // Block has no text content (e.g. image). Return it as a block
+      // with no content — the paste handler will treat it specially.
+      textBlocks.push({
+        type,
+        attrs: attrs ?? {},
+        content: [],
+      });
+    }
+    return textBlocks;
+  } catch {
+    return [];
+  }
 }
 
 function inlineTextLen(seq: InlineSeq): number {
@@ -348,7 +400,8 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       const hasTrueBlockChildren = Array.from(elem.children).some(
         (c) => isTrueBlock((c as HTMLElement).tagName.toLowerCase()),
       );
-      if (hasTrueBlockChildren) {
+      const hasImageDescendant = !!elem.querySelector('img');
+      if (hasTrueBlockChildren || hasImageDescendant) {
         processChildren(elem.childNodes, doc, blocks);
       } else if (elem.querySelector('br')) {
         splitInlineByBr(elem, doc, blocks);
@@ -364,7 +417,8 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       const hasTrueBlockChildren = Array.from(elem.children).some(
         (c) => isTrueBlock((c as HTMLElement).tagName.toLowerCase()),
       );
-      if (hasTrueBlockChildren) {
+      const hasImageDescendant = !!elem.querySelector('img');
+      if (hasTrueBlockChildren || hasImageDescendant) {
         flushInline();
         processChildren(elem.childNodes, doc, blocks);
         consecutiveBr = 0;
@@ -391,7 +445,16 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       continue;
     }
 
-    // All other inline elements (b, i, u, s, code, span.*, a, etc.)
+    // All other inline elements (b, i, u, s, code, a, etc.)
+    // If any descendant is an <img>, recurse via processChildren so the img
+    // branch above fires and produces a real image block — otherwise the img
+    // would disappear inside inlineFromDom() during flushInline.
+    if ((elem as HTMLElement).querySelector?.('img')) {
+      flushInline();
+      processChildren(elem.childNodes, doc, blocks);
+      consecutiveBr = 0;
+      continue;
+    }
     inlineBuffer.push(child);
     consecutiveBr = 0;
   }
