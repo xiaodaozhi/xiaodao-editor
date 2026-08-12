@@ -77,9 +77,9 @@ export const TodoListExtension: Extension = {
   slashCommands: [
     {
       id: 'todo-list',
-      title: '待办列表',
+      title: 'slash.todoList.title',
       keywords: ['todo', 'task', 'checkbox', '待办', '任务', '复选框', '[]', '[ ]'],
-      description: '用复选框追踪待办任务。',
+      description: 'slash.todoList.description',
       icon: ICON_TODO,
       command: 'convertBlock',
       category: 'list',

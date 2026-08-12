@@ -5,11 +5,25 @@ zero-runtime-dependency package: a framework-agnostic core plus a Vue view
 layer. Every block type (paragraph, heading, list, code, …) is contributed
 by an **extension**, so the core never switches on a block type.
 
+![Preview](./img/preview-1.png)
+
 ## Features
 
-- **8 built-in block types** — paragraph, h1–h6 (heading), bullet list,
-  ordered list, to-do, quote, code block, **image** (10 extensions total
-  including Keymap and History behavior extensions)
+- **10 built-in block types** — paragraph, h1–h6 (heading), bullet list,
+  ordered list, to-do, quote, code block, **image**, **divider**,
+  **table** (12 extensions total including Keymap and History behavior
+  extensions)
+- **Table block** — `attrs`-based N×M grid; default 120 px column widths,
+  new tables default to header row; row/column selection strips,
+  corner-handle to select the whole table; insert dots between rows/cols;
+  floating action bar with merge/split cells, **toggle header row** (sets
+  `attrs.headerRow`), and delete row/col/table; each cell uses its own
+  `contenteditable` with paragraph/heading/codeBlock cell types, rich
+  inline marks, cell background color, and alignment; Tab navigates
+  between cells, Enter exits edit (code-block cells: Enter inserts a
+  newline), Escape blurs; internal horizontal scrollbar à la Arco Design;
+  full-rect merge-cell selection expansion so you can never select half
+  of a merged cell.
 - **Inline marks** — bold, italic, underline, strikethrough, inline code,
   **link** (`Mod-K`, URL pasting, auto-link, popover with view/edit/copy/remove,
   href sanitization to block `javascript:` / XSS), per-selection text color
@@ -52,7 +66,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 </template>
 ```
 
-The editor ships with all 10 built-in extensions by default — no need to pass
+The editor ships with all 12 built-in extensions by default — no need to pass
 `extensions` unless you want a custom set.
 
 ## Props
@@ -106,7 +120,7 @@ Set it explicitly if needed:
 
 ## Built-in extensions
 
-`BuiltinExtensions` bundles these **10 extensions** (8 block types + 2 behavior extensions):
+`BuiltinExtensions` bundles these **12 extensions** (10 block types + 2 behavior extensions):
 
 | Extension             | Block type      | Notes                                                            |
 | --------------------- | --------------- | ---------------------------------------------------------------- |
@@ -118,6 +132,8 @@ Set it explicitly if needed:
 | `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
 | `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating — Enter inserts a newline.           |
 | `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `uploadImage` prop + `cleanup:image-file`. |
+| `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |
+| `DividerExtension`    | `divider`       | Isolating horizontal rule.                                       |
 | `KeymapExtension`     | —               | Enter / Backspace / ArrowUp / ArrowDown bindings.                |
 | `HistoryExtension`    | —               | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` undo/redo keymap.              |
 
@@ -169,6 +185,20 @@ const doc: DocumentData = {
     { type: 'image', attrs: {
         src: 'https://cdn.example.com/hero.png', alt: 'Hero',
         width: 1200, height: 630, caption: 'Fig. 1 — Architecture overview', fileId: 42,
+      }, content: [] },
+    { type: 'divider' },
+    { type: 'table', attrs: {
+        rows: 2, cols: 3,
+        headerRow: true,
+        colWidths: [120, 120, 120],
+        cells: [
+          [{ content: [{ type: 'text', text: 'A' }], rowspan: 1, colspan: 1, covered: false },
+           { content: [{ type: 'text', text: 'B' }], rowspan: 1, colspan: 1, covered: false },
+           { content: [{ type: 'text', text: 'C' }], rowspan: 1, colspan: 1, covered: false }],
+          [{ content: [{ type: 'text', text: '1' }], rowspan: 1, colspan: 1, covered: false },
+           { content: [{ type: 'text', text: '2' }], rowspan: 1, colspan: 1, covered: false },
+           { content: [{ type: 'text', text: '3' }], rowspan: 1, colspan: 1, covered: false }],
+        ],
       }, content: [] },
   ],
 }
@@ -231,9 +261,13 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
   `BlockHost`, `BlockContent` (per-block `contenteditable`), and the UI
   components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
   `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`).
-- **`src/extensions/`** — the 10 built-in extensions plus `_commonAttrs.ts`
+- **`src/extensions/`** — the 12 built-in extensions plus `_commonAttrs.ts`
   (shared align/color/bgColor/indent specs and color presets, plus
-  `ImageExtension`'s upload-side-channel renderer logic).
+  `ImageExtension`'s upload-side-channel renderer logic). **Table** lives in
+  `Table.ts` (Vue renderer + command registrations) and `tableModel.ts` (pure
+  structural helpers: insert/remove row/col, merge/split cells, full-rect
+  selection expansion, header row toggle, column width helpers, HTML/Markdown
+  serialization, attrs validation/coercion). **Divider** lives in `Divider.ts`.
 - **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
   provide/inject so popovers rendered through `<Teleport>` stay reactive.
 

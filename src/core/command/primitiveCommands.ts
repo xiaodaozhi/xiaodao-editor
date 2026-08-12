@@ -460,25 +460,14 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
       }
 
       // Caret at offset 0 on a list item: Backspace exits the list rather
-      // than merging text into the previous block.
-      //   • Non-empty item → convert to paragraph (un-list), keep text.
-      //   • Empty item with a previous sibling → delete it and move caret to
-      //     the end of the previous block (standard "remove empty bullet").
-      //   • Empty item with no previous sibling → convert to paragraph.
+      // than merging text into the previous block. Convert the item to a
+      // paragraph — empty or not — matching the other non-paragraph text
+      // blocks (heading/quote/codeBlock), which convert back to a paragraph
+      // when empty. Keeping the item as an empty paragraph (instead of
+      // deleting it) gives a progressive exit: Backspace once → paragraph,
+      // Backspace again → merge into the previous block.
       if (ctx.registries.schema.isListLike(block.type)) {
-        if (!ctx.registries.schema.isEmpty(block)) {
-          return convertBlockCommand(ctx).run({ id: block.id, type: ctx.registries.defaultBlockType })(state, dispatch);
-        }
-        const listPrev = blockBefore(state.doc, block.id);
-        if (!listPrev) {
-          return convertBlockCommand(ctx).run({ id: block.id, type: ctx.registries.defaultBlockType })(state, dispatch);
-        }
-        const prevText = inlineText(listPrev.content);
-        const builder = createTransaction();
-        builder.removeBlock(block.id);
-        builder.setSelection(caretSelection(listPrev.id, prevText.length));
-        dispatch?.(builder.build());
-        return true;
+        return convertBlockCommand(ctx).run({ id: block.id, type: ctx.registries.defaultBlockType })(state, dispatch);
       }
 
       // Caret at offset 0 in an empty non-paragraph block: convert to

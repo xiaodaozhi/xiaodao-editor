@@ -27,6 +27,9 @@ export { KeymapExtension } from './extensions/Keymap';
 export { HistoryExtension } from './extensions/History';
 export { ImageExtension } from './extensions/Image';
 export type { ImageAttrs } from './extensions/Image';
+export { TableExtension } from './extensions/Table';
+export type { TableAttrs, TableCellData } from './extensions/tableModel';
+export { DividerExtension } from './extensions/Divider';
 export type { ImageUploadResult, UploadImageHandler } from './view/imageUpload';
 
 // I18n + theme (re-exported so consumers can type props safely)

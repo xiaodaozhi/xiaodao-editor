@@ -43,9 +43,9 @@ export const QuoteExtension: Extension = {
   slashCommands: [
     {
       id: 'quote',
-      title: '引用',
+      title: 'slash.quote.title',
       keywords: ['quote', 'blockquote', '引用', '>', '引言'],
-      description: '引用一段话。',
+      description: 'slash.quote.description',
       icon: ICON_QUOTE,
       command: 'convertBlock',
       category: 'other',

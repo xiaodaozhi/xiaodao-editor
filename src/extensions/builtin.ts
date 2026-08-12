@@ -19,6 +19,8 @@ import { TodoListExtension } from './TodoList';
 import { QuoteExtension } from './Quote';
 import { CodeBlockExtension } from './CodeBlock';
 import { ImageExtension } from './Image';
+import { TableExtension } from './Table';
+import { DividerExtension } from './Divider';
 
 export const BuiltinExtensions: readonly Extension[] = [
   ParagraphExtension,
@@ -29,6 +31,8 @@ export const BuiltinExtensions: readonly Extension[] = [
   QuoteExtension,
   CodeBlockExtension,
   ImageExtension,
+  TableExtension,
+  DividerExtension,
   KeymapExtension,
   HistoryExtension,
 ];
@@ -43,3 +47,5 @@ export { TodoListExtension } from './TodoList';
 export { QuoteExtension } from './Quote';
 export { CodeBlockExtension } from './CodeBlock';
 export { ImageExtension } from './Image';
+export { TableExtension, createTableCommands } from './Table';
+export { DividerExtension } from './Divider';

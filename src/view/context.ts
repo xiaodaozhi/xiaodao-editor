@@ -15,12 +15,21 @@
  *   from `.vue` files impossible.
  */
 
-import type { InjectionKey } from 'vue';
-import { inject } from 'vue';
+import type { InjectionKey, Ref } from 'vue';
+import { inject, ref } from 'vue';
 import type { Editor } from '../core/Editor';
 import type { Block, BlockId } from '../core/types';
 
 export const editorKey: InjectionKey<Editor> = Symbol('block-editor');
+
+/**
+ * Injection key for the reactive `editable` flag. Provided by BlockEditor
+ * so child components (BlockContent, TableBlock, …) can reactively bind
+ * `contenteditable` and gate editing actions. Unlike `editorKey` (which is
+ * non-reactive), this is a Vue `Ref<boolean>` so changes propagate
+ * immediately through the component tree.
+ */
+export const editableKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-editable');
 
 /**
  * Injection key for image upload helper function. Provided by BlockEditor
@@ -72,4 +81,15 @@ export function useEditor(): Editor {
  */
 export function useBeginImageUpload(): BeginImageUploadFn | null {
   return inject(imageUploadKey, null);
+}
+
+/**
+ * Access the reactive `editable` flag. Returns a ref that is `true` when
+ * the editor is in editing mode, `false` when read-only. Must be called
+ * within a component tree that contains a `<BlockEditor>`.
+ */
+export function useEditable(): Ref<boolean> {
+  const editable = inject(editableKey);
+  // Fallback: if somehow used outside a BlockEditor, default to editable.
+  return editable ?? ref(true);
 }

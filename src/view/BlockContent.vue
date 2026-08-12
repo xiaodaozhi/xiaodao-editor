@@ -31,7 +31,7 @@
     :data-block-id="block.id"
     :data-empty="isEmpty"
     :data-placeholder="placeholder"
-    contenteditable="true"
+    :contenteditable="editable"
     spellcheck="false"
     @input="onInput"
     @compositionstart="onCompositionStart"
@@ -51,7 +51,7 @@ import { ref, watch, onMounted, shallowRef } from 'vue';
 import type { Block, BlockId, InlineSeq } from '../core/types';
 import { inlineText, splitInline } from '../core/types';
 import { caretSelection } from '../core/selection/Selection';
-import { useEditor, useBeginImageUpload } from './context';
+import { useEditor, useBeginImageUpload, useEditable } from './context';
 import { runInputRules, isSlashTrigger } from './ui/inputRulesEngine';
 import {
   inlineToHtml,
@@ -85,6 +85,7 @@ const emit = defineEmits<{
 }>();
 
 const editor = useEditor();
+const editable = useEditable();
 const el = ref<HTMLElement | null>(null);
 
 // IME composition state. Must not sync to state during composition — the
@@ -288,6 +289,8 @@ function onKeyDownCapture(_event: KeyboardEvent): void {
 }
 
 function onInput(event: InputEvent): void {
+  // Read-only: ignore any stray input events (e.g. during prop transition).
+  if (!editable.value) return;
   const node = el.value;
   if (!node) return;
   // Extract InlineSeq (text + marks) from the live DOM. This preserves
@@ -416,6 +419,11 @@ function onCopy(event: ClipboardEvent): void {
  * Cut = copy clean data, then delete the selected range from the block.
  */
 function onCut(event: ClipboardEvent): void {
+  // Read-only: cutting would delete content — block it entirely.
+  if (!editable.value) {
+    event.preventDefault();
+    return;
+  }
   const offsets = readSelectionOffsets();
   if (!offsets) return;
   const [lo, hi] = offsets;
@@ -478,6 +486,12 @@ function collectImageFilesFromClipboard(data: DataTransfer): File[] {
 }
 
 async function onPaste(event: ClipboardEvent): Promise<void> {
+  // Read-only: no pasting — preventDefault also stops any default browser
+  // paste behavior on the (non-editable) element.
+  if (!editable.value) {
+    event.preventDefault();
+    return;
+  }
   const data = event.clipboardData;
   if (!data) return;
 
@@ -847,6 +861,12 @@ function onBlur(): void {
 
 // --- Link click handling -------------------------------------------------
 
+/** First text node inside `root`, or null if the subtree has none. */
+function firstTextNodeIn(root: Node): Node | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  return walker.nextNode();
+}
+
 function onClick(event: MouseEvent): void {
   const target = event.target as HTMLElement | null;
   if (!target) return;
@@ -861,14 +881,32 @@ function onClick(event: MouseEvent): void {
   event.preventDefault();
 
   // Calculate the character offset of the click within the block.
+  //
+  // Only trust the DOM selection when it lies INSIDE the clicked <a> —
+  // only then was it produced by this very click. A stale selection from a
+  // previous edit session (common in read-only mode: clicking a link inside
+  // contenteditable=false creates no new selection) may sit anywhere in the
+  // block, so using it would produce an offset unrelated to the clicked
+  // link and findLinkAtOffset() would miss. In that case fall back to
+  // locating the link element itself: offset = text length before the
+  // link's first text node (equal to the link run's start offset, which is
+  // guaranteed to be covered by the link mark).
   const sel = window.getSelection();
   let offset = 0;
-  if (sel && sel.rangeCount > 0) {
-    const range = sel.getRangeAt(0);
-    if (el.value?.contains(range.commonAncestorContainer)) {
+  const selInAnchor = sel && sel.rangeCount > 0
+    && !!anchor.contains(sel.getRangeAt(0).commonAncestorContainer);
+  if (selInAnchor) {
+    const range = sel!.getRangeAt(0);
+    const preRange = document.createRange();
+    preRange.selectNodeContents(el.value);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    offset = preRange.toString().length;
+  } else {
+    const firstText = firstTextNodeIn(anchor);
+    if (firstText) {
       const preRange = document.createRange();
       preRange.selectNodeContents(el.value);
-      preRange.setEnd(range.startContainer, range.startOffset);
+      preRange.setEnd(firstText, 0);
       offset = preRange.toString().length;
     }
   }

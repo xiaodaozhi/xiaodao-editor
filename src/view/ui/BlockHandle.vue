@@ -109,6 +109,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import type { BlockId } from '../../core/types';
 import { useI18n } from '../../i18n';
+import { useEditable } from '../context';
 
 const props = defineProps<{
   blockId: BlockId;
@@ -126,6 +127,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const editable = useEditable();
 
 const handleEl = ref<HTMLElement | null>(null);
 const insertBtn = ref<HTMLElement | null>(null);
@@ -205,6 +207,7 @@ onMounted(measure);
 onBeforeUnmount(stopObserve);
 
 function onPlusClick(): void {
+  if (!editable.value) return;
   if (insertBtn.value) emit('openPlusMenu', insertBtn.value);
 }
 
@@ -228,6 +231,7 @@ let startTime = 0;
 let potentiallyDragging = false;
 
 function onGripMouseDown(e: MouseEvent): void {
+  if (!editable.value) return;
   startTime = Date.now();
   startX = e.clientX;
   startY = e.clientY;
@@ -248,6 +252,7 @@ function handleSetLocalDragging(active: boolean): void {
 }
 
 function onGripClick(): void {
+  if (!editable.value) return;
   if (dragging.value) return;
   if (potentiallyDragging) {
     // If parent hasn't cleared this flag, drag never started but don't

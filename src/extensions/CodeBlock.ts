@@ -12,9 +12,11 @@
  */
 
 import { defineComponent, h, ref, type PropType } from 'vue';
+import { useI18n } from '../i18n';
 import type { Extension } from '../core/extension/Extension';
 import type { Block } from '../core/types';
 import BlockContent from '../view/BlockContent.vue';
+import { useEditable } from '../view/context';
 import { ICON_CODE } from '../view/ui/icons';
 import { classesFromAttrs, CODE_BLOCK_ATTRS } from './_commonAttrs';
 
@@ -26,6 +28,8 @@ const CodeBlock = defineComponent({
   },
   setup(props) {
     const langEl = ref<HTMLElement | null>(null);
+    const i18n = useI18n();
+    const editable = useEditable();
     return () => {
       const lang = (props.block.attrs.language as string) ?? 'plain';
       const langLabel = h(
@@ -39,6 +43,8 @@ const CodeBlock = defineComponent({
           },
           onClick: (e: MouseEvent) => {
             e.stopPropagation();
+            // Read-only: clicking the language label must not open the picker.
+            if (!editable.value) return;
             const ev = new CustomEvent('code-lang-click', {
               bubbles: true,
               detail: { blockId: props.block.id, anchor: langEl.value },
@@ -48,7 +54,12 @@ const CodeBlock = defineComponent({
         },
         lang.toUpperCase(),
       );
+      // Static "code block" label pinned to the top-left corner, sharing the
+      // typography of the language label (top-right). Purely decorative —
+      // clicks pass through to the editable area (pointer-events: none).
+      const titleLabel = h('div', { class: 'block-code-title' }, i18n.t('codeBlock.title'));
       return h('div', { class: 'block-code-wrapper', 'data-lang': lang }, [
+        titleLabel,
         langLabel,
         h(BlockContent, {
           block: props.block,
@@ -80,9 +91,9 @@ export const CodeBlockExtension: Extension = {
   slashCommands: [
     {
       id: 'code-block',
-      title: '代码块',
+      title: 'slash.codeBlock.title',
       keywords: ['code', 'fence', 'pre', '代码', '代码块', '```', 'codeblock'],
-      description: '插入一段代码块。',
+      description: 'slash.codeBlock.description',
       icon: ICON_CODE,
       command: 'convertBlock',
       category: 'other',

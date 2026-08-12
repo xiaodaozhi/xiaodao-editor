@@ -9,6 +9,7 @@
 import type { Attrs, BlockType, InlineSeq } from '../core/types';
 import { inlineFromString } from '../core/types';
 import { inlineFromDom } from './inlineDom';
+import { parseHtmlTable } from '../extensions/tableModel';
 
 export interface ParsedBlock {
   readonly type: BlockType;
@@ -19,7 +20,12 @@ export interface ParsedBlock {
 const TRUE_BLOCK_TAGS = new Set([
   'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'li', 'pre', 'blockquote', 'hr', 'tr', 'table-row',
+  'table',
 ]);
+
+/** Markdown thematic-break lines that map to divider blocks when seen in
+ *  plain-text pastes. Matches the same set as Divider.ts's input rule. */
+const DIVIDER_MD_PATTERN = /^(?:-{3,}|\*{3,}|_{3,})\s*$/;
 
 const HEADING_LEVELS: Record<string, number> = {
   h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6,
@@ -165,7 +171,9 @@ function trimInlineSeqEdges(seq: InlineSeq): InlineSeq {
 function trimBlockEdges(blocks: ParsedBlock[]): void {
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]!;
-    if (b.type === 'codeBlock' || b.type === 'image') continue;
+    // Non-text blocks (code / image / table / divider) carry structural meaning
+    // in their attrs rather than in their inline content — never trim them.
+    if (b.type === 'codeBlock' || b.type === 'image' || b.type === 'table' || b.type === 'divider') continue;
     blocks[i] = { ...b, content: trimInlineSeqEdges(b.content) };
   }
 }
@@ -174,11 +182,19 @@ function parsePlainText(text: string): ParsedBlock[] {
   const lines = text.split(/\r?\n/);
   const blocks: ParsedBlock[] = [];
   for (const line of lines) {
-    blocks.push({
-      type: 'paragraph' as BlockType,
-      attrs: {},
-      content: inlineFromString(line),
-    });
+    if (DIVIDER_MD_PATTERN.test(line)) {
+      blocks.push({
+        type: 'divider' as BlockType,
+        attrs: {},
+        content: [],
+      });
+    } else {
+      blocks.push({
+        type: 'paragraph' as BlockType,
+        attrs: {},
+        content: inlineFromString(line),
+      });
+    }
   }
   trimBlockEdges(blocks);
   compactEmptyBlocks(blocks);
@@ -194,11 +210,13 @@ function parsePlainText(text: string): ParsedBlock[] {
  */
 function compactEmptyBlocks(blocks: ParsedBlock[]): void {
   // Step 1: collapse multiple consecutive empties into one.
-  // Image blocks are NEVER considered "empty" — they carry a src.
+  // Image / Table / Divider / Code blocks are NEVER considered "empty" — they
+  // carry structural meaning in their attrs even without inline text.
+  const STRUCTURAL_TYPES = new Set(['image', 'table', 'divider', 'codeBlock']);
   const collapsed: ParsedBlock[] = [];
   let prevEmpty = false;
   for (const b of blocks) {
-    const empty = b.type !== 'image' && inlineTextLen(b.content) === 0;
+    const empty = !STRUCTURAL_TYPES.has(b.type) && inlineTextLen(b.content) === 0;
     if (empty) {
       if (!prevEmpty) collapsed.push(b);
       prevEmpty = true;
@@ -208,10 +226,14 @@ function compactEmptyBlocks(blocks: ParsedBlock[]): void {
     }
   }
   // Step 2: trim leading & trailing empties, but keep at least one non-empty.
-  while (collapsed.length > 1 && collapsed[0]!.type !== 'image' && inlineTextLen(collapsed[0]!.content) === 0) {
+  while (collapsed.length > 1
+    && !STRUCTURAL_TYPES.has(collapsed[0]!.type)
+    && inlineTextLen(collapsed[0]!.content) === 0) {
     collapsed.shift();
   }
-  while (collapsed.length > 1 && collapsed[collapsed.length - 1]!.type !== 'image' && inlineTextLen(collapsed[collapsed.length - 1]!.content) === 0) {
+  while (collapsed.length > 1
+    && !STRUCTURAL_TYPES.has(collapsed[collapsed.length - 1]!.type)
+    && inlineTextLen(collapsed[collapsed.length - 1]!.content) === 0) {
     collapsed.pop();
   }
   // Step 3: write back in-place.
@@ -361,6 +383,19 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       continue;
     }
 
+    if (tag === 'hr') {
+      // HTML <hr> → divider block. Flush any pending inline first so the
+      // divider always sits on its own structural boundary.
+      flushInline();
+      blocks.push({
+        type: 'divider' as BlockType,
+        attrs: {},
+        content: [],
+      });
+      consecutiveBr = 0;
+      continue;
+    }
+
     if (tag in HEADING_LEVELS) {
       flushInline();
       blocks.push({
@@ -438,6 +473,21 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
         blocks.push({
           type: 'image' as BlockType,
           attrs: { src: imgAttrs.src, alt: imgAttrs.alt, title: imgAttrs.title },
+          content: [],
+        });
+        consecutiveBr = 0;
+      }
+      continue;
+    }
+
+    // <table> — parse entire table into a single table block.
+    if (tag === 'table') {
+      const tattrs = parseHtmlTable(elem as HTMLTableElement);
+      if (tattrs) {
+        flushInline();
+        blocks.push({
+          type: 'table' as BlockType,
+          attrs: tattrs as unknown as Attrs,
           content: [],
         });
         consecutiveBr = 0;

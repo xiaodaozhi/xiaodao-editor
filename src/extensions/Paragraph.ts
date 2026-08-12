@@ -46,9 +46,9 @@ export const ParagraphExtension: Extension = {
   slashCommands: [
     {
       id: 'paragraph',
-      title: '正文',
+      title: 'slash.paragraph.title',
       keywords: ['text', 'paragraph', 'normal', '正文', '段落'],
-      description: '普通文本段落。',
+      description: 'slash.paragraph.description',
       icon: ICON_PARAGRAPH,
       command: 'convertBlock',
       category: 'basic',

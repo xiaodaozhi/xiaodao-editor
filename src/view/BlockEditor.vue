@@ -158,6 +158,7 @@
       :text="linkPopover.text"
       :initial-mode="linkPopover.initialMode"
       :show-text-input="linkPopover.showTextInput"
+      :readonly="!editableRef"
       @close="closeLinkPopover"
     />
   </div>
@@ -171,7 +172,7 @@ import { inlineText, inlineFromString, splitInline } from '../core/types';
 import { Editor } from '../core/Editor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
-import { editorKey, imageUploadKey } from './context';
+import { editorKey, imageUploadKey, editableKey } from './context';
 import type { BlockRenderItem, BeginImageUploadFn } from './context';
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
@@ -234,11 +235,15 @@ const props = withDefaults(defineProps<{
   editable: true,
   theme: 'light',
   locale: 'zh-CN',
+  placeholder: '',
+
+  // optional: when omitted, the editor falls back to its built-in mock upload.
+  uploadImage: undefined,
 });
 // Placeholder has a locale-aware default, so we only use the raw value when
-// the consumer explicitly passed one.  This keeps the signature tiny: if
-// the consumer omits `placeholder` entirely we still localise it.
-const hasExplicitPlaceholder = props.placeholder !== undefined;
+// the consumer explicitly passed a non-empty one.  This keeps the signature
+// tiny: if the consumer omits `placeholder` entirely we still localise it.
+const hasExplicitPlaceholder = props.placeholder !== '';
 
 const emit = defineEmits<{
   'update:modelValue': [DocumentData];
@@ -302,7 +307,37 @@ const editor = new Editor({
   editable: props.editable,
 });
 
+// Reactive editable flag — provided to child components so they can
+// reactively bind `contenteditable` and gate editing actions. The Editor
+// instance itself is non-reactive; this ref bridges the prop → view layer.
+const editableRef = ref(props.editable);
+provide(editableKey, editableRef);
 provide(editorKey, editor);
+
+// Keep both the ref and the Editor instance in sync when the prop changes.
+watch(
+  () => props.editable,
+  (v) => {
+    editableRef.value = v;
+    editor.editable = v;
+    // Switching into read-only mode: dismiss every editing-related floating
+    // panel so no editing affordance lingers on screen.
+    if (!v) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+      hoverToolbar.blockType = null;
+      hoverToolbar.blockAttrs = {};
+      closeOlMenu();
+      closeNumberPicker();
+      closeCodeLangPicker();
+      closeLinkPopover();
+      closePlusMenu();
+      closeSettingsMenu();
+      editor.commands.clearSelection?.();
+    }
+  },
+);
 
 // --- Image upload orchestration ----------------------------------------
 //
@@ -753,7 +788,12 @@ function findLinkAtOffset(blockId: BlockId, offset: number): {
           text: run.text,
         };
       }
-      return null;
+      // No link on this run. An offset equal to runEnd is a SHARED boundary
+      // with the next run (runs are contiguous, runEnd === next runStart) —
+      // e.g. the exact start of a link run. In that case keep scanning so
+      // the next run gets a chance to match; only truly-covering offsets
+      // (offset < runEnd) terminate the search.
+      if (offset < runEnd) return null;
     }
     pos = runEnd;
   }
@@ -819,7 +859,9 @@ function openLinkPopover(blockId: BlockId, from: number, to: number): void {
   linkPopover.href = existingHref;
   linkPopover.text = existingText;
   linkPopover.anchorRect = anchorRect;
-  linkPopover.initialMode = existingHref ? 'view' : 'edit';
+  // Read-only: even a new-link selection opens in view mode (empty URL);
+  // editing a link is forbidden.
+  linkPopover.initialMode = (existingHref || !editableRef.value) ? 'view' : 'edit';
   linkPopover.showTextInput = !hasSelection && !existingHref;
   linkPopover.visible = true;
 }
@@ -828,6 +870,8 @@ function openLinkPopover(blockId: BlockId, from: number, to: number): void {
  * Handle Ctrl/Cmd+K: open link popover for the current selection or cursor.
  */
 function onLinkShortcut(): void {
+  // Read-only: the link shortcut must not open the popover in edit mode.
+  if (!editableRef.value) return;
   syncSelectionFromDom();
   const sel = editor.getState().selection;
   if (sel.kind === 'caret') {
@@ -1226,6 +1270,64 @@ function onKeyDown(event: KeyboardEvent): void {
   if (plusMenu.visible && plusMenuRef.value?.onKeyDown(event)) return;
   if (settingsMenu.visible && settingsMenuRef.value?.onKeyDown(event)) return;
 
+  // Read-only mode: block every key that would modify the document, but
+  // leave read-only-safe keys untouched (copy / select-all / navigation /
+  // scrolling / browser shortcuts). Intercepted:
+  //   • Printable characters (would type into the contenteditable)
+  //   • Enter / Backspace / Delete (structure-changing keys)
+  //   • Cut / paste / undo / redo / duplicate (Mod-x / Mod-v / Mod-z /
+  //     Mod-y / Mod-Shift-z / Mod-d)
+  if (!editableRef.value) {
+    const k = event.key;
+    const mod = event.ctrlKey || event.metaKey;
+    const isPrintable = k.length === 1 && !mod && !event.altKey && !event.isComposing;
+    const isStructureKey = k === 'Enter' || k === 'Backspace' || k === 'Delete';
+    const modKey = k.toLowerCase();
+    const isEditShortcut = mod && (
+      modKey === 'x' // cut
+      || modKey === 'v' // paste
+      || modKey === 'z' // undo (Mod-z) / redo (Mod-Shift-z)
+      || modKey === 'y' // redo (Mod-y)
+      || modKey === 'd' // duplicate block
+    );
+    if (isPrintable || isStructureKey || isEditShortcut) {
+      event.preventDefault();
+      return;
+    }
+    // Select-all: run the editor's own selectAll so the whole DOCUMENT is
+    // selected (the browser default would select the whole page instead).
+    if (mod && modKey === 'a') {
+      event.preventDefault();
+      editor.commands.selectAll?.();
+      return;
+    }
+    // Copy: a cross-block selection has an empty native selection, so the
+    // browser copy event cannot carry the text — serialize it here.
+    if (mod && modKey === 'c') {
+      const sel = editor.getState().selection;
+      if (sel.kind === 'text' && isCrossBlockText(sel)) {
+        const data = serializeCrossBlockSelection(sel);
+        if (data) {
+          event.preventDefault();
+          const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+          if (ClipboardItemCtor) {
+            const clipboardItem = new ClipboardItemCtor({
+              'text/plain': new Blob([data.text], { type: 'text/plain' }),
+              'text/html': new Blob([data.html], { type: 'text/html' }),
+            });
+            navigator.clipboard.write([clipboardItem]).catch(() => {
+              navigator.clipboard.writeText(data.text).catch(() => {});
+            });
+          } else {
+            navigator.clipboard.writeText(data.text).catch(() => {});
+          }
+        }
+      }
+      return;
+    }
+    return;
+  }
+
   // Ctrl/Cmd+K: open link editor.
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.isComposing) {
     event.preventDefault();
@@ -1240,6 +1342,12 @@ function onKeyDown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   if (target && target.classList.contains('image-block-caption')) {
     return; // let the browser handle native contenteditable editing
+  }
+  // Table cells manage their own keyboard handling (Enter exits edit mode,
+  // Tab navigates cells). Skip the editor-level keymap to avoid creating
+  // new blocks or dispatching competing commands.
+  if (target && target.closest('.table-cell-inner')) {
+    return;
   }
 
   // During cross-block text selection, the native DOM selection is empty
@@ -1528,6 +1636,8 @@ function onGripPointerDown(
   startY: number,
   options: { thresholdPx: number },
 ): void {
+  // Read-only mode: no dragging.
+  if (!editableRef.value) return;
   // Guard: if for some reason a previous drag left listeners around,
   // clear them first to avoid duplicate handlers.
   if (dragPhase !== 'idle') {
@@ -1948,6 +2058,8 @@ function closeSettingsMenu(): void {
  *     type.
  */
 function onOpenPlusMenu(sourceBlockId: BlockId, anchor: HTMLElement): void {
+  // Read-only mode: no adding blocks.
+  if (!editableRef.value) return;
   closeSettingsMenu();
   closePlusMenu();
 
@@ -1990,6 +2102,8 @@ function onOpenPlusMenu(sourceBlockId: BlockId, anchor: HTMLElement): void {
 }
 
 function onSlashTrigger(el: HTMLElement, blockId: BlockId, query: string): void {
+  // Read-only mode: no slash commands.
+  if (!editableRef.value) return;
   closeSettingsMenu();
   plusMenu.visible = true;
   plusMenu.anchorEl = el;
@@ -2129,6 +2243,15 @@ function stripSlashPrefix(text: string): string {
 // --- Hover toolbar: show on mouseup, not during drag -------------------
 
 function onDocumentSelectionChange(): void {
+  // Read-only: never show the hover toolbar on text selection.
+  if (!editableRef.value) {
+    hoverToolbar.visible = false;
+    hoverToolbar.selectionRect = null;
+    hoverToolbar.blockId = null;
+    hoverToolbar.blockType = null;
+    hoverToolbar.blockAttrs = {};
+    return;
+  }
   const root = rootEl.value;
   if (!root) return;
   // If the editor state holds a cross-block text selection, the native
@@ -2163,6 +2286,20 @@ function onDocumentSelectionChange(): void {
   // Change 5: don't show toolbar while mouse button is held down (dragging).
   if (isMouseDown) return;
   const anchorNode = sel.anchorNode;
+  // If the selection is inside a table cell's contenteditable, the TableBlock
+  // renderer manages its own HoverToolbar (cellEditMode). Skip the editor-level
+  // toolbar to avoid showing a second toolbar with the wrong block context.
+  const cellInner = (anchorNode?.nodeType === 1
+    ? (anchorNode as HTMLElement).closest<HTMLElement>('.table-cell-inner')
+    : (anchorNode?.parentElement?.closest<HTMLElement>('.table-cell-inner')));
+  if (cellInner) {
+    hoverToolbar.visible = false;
+    hoverToolbar.selectionRect = null;
+    hoverToolbar.blockId = null;
+    hoverToolbar.blockType = null;
+    hoverToolbar.blockAttrs = {};
+    return;
+  }
   const contentEl = (anchorNode?.nodeType === 1
     ? (anchorNode as HTMLElement).closest<HTMLElement>('.block-content')
     : (anchorNode?.parentElement?.closest<HTMLElement>('.block-content')));
@@ -2245,6 +2382,8 @@ function unionRects(rects: DOMRect[]): DOMRect {
 
 /** Show the HoverToolbar for a cross-block text selection. */
 function showHoverToolbarForCrossBlock(sel: Extract<EditorSelection, { kind: 'text' }>): void {
+  // Read-only: never show the hover toolbar on cross-block selection.
+  if (!editableRef.value) return;
   const root = rootEl.value;
   if (!root) return;
   const rects = crossBlockSelectionRects(root, editor.getState().doc, sel);
@@ -2274,7 +2413,14 @@ function onMouseDown(e: MouseEvent): void {
     crossBlockRects.value = [];
   }
   // Start cross-block selection tracking if the press is inside a block content.
+  // Skip for table cells — the TableBlock renderer manages its own mouse
+  // events (cell selection, text editing) and cross-block tracking here
+  // would interfere with native text selection in editable cells.
   if (e.button === 0 && !e.shiftKey) {
+    const targetEl = e.target as HTMLElement | null;
+    if (targetEl && targetEl.closest('.table-cell-inner')) {
+      return;
+    }
     const hit = positionFromPoint(e.clientX, e.clientY, root, editor.getState().doc);
     if (hit) {
       // If there was a cross-block selection, collapse to the click position.
@@ -2365,6 +2511,8 @@ function onCut(e: ClipboardEvent): void {
 // --- Ordered-list marker click menu -------------------------------------
 
 function onOlMarkerClick(e: Event): void {
+  // Read-only: clicking the ordered-list number must not open its menu.
+  if (!editableRef.value) return;
   const detail = (e as CustomEvent).detail as { blockId?: BlockId; anchor?: HTMLElement } | undefined;
   if (!detail?.blockId || !detail?.anchor) return;
   const bid = detail.blockId;
@@ -2443,6 +2591,8 @@ function onNumberPickerConfirm(value: number): void {
 // --- Code-block language label click menu ----------------------------------
 
 function onCodeLangClick(e: Event): void {
+  // Read-only: clicking the code language label must not open its picker.
+  if (!editableRef.value) return;
   const detail = (e as CustomEvent).detail as { blockId?: BlockId; anchor?: HTMLElement } | undefined;
   if (!detail?.blockId || !detail?.anchor) return;
   const bid = detail.blockId;
@@ -2503,6 +2653,15 @@ function onWindowOutsideDown(e: Event): void {
   closeLinkPopover();
 }
 
+// Close ol-menu / number picker on page scroll or touch-move (swipe).
+// These menus are positioned relative to the viewport, so they go stale
+// the moment the page scrolls. The same applies to code-lang picker.
+function onScrollOrTouchClose(): void {
+  if (olMenu.visible) closeOlMenu();
+  if (numberPicker.visible) closeNumberPicker();
+  if (codeLangPicker.visible) closeCodeLangPicker();
+}
+
 // --- Lifecycle ----------------------------------------------------------
 
 onMounted(() => {
@@ -2526,6 +2685,9 @@ onMounted(() => {
   // scroll handler repositions — the toolbar then reads a fresh rect.
   window.addEventListener('scroll', refreshHoverToolbarRect, true);
   window.addEventListener('resize', refreshHoverToolbarRect);
+  // Close ol-menu / number picker / code-lang picker on scroll or touch swipe.
+  window.addEventListener('scroll', onScrollOrTouchClose, true);
+  document.addEventListener('touchmove', onScrollOrTouchClose, { passive: true, capture: true });
 });
 
 onBeforeUnmount(() => {
@@ -2541,6 +2703,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('touchstart', onWindowOutsideDown, true);
   window.removeEventListener('scroll', refreshHoverToolbarRect, true);
   window.removeEventListener('resize', refreshHoverToolbarRect);
+  window.removeEventListener('scroll', onScrollOrTouchClose, true);
+  document.removeEventListener('touchmove', onScrollOrTouchClose, true);
   unsubscribe();
   editor.destroy();
   // Image upload side-channel cleanup.

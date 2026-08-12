@@ -135,6 +135,41 @@ export function placeAboveSelection(
 }
 
 /**
+ * Position a popup ABOVE a selection rect, falling back to below only if
+ * there is not enough space above.  Used by the table cell selection
+ * toolbar so it doesn't obscure the selected cells below.
+ */
+export function placePreferAbove(
+  _root: HTMLElement,
+  selectionRect: DOMRect,
+  popupSize: { readonly width: number; readonly height: number },
+  margin = 8,
+): PopupPlacement {
+  const viewportHeight = document.documentElement.clientHeight;
+  const viewportW = document.documentElement.clientWidth;
+
+  const centerLeft = selectionRect.left + (selectionRect.width - popupSize.width) / 2;
+  const left = Math.max(margin, Math.min(viewportW - popupSize.width - margin, centerLeft));
+
+  const spaceAbove = selectionRect.top - margin;
+  const spaceBelow = viewportHeight - selectionRect.bottom - margin;
+  const fitsAbove = spaceAbove >= popupSize.height;
+  const fitsBelow = spaceBelow >= popupSize.height;
+  // Prefer above; only go below if above doesn't fit AND below has more room.
+  const above = fitsAbove || (!fitsBelow && spaceAbove > spaceBelow) || spaceAbove >= spaceBelow;
+
+  const top = above
+    ? Math.max(margin, selectionRect.top - popupSize.height - margin)
+    : selectionRect.bottom + margin;
+
+  const availableHeight = above
+    ? Math.max(120, spaceAbove)
+    : Math.max(120, spaceBelow);
+
+  return { top, left, above, availableHeight };
+}
+
+/**
  * Compute a rect relative to the editor root.
  */
 export function relativeRect(root: HTMLElement, el: HTMLElement): DOMRect {

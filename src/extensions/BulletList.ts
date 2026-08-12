@@ -43,9 +43,9 @@ export const BulletListExtension: Extension = {
   slashCommands: [
     {
       id: 'bullet-list',
-      title: '项目符号列表',
+      title: 'slash.bulletList.title',
       keywords: ['list', 'bullet', 'unordered', '项目符号', '无序列表', 'ul', '-', '*'],
-      description: '创建一个无序列表。',
+      description: 'slash.bulletList.description',
       icon: ICON_BULLET_LIST,
       command: 'convertBlock',
       category: 'list',

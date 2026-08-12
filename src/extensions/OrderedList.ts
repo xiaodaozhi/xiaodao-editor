@@ -21,7 +21,7 @@ import { defineComponent, h, ref, onBeforeUnmount, type PropType } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { Block, BlockId } from '../core/types';
 import BlockContent from '../view/BlockContent.vue';
-import { useEditor } from '../view/context';
+import { useEditor, useEditable } from '../view/context';
 import { ICON_ORDERED_LIST } from '../view/ui/icons';
 import { classesFromAttrs, COMMON_ATTRS } from './_commonAttrs';
 import { flatten } from '../core/state/store';
@@ -115,6 +115,7 @@ const OrderedListBlock = defineComponent({
   },
   setup(props) {
     const editor = useEditor();
+    const editable = useEditable();
     const markerEl = ref<HTMLElement | null>(null);
     // 文档变化时需要重新计算序号。由于结构共享，兄弟块编辑不会改变
     // 当前 block 的引用，Vue 会跳过重渲染。通过订阅 editor 状态变化
@@ -141,6 +142,8 @@ const OrderedListBlock = defineComponent({
           },
           onClick: (e: MouseEvent) => {
             e.stopPropagation();
+            // Read-only: clicking the number must not open the settings menu.
+            if (!editable.value) return;
             const ev = new CustomEvent('ordered-list-marker-click', {
               bubbles: true,
               detail: { blockId: props.block.id, anchor: markerEl.value },
@@ -183,9 +186,9 @@ export const OrderedListExtension: Extension = {
   slashCommands: [
     {
       id: 'ordered-list',
-      title: '编号列表',
+      title: 'slash.orderedList.title',
       keywords: ['list', 'numbered', 'ordered', '有序列表', '编号列表', 'ol', '1'],
-      description: '创建一个带编号的有序列表。',
+      description: 'slash.orderedList.description',
       icon: ICON_ORDERED_LIST,
       command: 'convertBlock',
       category: 'list',

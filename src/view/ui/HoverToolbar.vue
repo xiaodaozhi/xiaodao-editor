@@ -66,7 +66,7 @@
           :class="{ 'dropdown-open': !!openDropdown }"
           @scroll="updateHtScrollState"
         >
-          <!-- Block type dropdown -->
+          <!-- Block type dropdown (shown in all modes) -->
           <div class="ht-dropdown-wrap">
             <button
               ref="typeBtnEl"
@@ -184,7 +184,7 @@
               </button>
             </div>
           </div>
-          <!-- Align dropdown -->
+          <!-- Align dropdown (shown in all modes) -->
           <div class="ht-dropdown-wrap">
             <button
               ref="alignBtnEl"
@@ -528,6 +528,295 @@
               </button>
             </div>
           </div>
+          <!-- Vertical align dropdown (only in table mode / cell edit mode) -->
+          <div
+            v-if="tableMode || cellEditMode"
+            class="ht-dropdown-wrap"
+          >
+            <button
+              ref="verticalAlignBtnEl"
+              class="ht-btn ht-icon-only"
+              :class="{ open: openDropdown === 'verticalAlign', disabled: alignDisabled }"
+              :title="t('hoverToolbar.verticalAlignBtnTitle')"
+              :disabled="alignDisabled"
+              @mousedown.prevent.stop="!alignDisabled && toggleDropdown('verticalAlign')"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="15"
+                height="15"
+                aria-hidden="true"
+              >
+                <template v-if="currentVerticalAlign === 'top'">
+                  <line
+                    x1="2"
+                    y1="3"
+                    x2="14"
+                    y2="3"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="4"
+                    y1="7"
+                    x2="12"
+                    y2="7"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="5"
+                    y1="11"
+                    x2="11"
+                    y2="11"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                </template>
+                <template v-else-if="currentVerticalAlign === 'bottom'">
+                  <line
+                    x1="5"
+                    y1="5"
+                    x2="11"
+                    y2="5"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="4"
+                    y1="9"
+                    x2="12"
+                    y2="9"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="2"
+                    y1="13"
+                    x2="14"
+                    y2="13"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                </template>
+                <template v-else>
+                  <line
+                    x1="5"
+                    y1="3"
+                    x2="11"
+                    y2="3"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="3"
+                    y1="8"
+                    x2="13"
+                    y2="8"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="5"
+                    y1="13"
+                    x2="11"
+                    y2="13"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                  />
+                </template>
+              </svg>
+            </button>
+            <div
+              v-if="openDropdown === 'verticalAlign'"
+              ref="verticalAlignDropdownEl"
+              class="ht-dropdown"
+              :class="{ above: dropdownAbove }"
+              :style="dropdownStyle"
+            >
+              <button
+                v-if="canScrollUp"
+                class="menu-scroll-btn menu-scroll-up"
+                type="button"
+                :aria-label="t('ui.scrollUp')"
+                @mousedown.prevent="scrollUp"
+              >
+                <svg
+                  viewBox="0 0 12 12"
+                  width="10"
+                  height="10"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M3 7.5L6 4.5L9 7.5"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+              <div
+                ref="scrollEl"
+                class="ht-dropdown-scroll"
+                @scroll="updateScrollState"
+              >
+                <button
+                  v-for="va in verticalAlignOptions"
+                  :key="va.id"
+                  class="ht-dropdown-item ht-align-item"
+                  :class="{ active: currentVerticalAlign === va.value }"
+                  @mousedown.prevent.stop="onVerticalAlignPick(va.value)"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="15"
+                    height="15"
+                    aria-hidden="true"
+                  >
+                    <template v-if="va.value === 'top'">
+                      <line
+                        x1="2"
+                        y1="3"
+                        x2="14"
+                        y2="3"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="4"
+                        y1="7"
+                        x2="12"
+                        y2="7"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="5"
+                        y1="11"
+                        x2="11"
+                        y2="11"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                    </template>
+                    <template v-else-if="va.value === 'bottom'">
+                      <line
+                        x1="5"
+                        y1="5"
+                        x2="11"
+                        y2="5"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="4"
+                        y1="9"
+                        x2="12"
+                        y2="9"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="2"
+                        y1="13"
+                        x2="14"
+                        y2="13"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                    </template>
+                    <template v-else>
+                      <line
+                        x1="5"
+                        y1="3"
+                        x2="11"
+                        y2="3"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="3"
+                        y1="8"
+                        x2="13"
+                        y2="8"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="5"
+                        y1="13"
+                        x2="11"
+                        y2="13"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                    </template>
+                  </svg>
+                  <span>{{ va.label }}</span>
+                  <svg
+                    v-if="currentVerticalAlign === va.value"
+                    class="ht-check"
+                    viewBox="0 0 12 12"
+                    width="14"
+                    height="14"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2.5 6L5 8.5L9.5 4"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <button
+                v-if="canScrollDown"
+                class="menu-scroll-btn menu-scroll-down"
+                type="button"
+                :aria-label="t('ui.scrollDown')"
+                @mousedown.prevent="scrollDown"
+              >
+                <svg
+                  viewBox="0 0 12 12"
+                  width="10"
+                  height="10"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M3 4.5L6 7.5L9 4.5"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div class="ht-sep" />
           <!-- Inline marks -->
           <button
@@ -541,8 +830,9 @@
           >
             <SafeHtml :html="m.iconHtml" />
           </button>
-          <!-- Link button -->
+          <!-- Link button (hidden in tableMode; shown in cellEditMode) -->
           <button
+            v-if="!tableMode"
             class="ht-btn ht-icon-only"
             :class="{ active: activeMarks.has('link'), disabled: isMarkBtnDisabled('link') }"
             :title="t('hoverToolbar.linkBtnTitle')"
@@ -550,26 +840,14 @@
             @mousedown.prevent.stop="!isMarkBtnDisabled('link') && onLinkClick()"
           >
             <svg
-              viewBox="0 0 16 16"
+              viewBox="0 0 1024 1024"
               width="15"
               height="15"
               aria-hidden="true"
             >
               <path
-                d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-1 1"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.3"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0l-2 2a2.5 2.5 0 0 0 3.5 3.5l1-1"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.3"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                d="M394.666667 298.666667a32 32 0 0 1 4.693333 63.658666l-4.693333 0.341334H298.666667a149.333333 149.333333 0 0 0-8.789334 298.410666L298.666667 661.333333h96a32 32 0 0 1 4.693333 63.658667L394.666667 725.333333H298.666667a213.333333 213.333333 0 0 1-10.666667-426.410666L298.666667 298.666667h96zM725.333333 298.666667a213.333333 213.333333 0 0 1 10.666667 426.410666L725.333333 725.333333h-96a32 32 0 0 1-4.693333-63.658666l4.693333-0.341334H725.333333a149.333333 149.333333 0 0 0 8.789334-298.410666L725.333333 362.666667h-96a32 32 0 0 1-4.693333-63.658667L629.333333 298.666667H725.333333zM298.666667 480h426.666666a32 32 0 0 1 4.352 63.701333L725.333333 544H298.666667a32 32 0 0 1-4.352-63.701333L298.666667 480h426.666666H298.666667z"
+                fill="currentColor"
               />
             </svg>
           </button>
@@ -585,33 +863,13 @@
               @mousedown.prevent.stop="!isMarkBtnDisabled('color') && toggleDropdown('color')"
             >
               <svg
-                viewBox="0 0 16 16"
+                viewBox="0 0 1024 1024"
                 width="15"
                 height="15"
                 aria-hidden="true"
               >
                 <path
-                  d="M8 2.5C5 2.5 2.5 5 2.5 8S5 13.5 8 13.5c1.5 0 2.5-1 2.5-2 0-1.5-1-1.5-1-2.5 0-.8.7-1.5 1.5-1.5h1C13.3 5.5 13.5 4.5 13.5 4c0-1-2.5-1.5-5.5-1.5z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.2"
-                />
-                <circle
-                  cx="5.5"
-                  cy="6"
-                  r="0.9"
-                  fill="currentColor"
-                />
-                <circle
-                  cx="8"
-                  cy="5"
-                  r="0.9"
-                  fill="currentColor"
-                />
-                <circle
-                  cx="10.5"
-                  cy="6.5"
-                  r="0.9"
+                  d="M163.797333 249.941333c125.44-167.082667 385.28-215.68 570.197334-100.693333 182.613333 113.493333 249.770667 331.818667 174.933333 536.618667-70.613333 193.408-256.682667 269.994667-390.784 172.714666-50.218667-36.437333-69.717333-82.133333-79.104-156.330666l-4.522667-42.112-1.92-16.981334c-5.248-39.850667-13.269333-57.685333-30.08-67.072-22.826667-12.714667-38.058667-13.013333-68.053333-1.408l-14.976 6.229334-7.637333 3.328c-43.264 18.773333-72.021333 25.386667-108.416 17.749333l-8.533334-2.005333-6.997333-2.005334c-118.997333-36.864-136.618667-198.272-24.106667-348.032z m41.984 286.549334l5.248 1.578666 5.717334 1.28c18.730667 3.712 34.730667 0.64 61.312-10.325333l25.685333-10.965333c51.285333-21.034667 84.693333-23.04 129.962667 2.133333 39.125333 21.845333 54.4 55.381333 62.165333 113.493333l2.261333 19.584 2.346667 22.698667 2.005333 18.005333c7.338667 58.069333 20.693333 89.173333 53.248 112.810667 97.066667 70.4 236.117333 13.184 293.12-142.890667 64.682667-177.152 7.424-363.264-148.650666-460.330666-156.8-97.450667-379.690667-55.722667-485.248 84.778666-88.533333 117.888-77.653333 225.28-9.173334 248.149334z m478.933334-85.077334a53.333333 53.333333 0 1 1 102.997333-27.605333 53.333333 53.333333 0 0 1-102.997333 27.605333z m21.077333 148.821334a53.333333 53.333333 0 1 1 103.04-27.605334 53.333333 53.333333 0 0 1-103.04 27.605334zM600.32 323.285333a53.333333 53.333333 0 1 1 103.04-27.605333 53.333333 53.333333 0 0 1-103.04 27.605333z m-1.194667 383.914667a53.333333 53.333333 0 1 1 102.997334-27.605333 53.333333 53.333333 0 0 1-102.997334 27.605333z m-149.205333-425.386667a53.333333 53.333333 0 1 1 103.04-27.562666 53.333333 53.333333 0 0 1-103.04 27.562666z"
                   fill="currentColor"
                 />
               </svg>
@@ -742,29 +1000,83 @@
               />
             </svg>
           </button>
-          <!-- Delete -->
-          <button
-            class="ht-btn ht-icon-only ht-danger"
-            :title="t('hoverToolbar.deleteBlock')"
-            :aria-label="t('hoverToolbar.deleteBlock')"
-            @mousedown.prevent.stop="onDelete"
-          >
-            <svg
-              viewBox="0 0 16 16"
-              width="15"
-              height="15"
-              aria-hidden="true"
+          <!-- Table-mode specific buttons -->
+          <template v-if="tableMode">
+            <div
+              v-if="showMerge || showSplit || showHeaderRow || showDelete"
+              class="ht-sep"
+            />
+            <!-- Merge cells -->
+            <button
+              v-if="showMerge"
+              class="ht-btn ht-icon-only"
+              :title="t('table.mergeCells')"
+              @mousedown.prevent.stop="emit('merge')"
             >
-              <path
-                d="M3.5 4.5H12.5M6.5 4.5V3C6.5 2.45 6.95 2 7.5 2H8.5C9.05 2 9.5 2.45 9.5 3V4.5M5 4.5L5.5 13C5.55 13.55 6 14 6.55 14H9.45C10 14 10.45 13.55 10.5 13L11 4.5"
+              <svg
+                viewBox="0 0 1024 1024"
+                width="15"
+                height="15"
+                fill="currentColor"
+                aria-hidden="true"
+              ><path d="M266.666667 128A138.666667 138.666667 0 0 0 128 266.666667v490.666666A138.666667 138.666667 0 0 0 266.666667 896h490.666666A138.666667 138.666667 0 0 0 896 757.333333V266.666667A138.666667 138.666667 0 0 0 757.333333 128H266.666667zM192 266.666667c0-41.216 33.450667-74.666667 74.666667-74.666667H469.333333v128H192V266.666667z m341.333333 437.333333h298.666667v53.333333a74.666667 74.666667 0 0 1-74.666667 74.666667H533.333333v-128z m298.666667-384h-298.666667v-128h224c41.216 0 74.666667 33.450667 74.666667 74.666667V320z m-362.666667 384v128H266.666667a74.666667 74.666667 0 0 1-74.666667-74.666667V704H469.333333zM192 384h640v256h-640V384z" /></svg>
+            </button>
+            <!-- Split cell -->
+            <button
+              v-if="showSplit"
+              class="ht-btn ht-icon-only"
+              :title="t('table.splitCell')"
+              @mousedown.prevent.stop="emit('split')"
+            >
+              <svg
+                viewBox="0 0 1024 1024"
+                width="15"
+                height="15"
+                fill="currentColor"
+                aria-hidden="true"
+              ><path d="M533.333333 426.666667H469.333333v170.666666h64v-170.666666z" /><path d="M128 266.666667A138.666667 138.666667 0 0 1 266.666667 128h490.666666A138.666667 138.666667 0 0 1 896 266.666667v490.666666A138.666667 138.666667 0 0 1 757.333333 896H266.666667A138.666667 138.666667 0 0 1 128 757.333333V266.666667zM266.666667 192A74.666667 74.666667 0 0 0 192 266.666667V320H469.333333v-128H266.666667z m565.333333 512h-298.666667v128h224a74.666667 74.666667 0 0 0 74.666667-74.666667V704z m0-437.333333a74.666667 74.666667 0 0 0-74.666667-74.666667H533.333333v128h298.666667V266.666667zM192 704v53.333333c0 41.216 33.450667 74.666667 74.666667 74.666667H469.333333v-128H192z m0-64h640V384h-640v256z" /></svg>
+            </button>
+            <!-- Toggle header row (only when entire table is selected) -->
+            <button
+              v-if="showHeaderRow"
+              class="ht-btn ht-icon-only"
+              :class="{ active: headerRowActive }"
+              :title="t('table.toggleHeader')"
+              @mousedown.prevent.stop="emit('tableHeaderRow')"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="15"
+                height="15"
                 fill="none"
                 stroke="currentColor"
-                stroke-width="1.2"
+                stroke-width="1.3"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
+              ><rect
+                x="2"
+                y="2"
+                width="12"
+                height="12"
+                rx="1"
+              /><path d="M2 6h12" /><path d="M5 2v4" /></svg>
+            </button>
+            <!-- Delete (row / col / table) -->
+            <template v-if="showDelete">
+              <div
+                v-if="showMerge || showSplit || showHeaderRow"
+                class="ht-sep"
               />
-            </svg>
-          </button>
+              <button
+                class="ht-btn ht-danger ht-icon-only"
+                :title="deleteLabel || t('hoverToolbar.deleteBlock')"
+                @mousedown.prevent.stop="emit('delete')"
+              >
+                <SafeHtml :html="deleteIcon || '<svg viewBox=\'0 0 1024 1024\' width=\'15\' height=\'15\' fill=\'currentColor\' aria-hidden=\'true\'><path d=\'M128 266.666667A138.666667 138.666667 0 0 1 266.666667 128h490.666666A138.666667 138.666667 0 0 1 896 266.666667v246.272a276.096 276.096 0 0 0-64-30.250667V426.666667h-170.666667v56.021333a276.096 276.096 0 0 0-64 30.250667V426.666667h-170.666666v170.666666h86.272a276.096 276.096 0 0 0-30.250667 64H426.666667v170.666667h56.021333c7.381333 22.784 17.578667 44.245333 30.250667 64H266.666667A138.666667 138.666667 0 0 1 128 757.333333V266.666667zM266.666667 192A74.666667 74.666667 0 0 0 192 266.666667V362.666667h170.666667v-170.666667H266.666667zM192 426.666667v170.666666h170.666667v-170.666666h-170.666667z m469.333333-64h170.666667V266.666667a74.666667 74.666667 0 0 0-74.666667-74.666667H661.333333v170.666667z m-64-170.666667h-170.666666v170.666667h170.666666v-170.666667z m-405.333333 469.333333v96c0 41.216 33.450667 74.666667 74.666667 74.666667H362.666667v-170.666667h-170.666667z\'/><path d=\'M981.333333 746.666667a234.666667 234.666667 0 1 1-469.333333 0 234.666667 234.666667 0 0 1 469.333333 0z m-234.666666-30.165334l-70.229334-70.272a21.333333 21.333333 0 0 0-30.208 30.208l70.272 70.229334-70.272 70.229333a21.333333 21.333333 0 0 0 30.208 30.208l70.229334-70.272 70.229333 70.272a21.333333 21.333333 0 0 0 30.208-30.208L776.832 746.666667l70.272-70.229334a21.333333 21.333333 0 0 0-30.208-30.208L746.666667 716.501333z\'/></svg>'" />
+              </button>
+            </template>
+          </template>
         </div>
         <!-- Right nav button (shown when content overflows) -->
         <button
@@ -798,7 +1110,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount, shallowRef } from 'vue';
-import { placeBelowSelection as placeSelection } from './popup';
+import { placeBelowSelection as placeSelection, placePreferAbove } from './popup';
 import { useEditor } from '../context';
 import { useMenuScroll } from './useMenuScroll';
 import SafeHtml from './SafeHtml.vue';
@@ -854,11 +1166,42 @@ const props = defineProps<{
   blockType: string | null;
   blockAttrs: Readonly<Record<string, unknown>>;
   rootEl: HTMLElement | null;
+  // Table mode extras
+  tableMode?: boolean;
+  showDelete?: boolean;
+  deleteLabel?: string;
+  deleteIcon?: string;
+  showMerge?: boolean;
+  showSplit?: boolean;
+  showHeaderRow?: boolean;
+  headerRowActive?: boolean;
+  // Cell edit mode: when editing a cell and text is selected, the toolbar
+  // uses document.execCommand for marks/colors instead of editor.commands.
+  cellEditMode?: boolean;
+  // Table mode active state: pre-computed by the TableBlock renderer from
+  // the selected cells. Used for button state feedback (active marks,
+  // active colors) when there is no DOM text selection to inspect.
+  tableActiveMarks?: Set<string>;
+  tableActiveColor?: string;
+  tableActiveBgColor?: string;
+  tableActiveVerticalAlign?: string;
 }>();
 
 const emit = defineEmits<{
   close: [];
   linkClick: [blockId: BlockId, from: number, to: number];
+  delete: [];
+  merge: [];
+  split: [];
+  tableHeaderRow: [];
+  // Table cell operations (emitted in tableMode)
+  tableType: [cellType: string];
+  tableAlign: [align: string];
+  tableVerticalAlign: [verticalAlign: string];
+  tableMark: [markType: string];
+  tableTextColor: [color: string | null];
+  tableBgColor: [color: string | null];
+  tableCopy: [];
 }>();
 
 const { t } = useI18n();
@@ -867,12 +1210,14 @@ const editor = useEditor();
 const toolbarEl = ref<HTMLElement | null>(null);
 const typeDropdownEl = ref<HTMLElement | null>(null);
 const alignDropdownEl = ref<HTMLElement | null>(null);
+const verticalAlignDropdownEl = ref<HTMLElement | null>(null);
 const colorDropdownEl = ref<HTMLElement | null>(null);
 const typeBtnEl = ref<HTMLElement | null>(null);
 const alignBtnEl = ref<HTMLElement | null>(null);
+const verticalAlignBtnEl = ref<HTMLElement | null>(null);
 const colorBtnEl = ref<HTMLElement | null>(null);
 const placement = ref({ top: 0, left: 0, above: false });
-const openDropdown = ref<'type' | 'align' | 'color' | null>(null);
+const openDropdown = ref<'type' | 'align' | 'verticalAlign' | 'color' | null>(null);
 const dropdownAbove = ref(false);
 const dropdownMaxHeight = ref<number | null>(null);
 const scrollEl = ref<HTMLElement | null>(null);
@@ -908,8 +1253,26 @@ const currentBlock = computed(() =>
 );
 
 const currentAlign = computed<AlignValue>(() => {
+  if (props.cellEditMode || props.tableMode) {
+    const v = props.blockAttrs.align;
+    return (typeof v === 'string' ? v : 'left') as AlignValue;
+  }
   const v = currentBlock.value?.attrs.align;
   return (typeof v === 'string' ? v : 'left') as AlignValue;
+});
+
+type VerticalAlignValue = 'top' | 'middle' | 'bottom';
+
+const currentVerticalAlign = computed<VerticalAlignValue>(() => {
+  if (props.tableMode) {
+    const v = props.tableActiveVerticalAlign;
+    return (typeof v === 'string' ? v : 'middle') as VerticalAlignValue;
+  }
+  if (props.cellEditMode) {
+    const v = props.blockAttrs.verticalAlign;
+    return (typeof v === 'string' ? v : 'middle') as VerticalAlignValue;
+  }
+  return 'middle';
 });
 
 // Active inline color/bgColor marks on the current selection (not block-level).
@@ -929,14 +1292,39 @@ watch(() => props.blockId, () => {
 const activeMarks = ref<Set<string>>(new Set());
 const marksVersion = ref(0);
 
+/** Find the container element for mark/color detection. In normal mode this
+ *  is the [data-block-id] element; in cellEditMode it's the .table-cell-inner
+ *  that contains the current selection. */
+function findMarkContainer(): HTMLElement | null {
+  if (!props.rootEl) return null;
+  if (props.cellEditMode) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    const container = (range.commonAncestorContainer.nodeType === 1
+      ? (range.commonAncestorContainer as HTMLElement)
+      : range.commonAncestorContainer.parentElement
+    )?.closest('.table-cell-inner') as HTMLElement | null;
+    return container;
+  }
+  return props.rootEl.querySelector(`[data-block-id="${props.blockId}"]`);
+}
+
 function updateActiveMarks(): void {
   const marks = new Set<string>();
   if (!props.visible || !props.blockId || !props.rootEl) {
     activeMarks.value = marks;
     return;
   }
+  // In tableMode (cell selection, not cell edit), there is no DOM text
+  // selection to inspect. Use the pre-computed marks from the TableBlock
+  // renderer instead.
+  if (props.tableMode && props.tableActiveMarks) {
+    activeMarks.value = new Set(props.tableActiveMarks);
+    return;
+  }
   // ---- DOM-based path: try the current selection.
-  const blockEl = props.rootEl.querySelector(`[data-block-id="${props.blockId}"]`);
+  const blockEl = findMarkContainer();
   if (blockEl) {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
@@ -1024,6 +1412,10 @@ const marksDisabled = computed(() => props.blockType === 'codeBlock');
 
 /** 当前块是否支持对齐属性（代码块只允许左对齐）。 */
 const alignDisabled = computed(() => {
+  if (props.tableMode || props.cellEditMode) {
+    // In table/cell-edit mode, code block cells disallow alignment.
+    return props.blockType === 'codeBlock';
+  }
   const bt = props.blockType;
   if (!bt) return false;
   const schema = editor.registries.schema.get(bt as BlockType);
@@ -1039,6 +1431,17 @@ const alignDisabled = computed(() => {
  *    stays enabled so it can be toggled back off).
  */
 function isMarkBtnDisabled(markId: string): boolean {
+  if (props.tableMode || props.cellEditMode) {
+    // codeBlock cells: no inline marks at all (mirrors text-block codeBlock).
+    if (props.blockType === 'codeBlock') return true;
+    // quote cells: italic disabled (quote is already italic via CSS).
+    if (props.blockType === 'quote' && markId === 'italic') return true;
+    // Inline code incompatibility: when the selection is inline code, all
+    // other formatting marks are disabled (code wins). The code button
+    // itself stays enabled so it can be toggled off.
+    if (markId !== 'code' && activeMarks.value.has('code')) return true;
+    return false;
+  }
   if (marksDisabled.value) return true;
   if (markId === 'italic') {
     const bt = props.blockType;
@@ -1071,7 +1474,7 @@ const typeOptions = computed<TypeOption[]>(() => {
   const isActive = (type: string, level?: number): boolean =>
     bt === type && (level === undefined || Number(ba.level) === level);
 
-  return [
+  const all = [
     { id: 'text', label: t('turnInto.paragraph'), iconHtml: ICON_PARAGRAPH, active: isActive('paragraph'), convertType: 'paragraph' },
     { id: 'h1', label: t('turnInto.h1'), iconHtml: ICON_H1, active: isActive('heading', 1), convertType: 'heading', convertAttrs: { level: 1 } },
     { id: 'h2', label: t('turnInto.h2'), iconHtml: ICON_H2, active: isActive('heading', 2), convertType: 'heading', convertAttrs: { level: 2 } },
@@ -1085,6 +1488,8 @@ const typeOptions = computed<TypeOption[]>(() => {
     { id: 'quote', label: t('turnInto.quote'), iconHtml: ICON_QUOTE, active: isActive('quote'), convertType: 'quote' },
     { id: 'code', label: t('turnInto.code'), iconHtml: ICON_CODE, active: isActive('codeBlock'), convertType: 'codeBlock', convertAttrs: { language: 'plain' } },
   ];
+  // All block types are available in all modes (including table/cell-edit).
+  return all;
 });
 
 const currentTypeLabel = computed(() => {
@@ -1099,6 +1504,12 @@ const alignOptions = computed<{ id: string; label: string; value: AlignValue }[]
   { id: 'center', label: t('align.center'), value: 'center' },
   { id: 'right', label: t('align.right'), value: 'right' },
   { id: 'justify', label: t('align.justify'), value: 'justify' },
+]);
+
+const verticalAlignOptions = computed<{ id: string; label: string; value: VerticalAlignValue }[]>(() => [
+  { id: 'top', label: t('verticalAlign.top'), value: 'top' },
+  { id: 'middle', label: t('verticalAlign.middle'), value: 'middle' },
+  { id: 'bottom', label: t('verticalAlign.bottom'), value: 'bottom' },
 ]);
 
 // --- Color presets ---------------------------------------------------------
@@ -1192,10 +1603,15 @@ watch(
     // clamp in placeBelowSelection operates on accurate dimensions.
     const actualWidth = rect.width;
     const actualHeight = Math.max(rect.height, TOOLBAR_HEIGHT);
-    placement.value = placeSelection(props.rootEl, props.selectionRect, {
-      width: actualWidth,
-      height: actualHeight,
-    });
+    placement.value = (props.tableMode
+      ? placePreferAbove(props.rootEl, props.selectionRect, {
+          width: actualWidth,
+          height: actualHeight,
+        })
+      : placeSelection(props.rootEl, props.selectionRect, {
+          width: actualWidth,
+          height: actualHeight,
+        }));
   },
   { flush: 'post', immediate: true },
 );
@@ -1243,7 +1659,7 @@ const toolbarStyle = computed(() => {
 
 // --- Dropdown management ---------------------------------------------------
 
-async function toggleDropdown(kind: 'type' | 'align' | 'color'): Promise<void> {
+async function toggleDropdown(kind: 'type' | 'align' | 'verticalAlign' | 'color'): Promise<void> {
   openDropdown.value = openDropdown.value === kind ? null : kind;
   if (openDropdown.value) {
     await nextTick();
@@ -1277,12 +1693,16 @@ function positionActiveDropdown(): void {
     ? typeDropdownEl.value
     : kind === 'align'
       ? alignDropdownEl.value
-      : colorDropdownEl.value;
+      : kind === 'verticalAlign'
+        ? verticalAlignDropdownEl.value
+        : colorDropdownEl.value;
   const btn = kind === 'type'
     ? typeBtnEl.value
     : kind === 'align'
       ? alignBtnEl.value
-      : colorBtnEl.value;
+      : kind === 'verticalAlign'
+        ? verticalAlignBtnEl.value
+        : colorBtnEl.value;
   if (!dropdown || !btn) return;
   const btnRect = btn.getBoundingClientRect();
   const viewportH = window.innerHeight;
@@ -1353,6 +1773,18 @@ useMenuScroll(scrollEl, updateScrollState);
 // --- Actions --------------------------------------------------------------
 
 function onTypePick(opt: TypeOption): void {
+  if (props.tableMode || props.cellEditMode) {
+    // Map heading + level to table cell type (heading1, heading2, etc.)
+    // so the TableBlock renderer can store the correct cellType.
+    if (opt.convertType === 'heading' && opt.convertAttrs?.level) {
+      emit('tableType', `heading${opt.convertAttrs.level}`);
+    } else {
+      emit('tableType', opt.convertType);
+    }
+    openDropdown.value = null;
+    if (props.tableMode) emit('close');
+    return;
+  }
   const cb = getCrossBlockRanges();
   if (cb) {
     for (const r of cb.ranges) {
@@ -1377,6 +1809,11 @@ function onTypePick(opt: TypeOption): void {
 }
 
 function onAlignPick(align: AlignValue): void {
+  if (props.tableMode || props.cellEditMode) {
+    emit('tableAlign', align);
+    openDropdown.value = null;
+    return;
+  }
   const cb = getCrossBlockRanges();
   if (cb) {
     for (const r of cb.ranges) {
@@ -1390,7 +1827,52 @@ function onAlignPick(align: AlignValue): void {
   openDropdown.value = null;
 }
 
+function onVerticalAlignPick(verticalAlign: VerticalAlignValue): void {
+  if (props.tableMode || props.cellEditMode) {
+    emit('tableVerticalAlign', verticalAlign);
+    openDropdown.value = null;
+    return;
+  }
+  openDropdown.value = null;
+}
+
 function onTextColorPick(key: string): void {
+  if (props.tableMode) {
+    emit('tableTextColor', key === 'default' ? null : key);
+    openDropdown.value = null;
+    return;
+  }
+  if (props.cellEditMode) {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0);
+      if (key === 'default') {
+        // Remove be-color-* spans from the extracted selection.
+        const frag = range.extractContents();
+        frag.querySelectorAll('span[class*="be-color-"]').forEach((span) => {
+          const cls = span.className.replace(/be-color-\w+/g, '').trim();
+          if (cls) span.className = cls;
+          else {
+            while (span.firstChild) span.parentNode!.insertBefore(span.firstChild, span);
+            span.parentNode!.removeChild(span);
+          }
+        });
+        range.insertNode(frag);
+      } else {
+        const span = document.createElement('span');
+        span.className = `be-color-${key}`;
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        sel.removeAllRanges();
+        const nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      }
+    }
+    openDropdown.value = null;
+    updateActiveColors();
+    return;
+  }
   const cb = getCrossBlockRanges();
   if (cb) {
     for (const r of cb.ranges) {
@@ -1444,6 +1926,42 @@ function onTextColorPick(key: string): void {
 }
 
 function onBgColorPick(key: string): void {
+  if (props.tableMode) {
+    emit('tableBgColor', key === 'default' ? null : key);
+    openDropdown.value = null;
+    return;
+  }
+  if (props.cellEditMode) {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0);
+      if (key === 'default') {
+        // Remove be-bg-* spans from the extracted selection.
+        const frag = range.extractContents();
+        frag.querySelectorAll('span[class*="be-bg-"]').forEach((span) => {
+          const cls = span.className.replace(/be-bg-\w+/g, '').trim();
+          if (cls) span.className = cls;
+          else {
+            while (span.firstChild) span.parentNode!.insertBefore(span.firstChild, span);
+            span.parentNode!.removeChild(span);
+          }
+        });
+        range.insertNode(frag);
+      } else {
+        const span = document.createElement('span');
+        span.className = `be-bg-${key}`;
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        sel.removeAllRanges();
+        const nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      }
+    }
+    openDropdown.value = null;
+    updateActiveColors();
+    return;
+  }
   const cb = getCrossBlockRanges();
   if (cb) {
     for (const r of cb.ranges) {
@@ -1489,9 +2007,15 @@ function onBgColorPick(key: string): void {
 
 /** Detect inline color/bgColor marks in the current selection. */
 function updateActiveColors(): void {
+  // In tableMode, use the pre-computed values from the TableBlock renderer.
+  if (props.tableMode) {
+    activeColor.value = props.tableActiveColor ?? '';
+    activeBgColor.value = props.tableActiveBgColor ?? '';
+    return;
+  }
   // Try DOM-based path first (current selection).
   if (props.visible && props.blockId && props.rootEl) {
-    const blockEl = props.rootEl.querySelector(`[data-block-id="${props.blockId}"]`);
+    const blockEl = findMarkContainer();
     const sel = window.getSelection();
     if (blockEl && sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
@@ -1651,6 +2175,41 @@ function serializeCrossBlock(): { text: string; html: string } | null {
 }
 
 function onToggleMark(markType: string): void {
+  if (props.tableMode) {
+    emit('tableMark', markType);
+    return;
+  }
+  if (props.cellEditMode) {
+    // Map mark types to execCommand names.
+    const cmdMap: Record<string, string> = {
+      bold: 'bold',
+      italic: 'italic',
+      underline: 'underline',
+      strikethrough: 'strikeThrough',
+      code: 'insertHTML',
+    };
+    const cmd = cmdMap[markType];
+    if (cmd === 'insertHTML') {
+      // Wrap selection in <code> tags.
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        const codeEl = document.createElement('code');
+        try {
+          codeEl.appendChild(range.extractContents());
+          range.insertNode(codeEl);
+          sel.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(codeEl);
+          sel.addRange(newRange);
+        } catch { /* ignore */ }
+      }
+    } else if (cmd) {
+      document.execCommand(cmd);
+    }
+    updateActiveMarks();
+    return;
+  }
   const cb = getCrossBlockRanges();
   if (cb) {
     for (const r of cb.ranges) {
@@ -1699,6 +2258,13 @@ function onToggleMark(markType: string): void {
 }
 
 function onLinkClick(): void {
+  // Cell edit mode: emit linkClick with dummy offsets. The TableBlock
+  // renderer reads the selection directly from window.getSelection() to
+  // open the LinkPopover, so offsets are not needed.
+  if (props.cellEditMode) {
+    emit('linkClick', currentBlockId.value ?? '' as BlockId, 0, 0);
+    return;
+  }
   // Pass selection offsets directly to avoid syncSelectionFromDom
   // which would trigger a re-render and destroy the DOM selection.
   if (currentBlockId.value) {
@@ -1710,6 +2276,11 @@ function onLinkClick(): void {
 }
 
 function onCopy(): void {
+  if (props.tableMode) {
+    emit('tableCopy');
+    emit('close');
+    return;
+  }
   // Cross-block: serialize from editor state (native selection is empty).
   const cb = serializeCrossBlock();
   if (cb) {
@@ -1726,21 +2297,6 @@ function onCopy(): void {
   emit('close');
 }
 
-function onDelete(): void {
-  const cb = getCrossBlockRanges();
-  if (cb) {
-    // Remove all covered blocks (reverse order to keep indices valid).
-    for (let i = cb.ranges.length - 1; i >= 0; i--) {
-      editor.commands.removeBlock?.({ id: cb.ranges[i]!.id });
-    }
-    emit('close');
-    return;
-  }
-  if (!currentBlockId.value) return;
-  editor.commands.removeBlock?.({ id: currentBlockId.value });
-  emit('close');
-}
-
 defineExpose({});
 
 // Reposition on scroll/resize.
@@ -1751,10 +2307,15 @@ async function onScrollOrResize(): Promise<void> {
     measureHtOverflow();
     await nextTick();
     const rect = toolbarEl.value.getBoundingClientRect();
-    placement.value = placeSelection(props.rootEl, props.selectionRect, {
-      width: rect.width,
-      height: Math.max(rect.height, TOOLBAR_HEIGHT),
-    });
+    placement.value = (props.tableMode
+      ? placePreferAbove(props.rootEl, props.selectionRect, {
+          width: rect.width,
+          height: Math.max(rect.height, TOOLBAR_HEIGHT),
+        })
+      : placeSelection(props.rootEl, props.selectionRect, {
+          width: rect.width,
+          height: Math.max(rect.height, TOOLBAR_HEIGHT),
+        }));
   }
   if (openDropdown.value) positionActiveDropdown();
   updateScrollState();
@@ -1766,8 +2327,8 @@ async function onScrollOrResize(): Promise<void> {
 // Close dropdown on outside click.
 function onWindowMouseDown(e: MouseEvent): void {
   if (!openDropdown.value) return;
-  const dropdowns = [typeDropdownEl.value, alignDropdownEl.value, colorDropdownEl.value];
-  const buttons = [typeBtnEl.value, alignBtnEl.value, colorBtnEl.value];
+  const dropdowns = [typeDropdownEl.value, alignDropdownEl.value, verticalAlignDropdownEl.value, colorDropdownEl.value];
+  const buttons = [typeBtnEl.value, alignBtnEl.value, verticalAlignBtnEl.value, colorBtnEl.value];
   for (const d of dropdowns) {
     if (d && d.contains(e.target as Node)) return;
   }

@@ -48,8 +48,8 @@
         class="bsm-scroll"
         @scroll="updateScrollState"
       >
-        <!-- 1. Turn into (no label) — hidden for non-text blocks like image -->
-        <template v-if="!isImageBlock">
+        <!-- 1. Turn into (no label) — hidden for non-text blocks like image/table/divider -->
+        <template v-if="!isImageBlock && !isDividerBlock">
           <div class="bsm-group">
             <div class="bsm-icon-grid">
               <button
@@ -72,8 +72,11 @@
           <div class="bsm-sep" />
         </template>
 
-        <!-- 2. Align & Indent (collapsible) -->
-        <div class="bsm-group">
+        <!-- 2. Align & Indent (collapsible) — hidden for divider/table -->
+        <div
+          v-if="!hideAlignSection"
+          class="bsm-group"
+        >
           <button
             class="bsm-collapse-header"
             :class="{ 'bsm-disabled': alignDisabled && !canIndent, 'expanded': expandedSections.alignIndent }"
@@ -286,9 +289,9 @@
           </div>
         </div>
 
-        <!-- 3. Text color (collapsible) — hidden for non-text blocks like image -->
+        <!-- 3. Text color (collapsible) — hidden for non-text blocks like image/table/divider -->
         <div
-          v-if="!isImageBlock"
+          v-if="!isImageBlock && !isDividerBlock"
           class="bsm-group bsm-colors"
         >
           <button
@@ -334,9 +337,9 @@
           </div>
         </div>
 
-        <!-- 4. Background color (collapsible) — hidden for non-text blocks like image -->
+        <!-- 4. Background color (collapsible) — hidden for non-text blocks like image/table/divider -->
         <div
-          v-if="!isImageBlock"
+          v-if="!isImageBlock && !isDividerBlock"
           class="bsm-group bsm-colors"
         >
           <button
@@ -381,7 +384,10 @@
             </div>
           </div>
         </div>
-        <div class="bsm-sep" />
+        <div
+          v-if="!hideAlignSection"
+          class="bsm-sep"
+        />
 
         <!-- 5. Actions -->
         <div class="bsm-group">
@@ -570,8 +576,20 @@ const alignDisabled = computed<boolean>(() => {
   return !('align' in schema.attrs);
 });
 
-/** 图片块等非文本块：不显示"转为"、文字颜色、背景颜色，缩进也不可用 */
-const isImageBlock = computed<boolean>(() => currentBlock.value?.type === 'image');
+/** 图片块、表格块等非文本块：不显示"转为"、文字颜色、背景颜色，缩进也不可用 */
+const isImageBlock = computed<boolean>(() =>
+  currentBlock.value?.type === 'image' || currentBlock.value?.type === 'table',
+);
+
+/** 分割线块：隐藏"转为"、对齐与缩进、文字颜色、背景颜色，只保留操作区 */
+const isDividerBlock = computed<boolean>(() =>
+  currentBlock.value?.type === 'divider',
+);
+
+/** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格 */
+const hideAlignSection = computed<boolean>(() =>
+  currentBlock.value?.type === 'divider' || currentBlock.value?.type === 'table',
+);
 
 /** 当前块是否支持颜色属性（代码块不支持 color / bgColor）。 */
 const colorsDisabled = computed<boolean>(() => {

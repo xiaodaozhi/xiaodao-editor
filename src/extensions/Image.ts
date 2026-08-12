@@ -28,7 +28,7 @@
  * hook `uploadImage` prop to take over.
  */
 
-import { defineComponent, h, ref, type PropType, onBeforeUnmount } from 'vue';
+import { defineComponent, h, ref, type PropType, onBeforeUnmount, type VNode } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { Block, BlockId } from '../core/types';
 import SafeHtml from '../view/ui/SafeHtml.vue';
@@ -40,7 +40,7 @@ import {
   createTempObjectUrl,
   type UploadState,
 } from '../view/imageUpload';
-import { useEditor } from '../view/context';
+import { useEditor, useEditable } from '../view/context';
 import { useI18n } from '../i18n';
 import { COMMON_ATTRS, classesFromAttrs } from './_commonAttrs';
 
@@ -113,6 +113,7 @@ const ImageBlock = defineComponent({
   setup(props) {
     void props.placeholder; // reserved for future use
     const editor = useEditor();
+    const editable = useEditable();
     const i18n = useI18n();
     const blockId = props.block.id;
 
@@ -298,6 +299,8 @@ const ImageBlock = defineComponent({
     function onBlockClick(e: MouseEvent): void {
       // Clicking the image shell selects the block (Notion-style).
       e.stopPropagation();
+      // Read-only: selecting the block would surface editing affordances.
+      if (!editable.value) return;
       editor.commands.selectBlock?.({ blockId });
     }
 
@@ -310,38 +313,41 @@ const ImageBlock = defineComponent({
       const wrapperStyle: Record<string, string> = {};
       const hasError = us?.status === 'error';
       if (imageW && imageW > 0 && !hasError) wrapperStyle.width = `{imageW}px`;
-      const children: any[] = [];
+      const children: VNode[] = [];
 
       // Toolbar overlay (shown always on hover; forced-visible when the
-      // block has a pending/error upload state).
+      // block has a pending/error upload state). Hidden entirely in
+      // read-only mode — replace/remove are editing actions.
       const forceToolbarVisible = !!us && us.status !== 'success';
       const sel = editor.getState().selection;
       const isSelectedAsBlock = sel.kind === 'blocks' && sel.blockIds.includes(blockId);
-      children.push(
-        h('div', {
-          class: [
-            'image-block-toolbar',
-            { 'image-block-toolbar-visible': forceToolbarVisible || isSelectedAsBlock },
-          ],
-        }, [
-          h('button', {
-            class: 'image-block-btn',
-            title: i18n.t('image.replace'),
-            onClick: (e: MouseEvent) => {
-              e.stopPropagation();
-              openFilePicker();
-            },
-          }, [h(SafeHtml, { html: ICON_REPLACE })]),
-          h('button', {
-            class: 'image-block-btn',
-            title: i18n.t('image.remove'),
-            onClick: (e: MouseEvent) => {
-              e.stopPropagation();
-              onRemoveClick();
-            },
-          }, [h(SafeHtml, { html: ICON_CLOSE })]),
-        ]),
-      );
+      if (editable.value) {
+        children.push(
+          h('div', {
+            class: [
+              'image-block-toolbar',
+              { 'image-block-toolbar-visible': forceToolbarVisible || isSelectedAsBlock },
+            ],
+          }, [
+            h('button', {
+              class: 'image-block-btn',
+              title: i18n.t('image.replace'),
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                openFilePicker();
+              },
+            }, [h(SafeHtml, { html: ICON_REPLACE })]),
+            h('button', {
+              class: 'image-block-btn',
+              title: i18n.t('image.remove'),
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                onRemoveClick();
+              },
+            }, [h(SafeHtml, { html: ICON_CLOSE })]),
+          ]),
+        );
+      }
 
       // --- Upload pending ---
       if (us?.status === 'pending') {
@@ -390,6 +396,8 @@ const ImageBlock = defineComponent({
             class: 'image-block-empty',
             onClick: (e: MouseEvent) => {
               e.stopPropagation();
+              // Read-only: the placeholder is informational only.
+              if (!editable.value) return;
               openFilePicker();
             },
           }, [
@@ -404,7 +412,7 @@ const ImageBlock = defineComponent({
       if (src && us?.status !== 'error') {
         const imgStyle: Record<string, string> = {};
         if (imageW && imageW > 0) imgStyle.width = `${imageW}px`;
-        const imageArea: any[] = [
+        const imageArea: VNode[] = [
           h('img', {
             ref: imgEl,
             class: 'image-block-img',
@@ -426,8 +434,8 @@ const ImageBlock = defineComponent({
             },
           }),
         ];
-        // Resize handle — only when natural size is known.
-        if (naturalSize.value) {
+        // Resize handle — only when natural size is known AND editable.
+        if (naturalSize.value && editable.value) {
           imageArea.push(
             h('div', {
               class: 'image-block-resize-handle',
@@ -451,7 +459,7 @@ const ImageBlock = defineComponent({
         children.push(
           h('div', {
             class: 'image-block-caption',
-            contenteditable: 'true',
+            contenteditable: editable.value ? 'true' : 'false',
             'data-placeholder': i18n.t('image.captionPlaceholder'),
             onBlur: (e: FocusEvent) => {
               const newText = (e.currentTarget as HTMLElement).textContent ?? '';
@@ -534,9 +542,9 @@ export const ImageExtension: Extension = {
   slashCommands: [
     {
       id: 'image',
-      title: '图片',
+      title: 'slash.image.title',
       keywords: ['image', 'picture', 'photo', 'img', '图片', '图像', '照片'],
-      description: '插入一张图片（从本地上传或选择文件）。',
+      description: 'slash.image.description',
       icon: ICON_IMAGE,
       command: 'convertBlock',
       category: 'other',

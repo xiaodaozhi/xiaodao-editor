@@ -56,6 +56,9 @@ export const ICON_QUOTE = `<svg viewBox="0 0 16 16" width="16" height="16" fill=
 /** Code block — angle brackets with slash. */
 export const ICON_CODE = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4L2 8L5 12"/><path d="M11 4L14 8L11 12"/><line x1="10" y1="3" x2="6" y2="13"/></svg>`;
 
+/** Divider / horizontal rule — a single horizontal line. */
+export const ICON_DIVIDER = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="8" x2="14" y2="8"/></svg>`;
+
 /** Image — rectangle with mountain + sun. Drawn purely with SVG paths, no <text>. */
 export const ICON_IMAGE = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/><path d="M13 11.5L10 8.5L7 11.5L5 9.5L3 11.5"/></svg>`;
 

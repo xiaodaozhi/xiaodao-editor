@@ -85,13 +85,13 @@
               />
               <div class="slash-menu-text">
                 <div class="slash-menu-title">
-                  {{ item.title }}
+                  {{ t(item.title) }}
                 </div>
                 <div
                   v-if="item.description"
                   class="slash-menu-desc"
                 >
-                  {{ item.description }}
+                  {{ t(item.description) }}
                 </div>
               </div>
             </div>
@@ -212,9 +212,18 @@ function iconHtml(icon: unknown): string {
 
 // --- Search + grouping ---------------------------------------------------
 
-const filtered = computed<readonly SlashCommand[]>(() =>
-  editor.registries.slash.search(props.query),
-);
+// Search uses the LOCALISED title so users can type matches in their
+// active language. `keywords` are intentionally left untranslated because
+// they serve as fixed input shortcuts (e.g. "todo", "[]").
+const filtered = computed<readonly SlashCommand[]>(() => {
+  const q = props.query.trim().toLowerCase();
+  const all = editor.registries.slash.all;
+  if (!q) return all;
+  return all.filter((c) => {
+    const haystack = (t(c.title) + ' ' + (c.keywords ?? []).join(' ')).toLowerCase();
+    return haystack.includes(q);
+  });
+});
 
 const grouped = computed<MenuGroup[]>(() => {
   const groups: MenuGroup[] = [];

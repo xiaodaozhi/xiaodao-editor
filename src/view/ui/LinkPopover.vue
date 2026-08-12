@@ -103,6 +103,7 @@
             </svg>
           </button>
           <button
+            v-if="!readonly"
             class="link-popover-btn"
             :title="t('link.edit')"
             :aria-label="t('link.edit')"
@@ -125,24 +126,21 @@
             </svg>
           </button>
           <button
+            v-if="!readonly"
             class="link-popover-btn link-popover-danger"
             :title="t('link.remove')"
             :aria-label="t('link.remove')"
             @mousedown.prevent.stop="onRemoveLink"
           >
             <svg
-              viewBox="0 0 16 16"
+              viewBox="0 0 1024 1024"
               width="14"
               height="14"
               aria-hidden="true"
             >
               <path
-                d="M3.5 4.5H12.5M6.5 4.5V3C6.5 2.45 6.95 2 7.5 2H8.5C9.05 2 9.5 2.45 9.5 3V4.5M5 4.5L5.5 13C5.55 13.55 6 14 6.55 14H9.45C10 14 10.45 13.55 10.5 13L11 4.5"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                d="M394.666667 213.333333a32 32 0 0 1 4.693333 63.658667l-4.693333 0.341333H298.666667a149.333333 149.333333 0 0 0-8.789334 298.410667L298.666667 576h96a32 32 0 0 1 4.693333 63.658667L394.666667 640H298.666667a213.333333 213.333333 0 0 1-10.666667-426.410667L298.666667 213.333333h96zM725.333333 213.333333a213.333333 213.333333 0 0 1 189.013334 312.405334 277.162667 277.162667 0 0 0-55.210667-32.64 149.333333 149.333333 0 0 0-125.013333-215.466667L725.333333 277.290667h-96a32 32 0 0 1-4.693333-63.658667L629.333333 213.333333H725.333333zM298.666667 394.666667h426.666666a32 32 0 0 1 4.352 63.701333L725.333333 458.666667H298.666667a32 32 0 0 1-4.352-63.701334L298.666667 394.666667z m682.666666 352a234.666667 234.666667 0 1 1-469.333333 0 234.666667 234.666667 0 0 1 469.333333 0z m-304.896-100.437334a21.333333 21.333333 0 0 0-30.208 30.208l70.272 70.229334-70.272 70.229333a21.333333 21.333333 0 0 0 30.208 30.208l70.229334-70.272 70.229333 70.272a21.333333 21.333333 0 0 0 30.208-30.208L776.832 746.666667l70.272-70.229334a21.333333 21.333333 0 0 0-30.208-30.208L746.666667 716.501333l-70.229334-70.272z"
+                fill="currentColor"
               />
             </svg>
           </button>
@@ -228,6 +226,12 @@ const props = defineProps<{
   initialMode?: PopoverMode;
   /** Whether to show the text input field (hide when editing from Ctrl+K on selection). */
   showTextInput?: boolean;
+  /** When provided, overrides the default editor.commands.setLink for cell edit mode. */
+  onSaveLink?: (url: string, text: string | undefined) => void;
+  /** When provided, overrides the default editor.commands.unsetLink for cell edit mode. */
+  onRemoveLinkMark?: () => void;
+  /** Read-only mode: hides the edit/delete buttons and forbids entering edit mode. */
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -308,7 +312,9 @@ watch(
   (v) => {
     if (v) {
       shouldRender.value = true;
-      mode.value = props.initialMode ?? (props.href ? 'view' : 'edit');
+      // Read-only: a link popover may only open in view mode — the user can
+      // view/copy/open the URL but never edit or delete the link.
+      mode.value = props.readonly ? 'view' : (props.initialMode ?? (props.href ? 'view' : 'edit'));
       editUrl.value = props.href;
       editText.value = props.text;
       positioned.value = false;
@@ -340,6 +346,7 @@ watch(
 // --- Actions ---
 
 function switchToEdit(): void {
+  if (props.readonly) return;
   mode.value = 'edit';
   editUrl.value = props.href;
   editText.value = props.text;
@@ -366,7 +373,7 @@ function onUrlInput(): void {
 }
 
 function onSave(): void {
-  if (!props.blockId) return;
+  if (!props.blockId && !props.onSaveLink) return;
   const normalized = normalizeUrl(editUrl.value);
   const safe = sanitizeUrl(normalized);
   if (!safe) {
@@ -380,13 +387,17 @@ function onSave(): void {
   // If we have text input and it changed, update the link text too.
   const hasTextChange = showTextInput.value && editText.value !== props.text;
 
-  editor.commands.setLink?.({
-    id: props.blockId,
-    href: safe,
-    from: props.from,
-    to: props.to,
-    text: hasTextChange ? editText.value : undefined,
-  });
+  if (props.onSaveLink) {
+    props.onSaveLink(safe, hasTextChange ? editText.value : undefined);
+  } else {
+    editor.commands.setLink?.({
+      id: props.blockId!,
+      href: safe,
+      from: props.from,
+      to: props.to,
+      text: hasTextChange ? editText.value : undefined,
+    });
+  }
 
   // After saving, switch to view mode (or close if the popover was for creation).
   if (props.href) {
@@ -415,12 +426,16 @@ function onCancelEdit(): void {
 }
 
 function onRemoveLink(): void {
-  if (!props.blockId) return;
-  editor.commands.unsetLink?.({
-    id: props.blockId,
-    from: props.from,
-    to: props.to,
-  });
+  if (!props.blockId && !props.onRemoveLinkMark) return;
+  if (props.onRemoveLinkMark) {
+    props.onRemoveLinkMark();
+  } else {
+    editor.commands.unsetLink?.({
+      id: props.blockId!,
+      from: props.from,
+      to: props.to,
+    });
+  }
   emit('close');
 }
 

@@ -229,7 +229,6 @@ body.theme-light {
   min-height: 1.5em;
   line-height: 1.6;
   padding: 3px 2px;
-  border-radius: 3px;
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -254,28 +253,30 @@ body.theme-light {
 }
 .block-content code {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas,
-    "Liberation Mono", Menlo, monospace;
-  background: rgb(135 131 120 / 0.15);
-  color: var(--be-danger);
+    "Liberation Mono", Menlo, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
+  background: var(--be-hover);
+  color: inherit;
   padding: 0.1em 0.3em;
-  border-radius: 3px;
+  border: 1px solid var(--be-border);
+  border-radius: 4px;
   font-size: 0.88em;
 }
 .block-content code:hover {
-  background: rgb(135 131 120 / 0.2);
+  background: var(--be-active);
 }
 
 /* --- Link mark --- */
 
 .block-content a {
-  color: inherit;
+  color: var(--be-accent);
   text-decoration: underline;
   text-decoration-color: var(--be-accent);
   text-underline-offset: 2px;
-  cursor: text;
+  cursor: pointer;
 }
 .block-content a:hover {
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1px;
 }
 
 /* --- Link popover --- */
@@ -577,20 +578,31 @@ body.theme-light {
   padding: 8px 12px 8px 12px;
 }
 
-.block-code-lang {
+/* Corner labels: language picker (top-right, clickable) and the static
+   "code block" title (top-left) share typography. */
+.block-code-lang,
+.block-code-title {
   position: absolute;
   top: 4px;
-  right: 6px;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--be-muted);
   text-transform: uppercase;
   user-select: none;
-  cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.block-code-lang {
+  right: 6px;
+  cursor: pointer;
   transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.block-code-title {
+  left: 6px;
+  pointer-events: none;
 }
 
 .block-code-lang:hover {
@@ -600,12 +612,39 @@ body.theme-light {
 
 .block-code {
   font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    "Liberation Mono", -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
   font-size: 0.92em;
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
   padding: 18px 2px 2px;
+}
+
+/* --- Divider / Horizontal Rule (Divider.ts renderer) --------------------- */
+
+.block-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--be-border);
+  margin: 14px 0;
+  /* Make the divider look like a line but still give it a hit-area for
+   * selection. */
+  display: block;
+  user-select: none;
+  /* Ensure the divider sits on its own visual row with a bit of breathing
+   * space above and below. */
+  position: relative;
+}
+
+/* Hover feedback: subtly thicken so the divider is easy to notice when
+ * the user is moving the cursor near it. */
+.block-host-item:hover > .block-divider,
+.block-host-item[data-block-selected="true"] > .block-divider {
+  background: var(--be-accent-soft);
+  height: 2px;
+  margin: 13px 0;
+  transition: background-color 0.15s ease, height 0.15s ease;
 }
 
 /* --- Plus / Slash menu (PlusMenu.vue) ------------------------------------ */
@@ -1363,6 +1402,13 @@ body.theme-light {
   margin: 0 3px;
 }
 
+/* Hide orphaned separators at the edges or when adjacent elements are hidden */
+.ht-content > .ht-sep:first-child,
+.ht-content > .ht-sep:last-child,
+.ht-content > .ht-sep + .ht-sep {
+  display: none;
+}
+
 .ht-danger:hover {
   background: rgba(224 62 62 / 0.85) !important;
   color: #fff;
@@ -1592,7 +1638,9 @@ body.theme-light {
   border: 1px solid var(--be-border);
   border-radius: 5px;
   font-size: 14px;
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', monospace, sans-serif;
   font-variant-numeric: tabular-nums;
   outline: none;
   color: var(--be-text);
@@ -1652,7 +1700,9 @@ body.theme-light {
   border: 1px solid var(--be-border);
   border-radius: 5px;
   font-size: 14px;
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', monospace, sans-serif;
   text-transform: lowercase;
   outline: none;
   color: var(--be-text);
@@ -2142,5 +2192,662 @@ body.theme-dark .image-block-error-overlay {
   color: var(--be-muted);
   opacity: 0.6;
   pointer-events: none;
+}
+
+/* ===========================================================================
+   Table block
+   =========================================================================== */
+
+/* Outer container. Padding creates gutter space for absolutely-positioned
+   row handles (left) and column handles (top). Overflow must be visible so
+   the overlay handles are not clipped. */
+.block-table-container {
+  position: relative;
+  /* No padding — .table-wrapper uses margin-left:20px to create the left
+     gutter for row handles, and padding-top:20px for the top col-handles
+     area. This keeps the container's overflow simple. */
+  padding: 0;
+  /* overflow:visible avoids the CSS spec gotcha where overflow-x:hidden
+     forces overflow-y to compute to 'auto', producing a spurious vertical
+     scrollbar. The wrapper handles its own horizontal scrolling. */
+  overflow: visible;
+  max-width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* ---- Toolbar strip (minimal, title only) ------------------------------
+ *
+ * .table-toolbar lives as a direct child of .block-table-container
+ * (outside .table-wrapper), so it stays fixed when the table scrolls
+ * horizontally.  Positioned to align with the container's gutters:
+ *   - left:0      → starts at container left edge
+ *   - top:0px     → in the top gutter area
+ *   - right:0     → spans full container width
+ *   - padding-left:24px  → leaves room for 20px corner handle + 4px gap
+ */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  padding-left: 24px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.table-toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 14px;            /* match icon size (14×14) for exact centering */
+  font-size: 12px;
+  line-height: 14px;       /* 12px text + 1px semi-leading top/bottom = perfectly centered in 14px */
+  color: var(--be-muted);
+  font-weight: 500;
+}
+
+.table-toolbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  width: 14px;
+}
+
+.table-toolbar-icon svg {
+  display: block;          /* remove inline baseline offset so SVG fills 14×14 exactly */
+}
+
+/* ---- Wrapper (scroll container) ----------------------------------------
+ *
+ * .table-wrapper is the horizontal scroll container. The selection
+ * handles (col-handles, row-handles) live OUTSIDE this wrapper as direct
+ * children of .block-table-container, so they stay fixed during scroll.
+ *
+ * The wrapper has NO padding — it sits directly inside the container's
+ * gutters (padding-left:20px, padding-top:20px), with its top-left at
+ * (20px, 20px) relative to the container.
+ *
+ *   .table-col-resizers  — absolute, overlay the table (scrolls with it)
+ *   <table>              — absolute or max-content inside wrapper
+ */
+.table-wrapper {
+  position: relative;
+  /* margin-left creates the left gutter for row-handles (20px wide).
+     padding-top creates space at the top for col-handles (20px tall),
+     which live INSIDE this wrapper so they scroll horizontally with
+     the table — like Arco Design's table header. */
+  margin-left: 20px;
+  padding: 0;
+  padding-top: 20px;
+  /* Fill remaining width after margin-left. */
+  width: calc(100% - 20px);
+  /* overflow-x:auto enables horizontal scrolling when the table exceeds
+     the wrapper's visible width. overflow-y MUST be 'hidden' (not
+     'visible') to avoid the CSS spec gotcha where visible computes
+     to auto, producing a spurious vertical scrollbar. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* --- Top gutter (column selection strips + column dots) ---------
+ *
+ * Lives INSIDE .table-wrapper so it scrolls horizontally with the table
+ * — like Arco Design's table header. Positioned at top:0 (in the
+ * wrapper's padding-top area), left:0.
+ * Width is dynamically set via inline style to match tableTotalWidth.
+ */
+.table-col-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 20px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* --- Left gutter (row selection strips + row dots) -------------
+ *
+ * Lives OUTSIDE .table-wrapper as a direct child of .block-table-container.
+ * Fixed during horizontal scroll (rows don't move horizontally).
+ * top:0 because rowTops are measured relative to the wrapper's top edge
+ * (which includes the 20px padding-top offset), so they already account
+ * for the col-handles area.
+ */
+.table-row-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* --- Corner handle (top-left, select entire table) -----------------
+ *
+ * Lives as a direct child of .block-table-container (outside the scroll
+ * wrapper), so it stays fixed during horizontal scroll.  Positioned at
+ * the container's top-left corner, aligned with the wrapper's gutters.
+ */
+.table-corner-handle {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  z-index: 6;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--be-muted);
+  opacity: 0.6;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.table-corner-handle:hover {
+  opacity: 1;
+  color: var(--be-accent);
+}
+
+.table-corner-handle::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+/* --- Row selection strips (click to select row) --------------------------- */
+.table-row-strip {
+  position: absolute;
+  left: 0;
+  width: 20px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.12s ease;
+}
+
+.table-row-strip::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 3px;
+  border-radius: 1.5px;
+  background: var(--be-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.table-row-strip:hover::before {
+  opacity: 0.4;
+}
+
+.table-row-strip.is-selected {
+  background: var(--be-accent);
+}
+
+.table-row-strip.is-selected::before {
+  opacity: 1;
+  background: #fff;
+}
+
+/* --- Column selection strips (click to select column) -------------------- */
+.table-col-strip {
+  position: absolute;
+  top: 0;
+  height: 20px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.12s ease;
+}
+
+.table-col-strip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 12px;
+  border-radius: 1.5px;
+  background: var(--be-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.table-col-strip:hover::before {
+  opacity: 0.4;
+}
+
+.table-col-strip.is-selected {
+  background: var(--be-accent);
+}
+
+.table-col-strip.is-selected::before {
+  opacity: 1;
+  background: #fff;
+}
+
+/* --- Insertion dots (always visible, highlight on hover) ----------------- */
+.table-insert-dot {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 7;
+  opacity: 0.35;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.table-insert-dot-row {
+  left: 5px;
+  width: 10px;
+  height: 10px;
+  transform: translateY(-50%);
+}
+
+.table-insert-dot-col {
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%);
+}
+
+.table-insert-dot::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--be-muted);
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.table-insert-dot.is-hovered,
+.table-insert-dot:hover {
+  opacity: 1;
+}
+
+.table-insert-dot.is-hovered::before,
+.table-insert-dot:hover::before {
+  background: var(--be-accent);
+  transform: scale(1.4);
+}
+
+.table-insert-dot:hover {
+  transform: translateY(-50%) scale(1.3);
+}
+
+.table-insert-dot-col:hover {
+  transform: translateX(-50%) scale(1.3);
+}
+
+/* --- Column resizers (overlay, right edge of each column) --------------- */
+.table-col-resizers {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 20px);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.table-col-resize-item {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+.table-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  pointer-events: auto;
+  transition: background 0.1s ease;
+  z-index: 2;
+}
+
+.table-col-resizer:hover,
+.table-col-resizer:active {
+  background: var(--be-accent);
+  opacity: 0.4;
+}
+
+/* ---- The actual <table> ------------------------------------------------- */
+.block-table-grid,
+.table-block {
+  width: max-content;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--be-text);
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+}
+
+.block-table-grid .table-row,
+.table-block .table-row {
+  border-bottom: 1px solid var(--be-border);
+}
+
+.block-table-grid .table-row:last-child,
+.table-block .table-row:last-child {
+  border-bottom: none;
+}
+
+.block-table-grid .table-row-head,
+.table-block .table-row-head {
+  background: var(--be-hover);
+}
+
+.table-cell-header {
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Table cell alignment overrides — must take priority over .table-cell-header
+   so that be-align-* classes work on header (<th>) cells. Higher specificity
+   (two classes) beats .table-cell-header (one class). */
+.table-cell.be-align-left   { text-align: left; }
+.table-cell.be-align-center { text-align: center; }
+.table-cell.be-align-right  { text-align: right; }
+
+.table-cell {
+  vertical-align: top;
+  padding: 0;
+  border-left: 1px solid var(--be-border);
+  border-right: 1px solid var(--be-border);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.table-cell:last-child {
+  border-right: none;
+}
+
+.table-cell-selected {
+  background: var(--be-active);
+}
+
+.table-cell-focused {
+  outline: 2px solid var(--be-accent);
+  outline-offset: -2px;
+}
+
+.table-cell-inner {
+  min-height: 2.4em;
+  padding: 6px 8px;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 2px;
+}
+
+.block-ordered-list-wrapper .table-cell-inner,
+.table-cell-todo-wrapper .table-cell-inner {
+  padding-left: 0;
+}
+
+/* Heading-style cells: bold + slightly larger font */
+.table-cell-inner.table-cell-heading {
+  font-weight: 600;
+  font-size: 1.05em;
+}
+
+/* Heading levels — mirror .block-heading-hN but without margins
+ * (margins would break table cell layout). */
+.table-cell-inner.table-cell-h1 { font-size: 2rem; font-weight: 600; line-height: 1.3; }
+.table-cell-inner.table-cell-h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.3; }
+.table-cell-inner.table-cell-h3 { font-size: 1.25rem; font-weight: 600; line-height: 1.3; }
+.table-cell-inner.table-cell-h4 { font-size: 1.1rem; font-weight: 600; line-height: 1.3; }
+.table-cell-inner.table-cell-h5 { font-size: 1rem; font-weight: 600; line-height: 1.3; }
+.table-cell-inner.table-cell-h6 { font-size: 0.9rem; font-weight: 600; color: var(--be-muted); line-height: 1.3; }
+
+/* Bullet list cell: bullet marker via ::before.
+   padding-left matches the ordered list's text start position:
+   marker outer width (1.9em + 6px) + inner div padding-left (8px). */
+.table-cell-inner.table-cell-bullet {
+  position: relative;
+  padding-left: calc(1.9em + 2px);
+}
+.table-cell-inner.table-cell-bullet::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: 1.9em;
+  height: 1.6em;
+  display: flex;
+  align-items: flex-start;
+  justify-content: left;
+  font-weight: 700;
+  font-size: 0.95em;
+  color: inherit;
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+/* Ordered list cell: flex wrapper + clickable marker element (NOT ::before,
+   because the number needs to be clickable in both select and edit states
+   to open the ordered-list menu — continue / start new / modify number).
+   The wrapper is .block-ordered-list-wrapper so it reuses global styles
+   (display: flex, align-items: flex-start); we only need to compensate
+   for the .table-cell-inner padding-top: 6px which pushes the text down
+   relative to the wrapper's top edge.
+
+   Global .ol-marker has margin-top: 3px (for text blocks with 3px
+   padding-top). In table cells the inner padding is 6px, so shift the
+   marker down by an extra 3px. */
+.block-ordered-list-wrapper .table-cell-ol-marker {
+  margin-top: calc(3px + 3px);
+  margin-left: 2px;
+  cursor: pointer;
+  width: calc(1.9em + 1px);
+}
+
+/* Remove old ::before rule — ordered list cells no longer use ::before. */
+/* .table-cell-inner.table-cell-ordered { */
+  /* No extra padding; wrapper handles the marker width through flex. */
+/* } */
+
+/* Todo list cell: wrapper with real checkbox + content.
+   The checkbox is a sibling of the contenteditable div (not inside it)
+   so it can be toggled in non-edit mode without affecting cell content.
+   The gap is computed so the text starts at the same x-offset as the
+   ordered list: desired text start = 1.9em + 14px, checkbox takes
+   2px(margin) + 16px(width), inner div has 8px padding-left, so
+   gap = (1.9em + 14px) - 2 - 16 - 8 = 1.9em - 12px. */
+.table-cell-todo-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.table-cell-todo-checkbox {
+  margin-top: calc(0.45em + 2px);
+  margin-left: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--be-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  /* Ensure the checkbox is clickable even when the cell is not in edit mode
+     (contenteditable=false on the sibling div). */
+  pointer-events: auto;
+}
+
+/* The todo content div no longer needs the ::before marker (the real
+   checkbox replaces it). Keep position:relative for potential future use
+   but remove the left padding since the checkbox is now a flex sibling. */
+.table-cell-inner.table-cell-todo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Checked state: muted color + strikethrough, matching text-block behavior. */
+.table-cell-inner.table-cell-todo.todo-checked {
+  color: var(--be-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: from-font;
+}
+
+/* Quote cell: left border + italic */
+.table-cell-inner.table-cell-quote {
+  border-left: 3px solid var(--be-border);
+  padding-left: 14px;
+  color: var(--be-muted);
+  font-style: italic;
+}
+
+/* Code block cell: monospace font + background — mirror .block-code */
+.table-cell-inner.table-cell-code {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
+  font-size: 0.92em;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--be-hover);
+  border-radius: 4px;
+  margin: 3px;
+}
+
+/* Cell-level background color should NOT have rounded corners — it covers
+   the whole td/th area. Override the .be-bg-* border-radius for table cells. */
+.table-cell.be-bg-gray,
+.table-cell.be-bg-brown,
+.table-cell.be-bg-orange,
+.table-cell.be-bg-yellow,
+.table-cell.be-bg-green,
+.table-cell.be-bg-blue,
+.table-cell.be-bg-purple,
+.table-cell.be-bg-pink,
+.table-cell.be-bg-red {
+  border-radius: 0;
+}
+
+/* Inline code in table cells — mirror .block-content code styles */
+.table-cell-inner code {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
+  background: var(--be-hover);
+  color: inherit;
+  padding: 0.1em 0.3em;
+  border: 1px solid var(--be-border);
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+.table-cell-inner code:hover {
+  background: var(--be-active);
+}
+
+/* Link styles in table cells — mirror .block-content a */
+.table-cell-inner a {
+  color: var(--be-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--be-accent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Non-editable cell inner: let mousedown/click pass through to td */
+.table-cell-inner[contenteditable="false"] {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* But links inside non-editable cells should still be clickable so the
+   link view popover can be opened. */
+.table-cell-inner[contenteditable="false"] a {
+  pointer-events: auto;
+}
+
+/* ---- Floating toolbar (context-sensitive) ----------------------------- */
+.table-floating-toolbar {
+  position: fixed;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--be-bg);
+  border: 1px solid var(--be-border);
+  border-radius: 6px;
+  padding: 3px 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  z-index: 1000;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  user-select: none;
+}
+
+.table-floating-toolbar .ht-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--be-text);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.table-floating-toolbar .ht-btn:hover {
+  background: var(--be-hover);
+}
+
+.table-floating-toolbar .ht-btn.active {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.table-floating-toolbar .ht-btn.ht-danger {
+  color: var(--be-danger);
+}
+
+.table-floating-toolbar .ht-btn.ht-danger:hover {
+  background: rgb(224 62 62 / 0.14);
+}
+
+.table-floating-toolbar .ht-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--be-border);
+  margin: 0 2px;
+}
+
+/* ---- Dark mode --------------------------------------------------------- */
+.theme-dark .block-table-grid,
+.theme-dark .table-block,
+body.theme-dark .block-table-grid,
+body.theme-dark .table-block {
+  background: var(--be-bg);
+}
+
+.theme-dark .table-cell-inner,
+body.theme-dark .table-cell-inner {
+  color: var(--be-text);
 }
 

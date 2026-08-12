@@ -61,6 +61,7 @@ module.exports = {
         'src/view/**/*.vue',
         'src/extensions/**/*.ts',
         'src/extensions/**/*.vue',
+        'src/i18n.ts',
         'src/env.d.ts',
         'playground/**/*',
       ],
@@ -70,5 +71,5 @@ module.exports = {
       },
     },
   ],
-  ignorePatterns: ['dist', 'node_modules', '*.cjs'],
+  ignorePatterns: ['dist', 'node_modules', '*.cjs', '*.css'],
 }

@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from 'vue';
 import type { Block, BlockId } from '../core/types';
-import { useEditor } from './context';
+import { useEditor, useEditable } from './context';
 import BlockContent from './BlockContent.vue';
 import BlockHandle from './ui/BlockHandle.vue';
 
@@ -80,10 +80,13 @@ const emit = defineEmits<{
 }>();
 
 const editor = useEditor();
+const editable = useEditable();
 const hostEl = ref<HTMLElement | null>(null);
 const handleRef = ref<InstanceType<typeof BlockHandle> | null>(null);
 
 const showHandle = computed(() => {
+  // Read-only mode: never show the plus/insert or grip handle buttons.
+  if (!editable.value) return false;
   if (props.hasTextSelection) return false;
   if (props.hoveredBlockId === props.block.id) return true;
   if (props.hoveredBlockId === null && props.focusedBlockId === props.block.id) return true;
