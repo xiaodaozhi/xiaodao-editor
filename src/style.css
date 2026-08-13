@@ -194,7 +194,7 @@ body.theme-light {
   color: var(--be-muted);
   width: 20px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: 2px;
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
@@ -286,7 +286,7 @@ body.theme-light {
   z-index: 65;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: var(--be-shadow);
   padding: 7px;
   display: flex;
@@ -311,7 +311,7 @@ body.theme-light {
   color: var(--be-accent);
   text-decoration: none;
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: 4px;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -333,7 +333,7 @@ body.theme-light {
   border: none;
   background: transparent;
   color: var(--be-fg);
-  border-radius: 5px;
+  border-radius: 3px;
   padding: 5px 8px;
   cursor: pointer;
   font-size: 13px;
@@ -361,7 +361,7 @@ body.theme-light {
 }
 .link-popover-input {
   border: 1px solid var(--be-border);
-  border-radius: 5px;
+  border-radius: 3px;
   padding: 5px 8px;
   font-size: 13px;
   outline: none;
@@ -394,7 +394,7 @@ body.theme-light {
   background: var(--be-accent);
   color: #fff;
   padding: 5px 14px;
-  border-radius: 5px;
+  border-radius: 3px;
   font-weight: 500;
   font-size: 13.5px;
 }
@@ -404,14 +404,14 @@ body.theme-light {
 }
 .link-popover-cancel {
   padding: 5px 14px;
-  border-radius: 5px;
+  border-radius: 3px;
   font-size: 13.5px;
 }
 
-/* Placeholder shown when the block is empty and focused. Uses ::after so it
+/* Placeholder shown when the block is empty. Uses ::after so it
    never collides with list markers (::before on the same .block-content). */
 
-.block-content[data-empty="true"]:focus:after {
+.block-content[data-empty="true"]:after {
   content: attr(data-placeholder);
   color: var(--be-muted);
   pointer-events: none;
@@ -519,7 +519,7 @@ body.theme-light {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   user-select: none;
-  border-radius: 4px;
+  border-radius: 2px;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
@@ -574,7 +574,7 @@ body.theme-light {
   position: relative;
   background: var(--be-hover);
   border: 1px solid var(--be-border);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 8px 12px 8px 12px;
 }
 
@@ -595,12 +595,14 @@ body.theme-light {
 }
 
 .block-code-lang {
+  font-size: 0.68rem;
   right: 6px;
   cursor: pointer;
   transition: background-color 0.1s ease, color 0.1s ease;
 }
 
 .block-code-title {
+  font-size: 0.8rem;
   left: 6px;
   pointer-events: none;
 }
@@ -611,6 +613,8 @@ body.theme-light {
 }
 
 .block-code {
+  position: relative;
+  z-index: 1; /* above the highlight layer, below the corner labels */
   font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
     "Liberation Mono", -apple-system, BlinkMacSystemFont,
     'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
@@ -619,6 +623,137 @@ body.theme-light {
   white-space: pre-wrap;
   word-break: break-word;
   padding: 18px 2px 2px;
+  /* Two-layer highlighting: the editable text is transparent by default so
+     the .block-code-highlight layer underneath shows through; only the
+     caret stays visible. On focus the plain text reappears and the
+     highlight layer fades out (Notion-style editing UX). */
+  color: transparent;
+  caret-color: var(--be-text);
+  transition: color 0.12s ease;
+}
+
+.block-code::selection {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.block-code:focus {
+  color: var(--be-text);
+}
+
+.block-code-wrapper:focus-within .block-code-highlight {
+  opacity: 0;
+}
+
+/* Decorative syntax-highlight layer (rendered by highlight.js in
+   CodeBlock.ts). Absolutely positioned inside the wrapper and aligned
+   pixel-for-pixel with the editable text layer: same padding origin
+   (wrapper 8px/12px + .block-code 18px/2px/2px = 26px/14px/10px), same
+   font metrics and identical wrapping rules. Never receives pointer
+   events and is invisible to AT (aria-hidden). */
+.block-code-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 26px 14px 10px;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Microsoft YaHei', monospace, sans-serif;
+  font-size: 0.92em;
+  line-height: 1.55;
+  color: var(--be-text);
+  transition: opacity 0.12s ease;
+}
+
+/* The browser UA stylesheet forces `code { font-family: monospace }`,
+   which would otherwise override the stack inherited from
+   .block-code-highlight and make the highlight layer render with a
+   different face/size than the editable text layer. Explicitly re-inherit
+   so both layers always share the exact same typography. */
+.block-code-highlight .hljs {
+  font: inherit;
+  white-space: inherit;
+  word-break: inherit;
+}
+
+/* Keep the corner labels above the highlight layer so the language label
+   stays clickable even if long tokens would run underneath it. */
+.block-code-lang,
+.block-code-title {
+  z-index: 2;
+}
+
+/* highlight.js token palette — mapped to the editor's semantic color
+   tokens so it adapts to light/dark themes automatically. */
+.block-code-highlight .hljs-comment,
+.block-code-highlight .hljs-quote,
+.block-code-highlight .hljs-meta {
+  color: var(--be-color-gray);
+  font-style: italic;
+}
+
+.block-code-highlight .hljs-keyword,
+.block-code-highlight .hljs-selector-tag,
+.block-code-highlight .hljs-literal,
+.block-code-highlight .hljs-doctag,
+.block-code-highlight .hljs-section,
+.block-code-highlight .hljs-meta .hljs-keyword {
+  color: var(--be-color-purple);
+}
+
+.block-code-highlight .hljs-string,
+.block-code-highlight .hljs-regexp,
+.block-code-highlight .hljs-addition,
+.block-code-highlight .hljs-attribute,
+.block-code-highlight .hljs-symbol,
+.block-code-highlight .hljs-bullet {
+  color: var(--be-color-green);
+}
+
+.block-code-highlight .hljs-number,
+.block-code-highlight .hljs-title,
+.block-code-highlight .hljs-title.function_,
+.block-code-highlight .hljs-function .hljs-title {
+  color: var(--be-color-blue);
+}
+
+.block-code-highlight .hljs-built_in,
+.block-code-highlight .hljs-builtin-name,
+.block-code-highlight .hljs-type,
+.block-code-highlight .hljs-class .hljs-title,
+.block-code-highlight .hljs-selector-class,
+.block-code-highlight .hljs-selector-id,
+.block-code-highlight .hljs-template-variable,
+.block-code-highlight .hljs-params {
+  color: var(--be-color-orange);
+}
+
+.block-code-highlight .hljs-attr,
+.block-code-highlight .hljs-variable,
+.block-code-highlight .hljs-property {
+  color: var(--be-color-brown);
+}
+
+.block-code-highlight .hljs-tag,
+.block-code-highlight .hljs-name,
+.block-code-highlight .hljs-selector-pseudo,
+.block-code-highlight .hljs-deletion,
+.block-code-highlight .hljs-diff .hljs-meta {
+  color: var(--be-color-red);
+}
+
+.block-code-highlight .hljs-emphasis {
+  font-style: italic;
+}
+
+.block-code-highlight .hljs-strong {
+  font-weight: 600;
 }
 
 /* --- Divider / Horizontal Rule (Divider.ts renderer) --------------------- */
@@ -668,7 +803,7 @@ body.theme-light {
   z-index: 50;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: var(--be-shadow);
   padding: 6px;
   overflow: hidden;
@@ -707,7 +842,7 @@ body.theme-light {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   user-select: none;
 }
@@ -735,7 +870,7 @@ body.theme-light {
   font-size: 14px;
   font-weight: 600;
   border: 1px solid var(--be-border);
-  border-radius: 4px;
+  border-radius: 2px;
   background: var(--be-bg);
   color: var(--be-text);
   flex-shrink: 0;
@@ -804,7 +939,7 @@ body.theme-light {
   color: var(--be-muted);
   cursor: pointer;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 2px;
   margin: 2px 0;
   transition: background 0.1s ease, color 0.1s ease;
 }
@@ -831,7 +966,7 @@ body.theme-light {
   z-index: 60;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: var(--be-shadow);
   padding: 6px;
   overflow: hidden;
@@ -887,7 +1022,7 @@ body.theme-light {
   padding: 6px 10px;
   border: 0;
   background: transparent;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   color: var(--be-text);
   font: inherit;
@@ -990,7 +1125,7 @@ body.theme-light {
   padding: 6px 10px;
   border: 0;
   background: transparent;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   color: var(--be-text);
   font: inherit;
@@ -1043,7 +1178,7 @@ body.theme-light {
   width: 100%;
   height: 34px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 2px;
   background: transparent;
   color: var(--be-text);
   cursor: pointer;
@@ -1086,7 +1221,7 @@ body.theme-light {
 .bsm-icon-btn {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 2px;
   color: var(--be-text);
   width: 32px;
   height: 28px;
@@ -1167,15 +1302,15 @@ body.theme-light {
 .be-color-red     { color: var(--be-color-red); }
 
 /* Background color presets — uses theme-aware CSS variables with opacity */
-.be-bg-gray    { background-color: var(--be-swatch-bg-gray); border-radius: 4px; }
-.be-bg-brown   { background-color: var(--be-swatch-bg-brown); border-radius: 4px; }
-.be-bg-orange  { background-color: var(--be-swatch-bg-orange); border-radius: 4px; }
-.be-bg-yellow  { background-color: var(--be-swatch-bg-yellow); border-radius: 4px; }
-.be-bg-green   { background-color: var(--be-swatch-bg-green); border-radius: 4px; }
-.be-bg-blue    { background-color: var(--be-swatch-bg-blue); border-radius: 4px; }
-.be-bg-purple  { background-color: var(--be-swatch-bg-purple); border-radius: 4px; }
-.be-bg-pink    { background-color: var(--be-swatch-bg-pink); border-radius: 4px; }
-.be-bg-red     { background-color: var(--be-swatch-bg-red); border-radius: 4px; }
+.be-bg-gray    { background-color: var(--be-swatch-bg-gray); border-radius: 2px; }
+.be-bg-brown   { background-color: var(--be-swatch-bg-brown); border-radius: 2px; }
+.be-bg-orange  { background-color: var(--be-swatch-bg-orange); border-radius: 2px; }
+.be-bg-yellow  { background-color: var(--be-swatch-bg-yellow); border-radius: 2px; }
+.be-bg-green   { background-color: var(--be-swatch-bg-green); border-radius: 2px; }
+.be-bg-blue    { background-color: var(--be-swatch-bg-blue); border-radius: 2px; }
+.be-bg-purple  { background-color: var(--be-swatch-bg-purple); border-radius: 2px; }
+.be-bg-pink    { background-color: var(--be-swatch-bg-pink); border-radius: 2px; }
+.be-bg-red     { background-color: var(--be-swatch-bg-red); border-radius: 2px; }
 
 /* Block indent: each level is list-marker width (calc(1.9em + 2px)) */
 .be-indent-1  { margin-left: calc(1.9em + 2px); }
@@ -1209,7 +1344,7 @@ body.theme-light {
   gap: 0;
   background: #1f1f1f;
   color: #fff;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 4px;
   box-shadow: 0 0 0 1px rgba(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.18),
     0 6px 16px rgb(0 0 0 / 0.28);
@@ -1252,7 +1387,7 @@ body.theme-light {
   color: inherit;
   width: 22px;
   height: 30px;
-  border-radius: 5px;
+  border-radius: 3px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1345,7 +1480,7 @@ body.theme-light {
   height: 30px;
   min-width: 30px;
   padding: 0 8px;
-  border-radius: 5px;
+  border-radius: 3px;
   cursor: pointer;
   font: inherit;
   display: inline-flex;
@@ -1428,7 +1563,7 @@ body.theme-light {
   background: var(--be-bg);
   color: var(--be-text);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: var(--be-shadow);
   padding: 4px;
   z-index: 10;
@@ -1460,7 +1595,7 @@ body.theme-light {
   padding: 7px 10px;
   border: 0;
   background: transparent;
-  border-radius: 5px;
+  border-radius: 3px;
   cursor: pointer;
   color: var(--be-text);
   font: inherit;
@@ -1563,7 +1698,7 @@ body.theme-light {
   background: var(--be-bg);
   color: var(--be-text);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 4px;
   box-shadow: var(--be-shadow);
   display: flex;
@@ -1585,7 +1720,7 @@ body.theme-light {
   border: 0;
   color: inherit;
   padding: 7px 9px;
-  border-radius: 5px;
+  border-radius: 3px;
   cursor: pointer;
   text-align: left;
   font-size: 13.5px;
@@ -1620,7 +1755,7 @@ body.theme-light {
   background: var(--be-bg);
   color: var(--be-text);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 7px;
   box-shadow: var(--be-shadow);
   animation: olm-fade-in 0.12s ease;
@@ -1636,7 +1771,7 @@ body.theme-light {
   width: 90px;
   padding: 5px 8px;
   border: 1px solid var(--be-border);
-  border-radius: 5px;
+  border-radius: 3px;
   font-size: 14px;
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas,
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
@@ -1658,7 +1793,7 @@ body.theme-light {
   color: #fff;
   border: 0;
   padding: 5px 14px;
-  border-radius: 5px;
+  border-radius: 3px;
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -1676,29 +1811,95 @@ body.theme-light {
 .code-lang-picker {
   position: fixed;
   z-index: 70;
+  min-width: 210px;
   background: var(--be-bg);
   color: var(--be-text);
   border: 1px solid var(--be-border);
-  border-radius: 8px;
-  padding: 7px;
+  border-radius: 4px;
+  padding: 4px;
   box-shadow: var(--be-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: olm-fade-in 0.12s ease;
+}
+
+.clp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.clp-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 7px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.4;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background-color 0.1s ease;
+}
+
+.clp-item:hover {
+  background: var(--be-hover);
+}
+
+.clp-item.active {
+  background: var(--be-active);
+  color: var(--be-accent);
+}
+
+.clp-item-check {
+  font-size: 12px;
+  color: var(--be-accent);
+  flex-shrink: 0;
+}
+
+.clp-item-custom {
+  border-top: 1px solid var(--be-border);
+  border-radius: 0 0 3px 3px;
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.clp-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 3px;
 }
 
 .clp-form {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Buttons below the input, right-aligned (mirrors .link-popover-edit-actions). */
+.clp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .clp-input {
-  flex: 1 1 auto;
-  min-width: 80px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 5px 8px;
   border: 1px solid var(--be-border);
-  border-radius: 5px;
+  border-radius: 3px;
   font-size: 14px;
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas,
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
@@ -1720,7 +1921,7 @@ body.theme-light {
   color: #fff;
   border: 0;
   padding: 5px 14px;
-  border-radius: 5px;
+  border-radius: 3px;
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -1733,6 +1934,23 @@ body.theme-light {
 .clp-ok:hover {
   background: var(--be-accent);
   filter: brightness(1.1);
+}
+
+.clp-cancel {
+  background: transparent;
+  border: 1px solid var(--be-border);
+  color: inherit;
+  padding: 5px 14px;
+  border-radius: 3px;
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+
+.clp-cancel:hover {
+  background: var(--be-hover);
 }
 
 /* --- Block drag & drop styles -------------------------------------------- */
@@ -1870,7 +2088,7 @@ body.theme-light {
   max-width: 100%;
   margin: 6px 0;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: 4px;
   user-select: none;
 }
 
@@ -1914,7 +2132,7 @@ body.theme-light {
   padding: 3px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--be-border);
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.10);
   opacity: 0;
   transform: translateY(-2px);
@@ -1943,7 +2161,7 @@ body.theme-dark .image-block-toolbar {
   border: 0;
   background: transparent;
   color: var(--be-text);
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   line-height: 1;
 }
@@ -1966,7 +2184,7 @@ body.theme-dark .image-block-toolbar {
   padding: 16px 20px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--be-border);
-  border-radius: 6px;
+  border-radius: 4px;
   z-index: 4;
   text-align: center;
 }
@@ -1992,14 +2210,14 @@ body.theme-dark .image-block-upload-overlay {
   max-width: 260px;
   height: 6px;
   background: var(--be-hover);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .image-block-progress-bar {
   height: 100%;
   background: var(--be-accent);
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 0.15s ease;
 }
 
@@ -2021,7 +2239,7 @@ body.theme-dark .image-block-upload-overlay {
   padding: 16px 20px;
   background: rgba(255, 240, 240, 0.96);
   border: 1px solid rgba(224, 62, 62, 0.28);
-  border-radius: 6px;
+  border-radius: 4px;
   z-index: 4;
   text-align: center;
 }
@@ -2070,7 +2288,7 @@ body.theme-dark .image-block-error-overlay {
   background: var(--be-accent);
   color: white;
   border: 0;
-  border-radius: 4px;
+  border-radius: 2px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -2092,7 +2310,7 @@ body.theme-dark .image-block-error-overlay {
   min-height: 140px;
   padding: 24px 20px;
   border: 2px dashed var(--be-border);
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   color: var(--be-muted);
   background: var(--be-hover);
@@ -2132,7 +2350,7 @@ body.theme-dark .image-block-error-overlay {
   display: block;
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: 2px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   user-select: none;
   -webkit-user-drag: none;
@@ -2179,7 +2397,7 @@ body.theme-dark .image-block-error-overlay {
   text-align: center;
   outline: none;
   min-height: 1.2em;
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 .image-block-caption:focus {
@@ -2207,10 +2425,13 @@ body.theme-dark .image-block-error-overlay {
      gutter for row handles, and padding-top:20px for the top col-handles
      area. This keeps the container's overflow simple. */
   padding: 0;
-  /* overflow:visible avoids the CSS spec gotcha where overflow-x:hidden
-     forces overflow-y to compute to 'auto', producing a spurious vertical
-     scrollbar. The wrapper handles its own horizontal scrolling. */
-  overflow: visible;
+  /* overflow-x:clip clips horizontal overflow (e.g. dot hover-scale at the
+     right edge) without the CSS spec gotcha where overflow-x:hidden forces
+     overflow-y to compute to 'auto' and produces a spurious vertical
+     scrollbar. overflow-y stays visible. The wrapper handles its own
+     horizontal scrolling internally. */
+  overflow-x: clip;
+  overflow-y: visible;
   max-width: 100%;
   box-sizing: border-box;
   outline: none;
@@ -2490,6 +2711,39 @@ body.theme-dark .image-block-error-overlay {
 
 .table-insert-dot-col:hover {
   transform: translateX(-50%) scale(1.3);
+}
+
+/* --- Column insert dots (fixed overlay, outside the scroll wrapper) -------
+ *
+ * Sibling to .table-wrapper (direct child of .block-table-container).
+ * left:20px / right:0 mirrors the wrapper's box (margin-left:20px,
+ * width:calc(100% - 20px)) so the overlay's coordinate origin aligns with
+ * the wrapper's visible left edge. Each dot's inline `left` is a viewport-x
+ * (content-x − scrollLeft) computed in JS — the overlay itself never scrolls.
+ *
+ * The overlay fades out while the wrapper is actively scrolling and fades
+ * back in once scrolling is stationary, so the dots never visibly chase
+ * intermediate scroll frames.
+ */
+.table-col-insert-dots {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 0;
+  height: 20px;
+  pointer-events: none;
+  z-index: 7;
+  transition: opacity 0.15s ease;
+}
+
+.table-col-insert-dots.is-scrolling {
+  opacity: 0;
+}
+
+/* While scrolling the dots are invisible — disable hit-testing so a stray
+   click can never fire a column insert against a stale position. */
+.table-col-insert-dots.is-scrolling .table-insert-dot {
+  pointer-events: none;
 }
 
 /* --- Column resizers (overlay, right edge of each column) --------------- */
@@ -2790,7 +3044,7 @@ body.theme-dark .image-block-error-overlay {
   gap: 2px;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 3px 4px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
   z-index: 1000;
@@ -2807,7 +3061,7 @@ body.theme-dark .image-block-error-overlay {
   height: 26px;
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 2px;
   background: transparent;
   color: var(--be-text);
   cursor: pointer;

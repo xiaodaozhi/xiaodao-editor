@@ -536,6 +536,27 @@ function setSelectionCommand(): CommandEntry<{ selection: Selection }> {
   };
 }
 
+/**
+ * Drop any active block selection: set the selection to an empty block
+ * selection ({ kind: 'blocks', blockIds: [] }), which the core treats as
+ * "nothing selected". Used when deselecting image/table/code blocks —
+ * they have no text caret, so there is no caret position to move to.
+ */
+function clearSelectionCommand(): CommandEntry {
+  return {
+    name: 'clearSelection',
+    run: () => (_state, dispatch) => {
+      dispatch?.(
+        createTransaction()
+          .setSelection({ kind: 'blocks', blockIds: [] })
+          .setMeta({ addToHistory: false })
+          .build(),
+      );
+      return true;
+    },
+  };
+}
+
 /** Select all content: a text selection from the first block's start to the
  *  last block's end. For a single-block document, produces a normal
  *  single-block text selection (rendered by the native Selection API). */
@@ -1287,6 +1308,7 @@ export function createPrimitiveCommands(registries: EditorRegistries): AnyComman
     setSelectionCommand(),
     selectAllCommand(),
     selectBlockCommand(),
+    clearSelectionCommand(),
     moveBlockCommand(ctx),
     convertBlockCommand(ctx),
     moveBlockUpCommand(ctx),

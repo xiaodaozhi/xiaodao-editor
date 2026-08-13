@@ -17,7 +17,7 @@
  *      ordered-list items that don't themselves have an explicit override.
  */
 
-import { defineComponent, h, ref, onBeforeUnmount, type PropType } from 'vue';
+import { defineComponent, h, ref, useAttrs, onBeforeUnmount, type PropType } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { Block, BlockId } from '../core/types';
 import BlockContent from '../view/BlockContent.vue';
@@ -117,6 +117,17 @@ const OrderedListBlock = defineComponent({
     const editor = useEditor();
     const editable = useEditable();
     const markerEl = ref<HTMLElement | null>(null);
+    // BlockHost passes @link-click/@slash-trigger/@input-changed listeners to
+    // the renderer component. This wrapper's root is a plain <div>, so Vue's
+    // automatic attrs inheritance would drop them onto the <div> as DOM event
+    // listeners (never fired) instead of reaching the inner BlockContent.
+    // Forward them explicitly to BlockContent.
+    const attrs = useAttrs();
+    const forwardEvents = {
+      ...(typeof attrs.onLinkClick === 'function' ? { onLinkClick: attrs.onLinkClick as () => void } : {}),
+      ...(typeof attrs.onSlashTrigger === 'function' ? { onSlashTrigger: attrs.onSlashTrigger as () => void } : {}),
+      ...(typeof attrs.onInputChanged === 'function' ? { onInputChanged: attrs.onInputChanged as () => void } : {}),
+    };
     // 文档变化时需要重新计算序号。由于结构共享，兄弟块编辑不会改变
     // 当前 block 的引用，Vue 会跳过重渲染。通过订阅 editor 状态变化
     // 递增 docVersion，在 render 函数中读取它以建立响应式依赖，
@@ -160,6 +171,7 @@ const OrderedListBlock = defineComponent({
         block: props.block,
         placeholder: props.placeholder,
         class: ['block-ordered-list-content', ...nonIndentClasses],
+        ...forwardEvents,
       });
       return h(
         'div',

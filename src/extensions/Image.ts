@@ -159,8 +159,26 @@ const ImageBlock = defineComponent({
       e.preventDefault();
       e.stopPropagation();
       const attrs = props.block.attrs;
-      resizeStartW = (attrs.width as number) || naturalSize.value?.w || 200;
-      resizeStartH = (attrs.height as number) || naturalSize.value?.h || 150;
+      // 拖拽基准必须与实际显示尺寸一致：attrs 里存的是自然尺寸，可能大于
+      // 容器宽度（CSS max-width:100% 视觉压缩）或超过高度上限
+      // （max-height:600px 等比压缩）。若直接以 attrs 为基准，move 里的
+      // 钳制会让首次拖动瞬间跳变/卡死。故先把宽高折算成当前显示尺寸。
+      const container = imgEl.value?.closest('.block-image-container') as HTMLElement | null;
+      const maxContainerW = container ? container.clientWidth - 8 : 0;
+      let baseW = (attrs.width as number) || naturalSize.value?.w || 200;
+      let baseH = (attrs.height as number) || naturalSize.value?.h || 150;
+      if (baseH > MAX_IMAGE_HEIGHT) {
+        const ratio = baseW / Math.max(1, baseH);
+        baseH = MAX_IMAGE_HEIGHT;
+        baseW = Math.round(baseH * ratio);
+      }
+      if (maxContainerW > 0 && baseW > maxContainerW) {
+        const ratio = baseW / Math.max(1, baseH);
+        baseW = maxContainerW;
+        baseH = Math.round(baseW / ratio);
+      }
+      resizeStartW = baseW;
+      resizeStartH = baseH;
       resizeStartMouseX = e.clientX;
       resizeRatio = resizeStartW / Math.max(1, resizeStartH);
       isResizing.value = true;
@@ -301,7 +319,7 @@ const ImageBlock = defineComponent({
       e.stopPropagation();
       // Read-only: selecting the block would surface editing affordances.
       if (!editable.value) return;
-      editor.commands.selectBlock?.({ blockId });
+      editor.commands.selectBlock?.({ id: blockId });
     }
 
     return () => {
@@ -309,10 +327,22 @@ const ImageBlock = defineComponent({
       const src = effectiveSrc();
       const us = uploadState.value;
       const imageW = attrs.width as number;
+      const imageH = attrs.height as number;
+
+      // Effective DISPLAY width: the wrapper and <img> must hug the image's
+      // actual on-screen width, not the raw attr width. CSS caps the img at
+      // max-height: MAX_IMAGE_HEIGHT, so a tall image (e.g. 800×1600) renders
+      // 300×600 — using the raw 800px attr width here would stretch the
+      // wrapper to ~100% of the container with empty side gutters, until a
+      // resize drag (which enforces the same cap) snaps it back.
+      let displayW = imageW;
+      if (imageW > 0 && imageH > MAX_IMAGE_HEIGHT) {
+        displayW = Math.max(1, Math.round((imageW * MAX_IMAGE_HEIGHT) / imageH));
+      }
 
       const wrapperStyle: Record<string, string> = {};
       const hasError = us?.status === 'error';
-      if (imageW && imageW > 0 && !hasError) wrapperStyle.width = `{imageW}px`;
+      if (imageW && imageW > 0 && !hasError) wrapperStyle.width = `${displayW}px`;
       const children: VNode[] = [];
 
       // Toolbar overlay (shown always on hover; forced-visible when the
@@ -411,7 +441,7 @@ const ImageBlock = defineComponent({
       // --- Actual image element (rendered only when there's a src and NOT in error state) ---
       if (src && us?.status !== 'error') {
         const imgStyle: Record<string, string> = {};
-        if (imageW && imageW > 0) imgStyle.width = `${imageW}px`;
+        if (imageW && imageW > 0) imgStyle.width = `${displayW}px`;
         const imageArea: VNode[] = [
           h('img', {
             ref: imgEl,

@@ -6,7 +6,7 @@
  * checkbox dispatches `setAttrs` to flip the `checked` flag.
  */
 
-import { defineComponent, h, type PropType } from 'vue';
+import { defineComponent, h, useAttrs, type PropType } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { Block } from '../core/types';
 import BlockContent from '../view/BlockContent.vue';
@@ -22,6 +22,15 @@ const TodoListBlock = defineComponent({
   },
   setup(props) {
     const editor = useEditor();
+    // Same event-forwarding need as OrderedListBlock: this wrapper's root is
+    // a <div>, so BlockHost's @link-click/@slash-trigger/@input-changed
+    // listeners must be forwarded explicitly to the inner BlockContent.
+    const attrs = useAttrs();
+    const forwardEvents = {
+      ...(typeof attrs.onLinkClick === 'function' ? { onLinkClick: attrs.onLinkClick as () => void } : {}),
+      ...(typeof attrs.onSlashTrigger === 'function' ? { onSlashTrigger: attrs.onSlashTrigger as () => void } : {}),
+      ...(typeof attrs.onInputChanged === 'function' ? { onInputChanged: attrs.onInputChanged as () => void } : {}),
+    };
 
     function onCheckboxChange(e: Event): void {
       const el = e.target as HTMLInputElement;
@@ -52,6 +61,7 @@ const TodoListBlock = defineComponent({
           block: props.block,
           placeholder: props.placeholder,
           class: classes,
+          ...forwardEvents,
         }),
       ]);
     };

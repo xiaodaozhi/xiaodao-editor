@@ -5,6 +5,7 @@ node_modules
 # build output
 dist
 dist-new
+.workbuddy
 *.tsbuildinfo
 
 # logs
@@ -21,4 +22,3 @@ pnpm-debug.log*
 # env
 .env
 .env.local
-docs

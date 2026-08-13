@@ -29,6 +29,9 @@
   "peerDependencies": {
     "vue": "^3.4.0"
   },
+  "dependencies": {
+    "highlight.js": "^11.11.0"
+  },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",

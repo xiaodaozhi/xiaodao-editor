@@ -24,6 +24,7 @@
       'block-drop-after': isDropTarget && dropPos === 'after',
     }"
     @mouseenter="onHover"
+    @mouseleave="onLeave"
   >
     <BlockHandle
       ref="handleRef"
@@ -73,7 +74,7 @@ const emit = defineEmits<{
   openPlusMenu: [blockId: BlockId, anchor: HTMLElement];
   slashTrigger: [el: HTMLElement, blockId: BlockId, query: string];
   inputChanged: [blockId: BlockId, text: string];
-  hoverChange: [blockId: BlockId];
+  hoverChange: [blockId: BlockId | null];
   gripPointerDown: [blockId: BlockId, startX: number, startY: number, options: { thresholdPx: number }];
   gripPointerUp: [blockId: BlockId];
   linkClick: [blockId: BlockId, offset: number];
@@ -112,6 +113,10 @@ function setHandleDragging(active: boolean): void {
 
 function onHover(): void {
   emit('hoverChange', props.block.id);
+}
+
+function onLeave(): void {
+  emit('hoverChange', null);
 }
 
 function onOpenPlusMenu(anchor: HTMLElement): void {

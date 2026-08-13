@@ -156,6 +156,9 @@ const zhCN: Dict = {
   'codeLang.inputLabel': '代码类型',
   'codeLang.placeholder': '请输入代码类型',
   'codeLang.confirm': '确定',
+  'codeLang.custom': '自定义…',
+  'codeLang.cancel': '取消',
+  'codeLang.plain': '纯文本',
 
   // HoverToolbar
   'hoverToolbar.label': '格式化',
@@ -353,6 +356,9 @@ const enUS: Dict = {
   'codeLang.inputLabel': 'Code language',
   'codeLang.placeholder': 'Enter code language',
   'codeLang.confirm': 'Confirm',
+  'codeLang.custom': 'Custom…',
+  'codeLang.cancel': 'Cancel',
+  'codeLang.plain': 'Plain text',
 
   // HoverToolbar
   'hoverToolbar.label': 'Formatting',

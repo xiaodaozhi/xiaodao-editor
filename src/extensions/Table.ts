@@ -704,13 +704,17 @@ const TableBlock = defineComponent({
       onCellSelectionChange();
     }
 
-    // Convert a wrapper-relative rect to a viewport-relative rect.
+    // Convert a content-relative rect (from measureState, which stores
+    // colLefts / rowTops relative to the wrapper's content origin) to a
+    // viewport-relative rect for position:fixed placement. Must subtract
+    // scrollLeft because content-origin coordinates don't account for how
+    // far the wrapper has been scrolled horizontally.
     function toViewportRect(rect: DOMRect): DOMRect {
       const wrap = wrapperRef.value;
       if (!wrap) return rect;
       const wr = wrap.getBoundingClientRect();
       return new DOMRect(
-        wr.left + rect.left,
+        wr.left + rect.left - wrap.scrollLeft,
         wr.top + rect.top,
         rect.width,
         rect.height,
@@ -1606,12 +1610,31 @@ const TableBlock = defineComponent({
       if (tableNumberPicker.visible) closeTableNumberPicker();
     }
 
-    // Close table ordered-list menu and number picker on page scroll or
-    // touch-move (swipe). These menus are positioned relative to the viewport,
-    // so they go stale the moment the page scrolls.
+    // Close table link popover (view/edit), ordered-list menu and number
+    // picker on page scroll or touch-move (swipe). These popovers are
+    // positioned relative to the viewport, so they go stale the moment the
+    // page scrolls.
     function onTableMenuScrollOrTouch(): void {
+      if (cellLinkPopover.visible) closeCellLinkPopover();
       if (tableOlMenu.visible) closeTableOlMenu();
       if (tableNumberPicker.visible) closeTableNumberPicker();
+      // Keep the cell-selection floating toolbar glued to the selected cells:
+      // re-measure the (wrapper-relative) selection rect and re-convert it to
+      // viewport space so the toolbar scrolls WITH the content instead of
+      // staying pinned to the viewport. Mirrors BlockEditor's
+      // refreshHoverToolbarRect for the text-selection toolbar.
+      if (selectionDOMRect.value !== null && cellSel.value) {
+        const raw = selectionRect(cellSel.value);
+        if (raw) {
+          const expanded = expandSelectionToFullRect(
+            tattrs.value, raw.r1, raw.c1, raw.r2, raw.c2,
+          );
+          const rect = computeSelectionRectDOM(
+            expanded.r1, expanded.c1, expanded.r2, expanded.c2,
+          );
+          if (rect) selectionDOMRect.value = toViewportRect(rect);
+        }
+      }
     }
 
     onMounted(() => {
@@ -1687,13 +1710,18 @@ const TableBlock = defineComponent({
 
       // Measure columns from <colgroup><col> elements — reliable even with
       // colspan/rowspan cells that would confuse a cell-based traversal.
+      // Add wrap.scrollLeft to convert from viewport-relative (r.left −
+      // wrapRect.left, which subtracts the scroll offset) to content-relative
+      // coordinates. colStrips / resizeItems live INSIDE the scroll container
+      // and use left:0 = content origin, so they need content-relative values.
+      const scrollLeft = wrap.scrollLeft;
       const colLefts: number[] = [];
       const colWidths: number[] = [];
       const colEls = Array.from(tbl.querySelectorAll('colgroup > col')) as HTMLTableColElement[];
       if (colEls.length > 0) {
         for (const col of colEls) {
           const r = col.getBoundingClientRect();
-          colLefts.push(Math.round(r.left - wrapRect.left));
+          colLefts.push(Math.round(r.left - wrapRect.left + scrollLeft));
           colWidths.push(Math.round(r.width));
         }
       }
@@ -1719,6 +1747,10 @@ const TableBlock = defineComponent({
         tableTotalWidth,
         tableTotalHeight,
       };
+      // Structure changed (rows/cols/widths) → the wrapper's scrollWidth /
+      // clamped scrollLeft may have changed too. Re-sync so the fixed
+      // column insert-dot overlay recomputes against fresh dimensions.
+      syncColScrollState();
     }
 
     // Re-measure after every render where table structure may have changed.
@@ -1730,19 +1762,54 @@ const TableBlock = defineComponent({
       // Trigger on focusedCell too (cell focus can change row height via outline).
       void focusedCell.value?.row;
       void focusedCell.value?.col;
-      nextTick(() => measureOffsets());
+      // Guard: during column resize, tattrs changes every mousemove frame.
+      // If we let measureOffsets run here, each frame does:
+      //   setAttrs → tattrs changes → watchEffect → nextTick → measureOffsets
+      //   (getBoundingClientRect = forced reflow) → measureState updates →
+      //   second render. That's double render + 1 reflow per frame = lag.
+      // Skip measureOffsets during resize; a final sync runs in onColResizeEnd.
+      nextTick(() => {
+        if (resizingCol.value !== null) return;
+        measureOffsets();
+      });
     });
 
-    // Re-measure on window resize — column widths / row heights can change
-    // when the viewport shrinks.
+    // Re-measure when observed elements resize — column widths / row heights
+    // can change when the viewport shrinks.
     let ro: ResizeObserver | null = null;
     onMounted(() => {
-      ro = new ResizeObserver(() => measureOffsets());
+      ro = new ResizeObserver(() => {
+        // Skip expensive DOM measurements during column resize — the widths
+        // are being driven by the mouse, not by layout. A final measurement
+        // runs in onColResizeEnd.
+        if (resizingCol.value !== null) return;
+        measureOffsets();
+        // Wrapper size changed → re-read scroll viewport so the insert-dot
+        // overlay recomputes against fresh dimensions.
+        syncColScrollState();
+      });
       if (wrapperRef.value) ro.observe(wrapperRef.value);
       if (tableEl.value) ro.observe(tableEl.value);
+      // Observe the editor content area (.block-editor) so that layout
+      // changes (sidebar toggle, panel resize, etc.) that alter the available
+      // width — even without changing the wrapper's own dimensions — trigger
+      // a re-measure and dot repositioning.
+      const editorEl = containerRef.value?.closest('.block-editor') as HTMLElement | null;
+      if (editorEl) ro.observe(editorEl);
+      // Track horizontal scroll of the wrapper to drive the fixed column
+      // insert-dot overlay.
+      if (wrapperRef.value) {
+        wrapperRef.value.addEventListener('scroll', onWrapperScroll, { passive: true });
+      }
+      syncColScrollState();
     });
     onBeforeUnmount(() => {
       ro?.disconnect();
+      if (wrapperRef.value) {
+        wrapperRef.value.removeEventListener('scroll', onWrapperScroll);
+      }
+      if (colScrollRafId) cancelAnimationFrame(colScrollRafId);
+      if (colScrollIdleTimer) clearTimeout(colScrollIdleTimer);
     });
 
     function onColResizeStart(col: number, ev: MouseEvent): void {
@@ -1755,6 +1822,11 @@ const TableBlock = defineComponent({
       resizeStartX = ev.clientX;
       document.addEventListener('mousemove', onColResizeMove, true);
       document.addEventListener('mouseup', onColResizeEnd, true);
+      // Force col-resize cursor on the entire document so it doesn't flicker
+      // between col-resize and default as the resizer element re-renders and
+      // the mouse momentarily slips off it during each drag frame.
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
     }
     function onColResizeMove(ev: MouseEvent): void {
       if (resizingCol.value === null) return;
@@ -1789,7 +1861,111 @@ const TableBlock = defineComponent({
       resizingCol.value = null;
       document.removeEventListener('mousemove', onColResizeMove, true);
       document.removeEventListener('mouseup', onColResizeEnd, true);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Final measurement after resize — the per-frame measurements were
+      // skipped during drag for performance.
+      nextTick(() => {
+        measureOffsets();
+        syncColScrollState();
+      });
     }
+
+    // --- Column insert dots: fixed overlay outside the scroll wrapper ----
+    //
+    // The column insertion dots used to live INSIDE .table-wrapper (the
+    // horizontal scroll container) as part of .table-col-handles, so they
+    // scrolled with the table. They are now rendered as a FIXED overlay
+    // (.table-col-insert-dots) — a direct child of .block-table-container
+    // and sibling to .table-wrapper — so they never scroll themselves.
+    //
+    // Their horizontal positions are COMPUTED from the current scroll
+    // state: each column boundary's content-x is mapped to a viewport-x
+    // (content-x − scrollLeft) and the dot is placed there. Only boundaries
+    // inside the visible viewport are shown; when the table is scrolled to
+    // its left/right edge (or needs no scrolling at all) the leftmost /
+    // rightmost boundary dots are forced visible so the user can always
+    // insert at the outer edges. The dots fade out while scrolling and
+    // reappear (recomputed) once scrolling is stationary.
+
+    const colScrollLeft = ref(0);
+    const colViewportWidth = ref(0);
+    const colScrollWidth = ref(0);
+    // True while the wrapper is actively scrolling — fades the dots out so
+    // they don't visually chase every intermediate scroll frame.
+    const colScrolling = ref(false);
+    let colScrollRafId = 0;
+    let colScrollIdleTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // Read the wrapper's live scroll geometry into reactive refs so the
+    // colDotItems computed can recompute without touching the DOM directly.
+    function syncColScrollState(): void {
+      const wrap = wrapperRef.value;
+      if (!wrap) return;
+      colScrollLeft.value = wrap.scrollLeft;
+      colViewportWidth.value = wrap.clientWidth;
+      colScrollWidth.value = wrap.scrollWidth;
+    }
+
+    function onWrapperScroll(): void {
+      if (!colScrolling.value) colScrolling.value = true;
+      // rAF-coalesce: one geometry read per frame instead of per event.
+      if (colScrollRafId) cancelAnimationFrame(colScrollRafId);
+      colScrollRafId = requestAnimationFrame(() => {
+        colScrollRafId = 0;
+        syncColScrollState();
+      });
+      if (colScrollIdleTimer) clearTimeout(colScrollIdleTimer);
+      // Once scrolling has been idle for a beat, mark stationary and do a
+      // final precise read so the dots settle on the resting position.
+      colScrollIdleTimer = setTimeout(() => {
+        colScrolling.value = false;
+        syncColScrollState();
+      }, 130);
+    }
+
+    // Boundary dot descriptors for the fixed overlay. Recomputes whenever
+    // the measured column geometry OR the scroll state changes.
+    const colDotItems = computed<{ c: number; left: number }[]>(() => {
+      if (!editable.value) return [];
+      const ms = measureState.value;
+      const cols = tattrs.value.cols;
+      const lefts = ms.colLefts;
+      const widths = ms.colWidths;
+      if (cols === 0 || lefts.length < cols || widths.length < cols) return [];
+      const scrollLeft = colScrollLeft.value;
+      const vw = colViewportWidth.value;
+      const sw = colScrollWidth.value;
+      if (vw <= 0) return [];
+
+      const atLeftEdge = scrollLeft <= 0;
+      const atRightEdge = scrollLeft + vw >= sw - 1;
+      const noOverflow = sw <= vw + 1;
+      // Keep dots fully inside the overlay (half-width ~5px + hover scale).
+      const INSET = 6;
+      const items: { c: number; left: number }[] = [];
+      for (let c = 0; c <= cols; c++) {
+        // Content-x of the boundary between column (c-1) and column c.
+        const b = c === 0
+          ? (lefts[0] ?? 0)
+          : c === cols
+            ? (lefts[cols - 1] ?? 0) + (widths[cols - 1] ?? 0)
+            : (lefts[c] ?? 0);
+        // Viewport-x: where this boundary currently sits in the visible area.
+        const vp = b - scrollLeft;
+        let visible = vp >= -1 && vp <= vw + 1;
+        // Always offer insertion at the outer edges when the table can't
+        // scroll any further in that direction (or doesn't scroll at all).
+        if (c === 0 && (atLeftEdge || noOverflow)) visible = true;
+        if (c === cols && (atRightEdge || noOverflow)) visible = true;
+        if (!visible) continue;
+        // Clamp so a dot resting on the viewport edge is never half-clipped.
+        // Nudge non-first dots +2px right, first dot -2px left for visual spacing.
+        const left = Math.max(INSET, Math.min(vp, vw - INSET)) + (c > 0 ? 2 : -2);
+        items.push({ c, left });
+      }
+      return items;
+    });
 
     // --- Structural actions dispatched through editor.commands -----------
 
@@ -2050,14 +2226,43 @@ const TableBlock = defineComponent({
         }));
       }
 
+      // --- Column geometry: use pure arithmetic during resize ------------
+      // During column resize, measureOffsets is skipped (guarded in the
+      // watchEffect above) so measureState is frozen at the pre-drag
+      // snapshot. To keep resizeItems (blue drag bars), colStrips (column
+      // selection strips), and .table-col-handles width following the drag
+      // in real time, compute column lefts/widths/total from the live
+      // tattrs.value.colWidths — pure arithmetic, zero DOM measurement.
+      const isResizing = resizingCol.value !== null;
+      const effColLefts: number[] = [];
+      const effColWidths: number[] = [];
+      let effTableTotalWidth;
+      if (isResizing) {
+        const cw = attr.colWidths;
+        let acc = 0;
+        for (let c = 0; c < cols; c++) {
+          effColLefts.push(acc);
+          const w = cw[c] ?? 80;
+          effColWidths.push(w);
+          acc += w;
+        }
+        effTableTotalWidth = acc;
+      } else {
+        for (let c = 0; c < cols; c++) {
+          effColLefts.push(ms.colLefts[c] ?? 0);
+          effColWidths.push(ms.colWidths[c] ?? 0);
+        }
+        effTableTotalWidth = ms.tableTotalWidth;
+      }
+
       // --- Column selection strips (top gutter, inside wrapper) ------------
       // .table-col-handles lives INSIDE .table-wrapper at top:0, left:0, so
       // it scrolls horizontally with the table. colLefts are measured
       // relative to the wrapper's left edge, so they apply directly.
       const colStrips: VNode[] = [];
       for (let c = 0; c < cols; c++) {
-        const left = ms.colLefts[c];
-        const w = ms.colWidths[c] ?? 0;
+        const left = effColLefts[c];
+        const w = effColWidths[c] ?? 0;
         const isSel = tsel.kind === 'col' && tsel.col === c;
         colStrips.push(h('div', {
           class: `table-col-strip${isSel ? ' is-selected' : ''}`,
@@ -2074,8 +2279,10 @@ const TableBlock = defineComponent({
 
       // --- Insertion dots ------------------------------------------------
       // Row dots are children of .table-row-handles (outside wrapper, fixed).
-      // Col dots are children of .table-col-handles (inside wrapper, scroll).
-      // Both use wrapper-relative coordinates directly.
+      // Column dots are NO LONGER rendered here — they used to live inside
+      // .table-col-handles (which scrolls with the table). They are now a
+      // fixed overlay (.table-col-insert-dots) computed from the wrapper's
+      // scroll state (see colDotItems) and rendered outside the wrapper.
       // Hidden entirely in read-only mode — inserting rows/cols is an
       // editing action.
       const rowDots: VNode[] = [];
@@ -2106,39 +2313,11 @@ const TableBlock = defineComponent({
         }
       }
 
-      const colDots: VNode[] = [];
-      if (editable.value) {
-        for (let c = 0; c <= cols; c++) {
-          let posLeft: number;
-          if (c === 0) {
-            posLeft = (ms.colLefts[0] ?? 0) + 3;
-          } else if (c === cols) {
-            const lastLeft = ms.colLefts[c - 1] ?? 0;
-            const lastW = ms.colWidths[c - 1] ?? 80;
-            posLeft = lastLeft + lastW + 2;
-          } else {
-            const beforeRight = (ms.colLefts[c - 1] ?? 0) + (ms.colWidths[c - 1] ?? 80);
-            const afterLeft = ms.colLefts[c] ?? 0;
-            posLeft = Math.round((beforeRight + afterLeft) / 2);
-          }
-          colDots.push(h('div', {
-            class: 'table-insert-dot table-insert-dot-col',
-            style: { left: `${posLeft}px` },
-            title: c < cols ? i18n.t('table.insertColLeft') : i18n.t('table.insertColRight'),
-            onClick: (e: MouseEvent) => {
-              e.preventDefault();
-              e.stopPropagation();
-              action('tableInsertCol', { beforeCol: c });
-            },
-          }));
-        }
-      }
-
       // --- Column resizers (overlay the table area) ---------------------
       const resizeItems: VNode[] = [];
       for (let c = 0; c < cols; c++) {
-        const left = ms.colLefts[c] ?? 0;
-        const w = ms.colWidths[c] ?? 0;
+        const left = effColLefts[c] ?? 0;
+        const w = effColWidths[c] ?? 0;
         resizeItems.push(h('div', {
           class: 'table-col-resize-item',
           style: {
@@ -2184,25 +2363,51 @@ const TableBlock = defineComponent({
       // Assemble the wrapper — this is the scroll container (overflow-x: auto).
       // col-handles lives INSIDE the wrapper so it scrolls horizontally with
       // the table (like Arco Design's table header). Row handles stay outside
-      // because rows don't move horizontally.
+      // because rows don't move horizontally. Column INSERT dots also stay
+      // outside (see .table-col-insert-dots below) — they are computed from
+      // the scroll state instead of scrolling with the content.
       children.push(
         h('div', {
           class: 'table-wrapper',
           ref: wrapperRef,
         }, [
-          // Column handles (top gutter, scrolls with table).
+          // Column handles (top gutter, scrolls with table). Only the
+          // column selection strips remain here; the insert dots have been
+          // moved to a fixed overlay outside the wrapper.
           h('div', {
             class: 'table-col-handles',
-            style: { width: `${ms.tableTotalWidth}px` },
+            style: { width: `${effTableTotalWidth}px` },
           }, [
             ...colStrips,
-            ...colDots,
           ]),
           // Column resizers (overlay the table area, scrolls with table).
           h('div', { class: 'table-col-resizers' }, resizeItems),
           // The actual <table> (scrolls with wrapper).
           tableElVNode,
         ]),
+      );
+
+      // --- Column insert dots (fixed overlay, outside the scroll wrapper) --
+      // Sibling to .table-wrapper. Horizontal positions come from
+      // colDotItems, which maps each column boundary's content-x to a
+      // viewport-x (content-x − scrollLeft). The overlay's left edge
+      // aligns with the wrapper's visible left edge, so a dot's `left`
+      // equals its viewport-x directly. The dots fade out while the
+      // wrapper is actively scrolling and reappear (recomputed) once it
+      // is stationary.
+      children.push(
+        h('div', {
+          class: ['table-col-insert-dots', (colScrolling.value || resizingCol.value !== null) ? 'is-scrolling' : ''],
+        }, colDotItems.value.map((d) => h('div', {
+          class: 'table-insert-dot table-insert-dot-col',
+          style: { left: `${d.left}px` },
+          title: d.c < cols ? i18n.t('table.insertColLeft') : i18n.t('table.insertColRight'),
+          onClick: (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            action('tableInsertCol', { beforeCol: d.c });
+          },
+        }))),
       );
 
       // --- Floating toolbar (HoverToolbar component in table mode) ---

@@ -104,7 +104,7 @@ function onSlashTrigger(el: HTMLElement, blockId: BlockId, query: string): void 
 function onInputChanged(blockId: BlockId, text: string): void {
   emit('inputChanged', blockId, text);
 }
-function onHoverChange(blockId: BlockId): void {
+function onHoverChange(blockId: BlockId | null): void {
   emit('hoverChange', blockId);
 }
 function onListMouseLeave(): void {

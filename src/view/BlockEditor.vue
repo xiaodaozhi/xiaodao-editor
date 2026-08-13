@@ -176,7 +176,7 @@ import { editorKey, imageUploadKey, editableKey } from './context';
 import type { BlockRenderItem, BeginImageUploadFn } from './context';
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
-import { caretSelection, textSelection } from '../core/selection/Selection';
+import { caretSelection, isBlocks, textSelection } from '../core/selection/Selection';
 import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
 import BlockSettingsMenu from './ui/BlockSettingsMenu.vue';
@@ -2243,6 +2243,28 @@ function stripSlashPrefix(text: string): string {
 // --- Hover toolbar: show on mouseup, not during drag -------------------
 
 function onDocumentSelectionChange(): void {
+  // Track which block the caret/focus sits in. A plain click into a
+  // contenteditable never dispatches an editor transaction, so the
+  // subscribe handler alone cannot maintain `focusedBlockId` — read it
+  // from the live DOM selection instead. This drives the handle-visibility
+  // fallback: when no block is hovered, the plus/grip handle shows on the
+  // caret's block.
+  const editorRoot = rootEl.value;
+  if (editorRoot) {
+    const domSel = window.getSelection();
+    focusedBlockId.value = null;
+    if (domSel && domSel.rangeCount > 0) {
+      const focusNode = domSel.focusNode;
+      const contentEl = (focusNode?.nodeType === 1
+        ? (focusNode as HTMLElement).closest<HTMLElement>('.block-content')
+        : (focusNode?.parentElement?.closest<HTMLElement>('.block-content')));
+      if (contentEl && editorRoot.contains(contentEl)) {
+        const bid = contentEl.getAttribute('data-block-id');
+        if (bid) focusedBlockId.value = bid as BlockId;
+      }
+    }
+  }
+
   // Read-only: never show the hover toolbar on text selection.
   if (!editableRef.value) {
     hoverToolbar.visible = false;
@@ -2260,6 +2282,21 @@ function onDocumentSelectionChange(): void {
   const stateSel = editor.getState().selection;
   if (stateSel.kind === 'text' && isCrossBlockText(stateSel) && !pendingSel) {
     return;
+  }
+  // A block selection (e.g. a selected image) is active but the caret has
+  // moved into a text block — a plain click into contenteditable dispatches
+  // no editor transaction, so the selection state would stay stuck on the
+  // selected block. Adopt the native caret position to drop the selection.
+  if (isBlocks(stateSel) && stateSel.blockIds.length > 0) {
+    const domSel = window.getSelection();
+    if (domSel && domSel.rangeCount > 0 && domSel.getRangeAt(0).collapsed) {
+      const read = readDomSelection(root, editor.getState().doc);
+      if (read && read.kind === 'caret') {
+        suppressSelectionSync = true;
+        editor.commands.setSelection?.({ selection: read });
+        suppressSelectionSync = false;
+      }
+    }
   }
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) {
@@ -2651,15 +2688,64 @@ function onWindowOutsideDown(e: Event): void {
   closeNumberPicker();
   closeCodeLangPicker();
   closeLinkPopover();
+  // Clicking outside the editor, or on editor whitespace, drops any active
+  // block selection (e.g. a selected image block). Clicks inside an editable
+  // region or a block body are left to their own handlers — selectionchange
+  // adopts the caret for text blocks, and image/table/code blocks re-select
+  // via their own click handlers.
+  const stateSel = editor.getState().selection;
+  if (stateSel.kind === 'blocks' && stateSel.blockIds.length > 0) {
+    const root = rootEl.value;
+    if (root && root.contains(target)) {
+      const el = target.nodeType === 1 ? (target as HTMLElement) : (target.parentElement ?? null);
+      if (el) {
+        if (el.closest('[contenteditable]')) return;
+        if (el.closest(
+          '.block-image-wrapper, .block-image-container, .block-table-container, '
+          + '.block-code-wrapper, .block-divider, .block-todo-checkbox, '
+          + '.block-ordered-list-wrapper, .block-video, .block-file, .block-embed, .block-callout',
+        )) return;
+      }
+    }
+    editor.commands.clearSelection?.();
+  }
 }
 
-// Close ol-menu / number picker on page scroll or touch-move (swipe).
-// These menus are positioned relative to the viewport, so they go stale
-// the moment the page scrolls. The same applies to code-lang picker.
-function onScrollOrTouchClose(): void {
+// Close ol-menu / number picker / code-lang picker / link-popover on page
+// scroll or touch-move (swipe). These popups are positioned relative to the
+// viewport, so they go stale the moment the page scrolls.
+// NOTE: scroll/touch events that originate INSIDE one of the popups (their
+// own list scrolling, wheel-to-list scrolling, or touch dragging over the
+// menu) are ignored — the scroll event of an inner overflow element still
+// reaches this window-capture listener, and must not close the menu itself.
+function onScrollOrTouchClose(e: Event): void {
+  const target = e.target;
+  if (target instanceof Element) {
+    const insidePopup
+      = target.closest('.code-lang-picker')
+        || target.closest('.ordered-list-menu')
+        || target.closest('.number-picker')
+        || target.closest('.link-popover');
+    if (insidePopup) return;
+  }
   if (olMenu.visible) closeOlMenu();
   if (numberPicker.visible) closeNumberPicker();
   if (codeLangPicker.visible) closeCodeLangPicker();
+  if (linkPopover.visible) closeLinkPopover();
+}
+
+// Escape drops any active block selection (image/table/code blocks have no
+// caret to hold it). Bound on document capture because after clicking such a
+// block the focus may sit outside the editor root, where the template-level
+// @keydown would never fire. We deliberately do NOT stopPropagation: an open
+// menu (e.g. settings) may also want to react to Escape and close itself.
+function onGlobalKeyDown(e: KeyboardEvent): void {
+  if (e.key !== 'Escape') return;
+  const stateSel = editor.getState().selection;
+  if (stateSel.kind === 'blocks' && stateSel.blockIds.length > 0) {
+    e.preventDefault();
+    editor.commands.clearSelection?.();
+  }
 }
 
 // --- Lifecycle ----------------------------------------------------------
@@ -2688,6 +2774,8 @@ onMounted(() => {
   // Close ol-menu / number picker / code-lang picker on scroll or touch swipe.
   window.addEventListener('scroll', onScrollOrTouchClose, true);
   document.addEventListener('touchmove', onScrollOrTouchClose, { passive: true, capture: true });
+  // Escape drops any active block selection, even when focus is outside the root.
+  document.addEventListener('keydown', onGlobalKeyDown, true);
 });
 
 onBeforeUnmount(() => {
@@ -2705,6 +2793,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', refreshHoverToolbarRect);
   window.removeEventListener('scroll', onScrollOrTouchClose, true);
   document.removeEventListener('touchmove', onScrollOrTouchClose, true);
+  document.removeEventListener('keydown', onGlobalKeyDown, true);
   unsubscribe();
   editor.destroy();
   // Image upload side-channel cleanup.
