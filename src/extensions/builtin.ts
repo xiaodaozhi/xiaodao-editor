@@ -21,6 +21,7 @@ import { CodeBlockExtension } from './CodeBlock';
 import { ImageExtension } from './Image';
 import { TableExtension } from './Table';
 import { DividerExtension } from './Divider';
+import { TableOfContentsExtension } from './TableOfContents';
 
 export const BuiltinExtensions: readonly Extension[] = [
   ParagraphExtension,
@@ -33,6 +34,7 @@ export const BuiltinExtensions: readonly Extension[] = [
   ImageExtension,
   TableExtension,
   DividerExtension,
+  TableOfContentsExtension,
   KeymapExtension,
   HistoryExtension,
 ];
@@ -49,3 +51,4 @@ export { CodeBlockExtension } from './CodeBlock';
 export { ImageExtension } from './Image';
 export { TableExtension, createTableCommands } from './Table';
 export { DividerExtension } from './Divider';
+export { TableOfContentsExtension } from './TableOfContents';

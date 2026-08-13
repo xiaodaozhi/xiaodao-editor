@@ -782,6 +782,51 @@ body.theme-light {
   transition: background-color 0.15s ease, height 0.15s ease;
 }
 
+/* --- Table of Contents (TableOfContents.ts renderer) --------------------- */
+
+.block-table-of-contents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 8px;
+  user-select: none;
+  /* The TOC is a computed view, never editable text — no caret. */
+  cursor: default;
+}
+
+.toc-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--be-muted);
+  margin-bottom: 4px;
+}
+
+.toc-empty {
+  font-size: 0.875rem;
+  color: var(--be-muted);
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--be-text);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 1px 8px;
+  cursor: pointer;
+  /* Link-style affordance: subtle underline on hover only. */
+  text-decoration: none;
+}
+
+.toc-item:hover {
+  color: var(--be-accent);
+  background: var(--be-hover);
+}
+
 /* --- Plus / Slash menu (PlusMenu.vue) ------------------------------------ */
 
 .plus-menu-header {

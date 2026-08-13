@@ -59,6 +59,9 @@ export const ICON_CODE = `<svg viewBox="0 0 16 16" width="16" height="16" fill="
 /** Divider / horizontal rule — a single horizontal line. */
 export const ICON_DIVIDER = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="8" x2="14" y2="8"/></svg>`;
 
+/** Table of Contents — indented list lines with leading dots. */
+export const ICON_TOC = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5h10M2 8h10M2 12.5h10"/><path d="M14.5 3.5v.01M14.5 8v.01M14.5 12.5v.01"/></svg>`;
+
 /** Image — rectangle with mountain + sun. Drawn purely with SVG paths, no <text>. */
 export const ICON_IMAGE = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/><path d="M13 11.5L10 8.5L7 11.5L5 9.5L3 11.5"/></svg>`;
 

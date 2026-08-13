@@ -9,10 +9,10 @@ by an **extension**, so the core never switches on a block type.
 
 ## Features
 
-- **10 built-in block types** — paragraph, h1–h6 (heading), bullet list,
+- **11 built-in block types** — paragraph, h1–h6 (heading), bullet list,
   ordered list, to-do, quote, code block, **image**, **divider**,
-  **table** (12 extensions total including Keymap and History behavior
-  extensions)
+  **table**, **table of contents** (13 extensions total including Keymap
+  and History behavior extensions)
 - **Table block** — `attrs`-based N×M grid; default 120 px column widths,
   new tables default to header row; row/column selection strips,
   corner-handle to select the whole table; insert dots between rows/cols;
@@ -49,6 +49,10 @@ by an **extension**, so the core never switches on a block type.
 - **Theming** — `light` (default) and `dark` via the `theme` prop; CSS
   variables for all design tokens
 - **Accessible** — keyboard navigation throughout, ARIA roles on menus
+- **Table of contents** — a live, non-editable block that renders a
+  hierarchical list of every heading in the document; stays in sync as
+  headings are added, removed, or edited; click an entry to jump to the
+  heading; insert via slash menu `/table of contents`
 
 ## Quick start
 
@@ -66,7 +70,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 </template>
 ```
 
-The editor ships with all 12 built-in extensions by default — no need to pass
+The editor ships with all 13 built-in extensions by default — no need to pass
 `extensions` unless you want a custom set.
 
 ## Props
@@ -120,7 +124,7 @@ Set it explicitly if needed:
 
 ## Built-in extensions
 
-`BuiltinExtensions` bundles these **12 extensions** (10 block types + 2 behavior extensions):
+`BuiltinExtensions` bundles these **13 extensions** (11 block types + 2 behavior extensions):
 
 | Extension             | Block type      | Notes                                                            |
 | --------------------- | --------------- | ---------------------------------------------------------------- |
@@ -134,6 +138,7 @@ Set it explicitly if needed:
 | `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `uploadImage` prop + `cleanup:image-file`. |
 | `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |
 | `DividerExtension`    | `divider`       | Isolating horizontal rule.                                       |
+| `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`; empty attrs — the heading list is a **dynamic view** computed from the editor state on every render. Non-editable block (`editable: false`); collects all `heading` blocks in document order (table-cell headings excluded automatically); click an entry to scroll the heading into view. Serialize emits empty string (the real headings are exported by their own blocks). |
 | `KeymapExtension`     | —               | Enter / Backspace / ArrowUp / ArrowDown bindings.                |
 | `HistoryExtension`    | —               | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` undo/redo keymap.              |
 
@@ -261,13 +266,15 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
   `BlockHost`, `BlockContent` (per-block `contenteditable`), and the UI
   components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
   `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`).
-- **`src/extensions/`** — the 12 built-in extensions plus `_commonAttrs.ts`
+- **`src/extensions/`** — the 13 built-in extensions plus `_commonAttrs.ts`
   (shared align/color/bgColor/indent specs and color presets, plus
   `ImageExtension`'s upload-side-channel renderer logic). **Table** lives in
   `Table.ts` (Vue renderer + command registrations) and `tableModel.ts` (pure
   structural helpers: insert/remove row/col, merge/split cells, full-rect
   selection expansion, header row toggle, column width helpers, HTML/Markdown
   serialization, attrs validation/coercion). **Divider** lives in `Divider.ts`.
+  **Table of contents** lives in `TableOfContents.ts` (non-editable block that
+  renders a live heading list).
 - **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
   provide/inject so popovers rendered through `<Teleport>` stay reactive.
 

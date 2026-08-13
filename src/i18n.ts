@@ -239,6 +239,12 @@ const zhCN: Dict = {
   'table.splitCell': '拆分单元格',
   'table.deleteTable': '删除表格',
   'turnInto.table': '表格',
+
+  // TOC block
+  'toc.title': '目录',
+  'toc.empty': '暂无标题',
+  'slash.tableOfContents.title': '目录',
+  'slash.tableOfContents.description': '插入文档目录。',
 };
 
 const enUS: Dict = {
@@ -440,6 +446,12 @@ const enUS: Dict = {
   'table.splitCell': 'Split cell',
   'table.deleteTable': 'Delete table',
   'turnInto.table': 'Table',
+
+  // TOC block
+  'toc.title': 'Table of Contents',
+  'toc.empty': 'No headings',
+  'slash.tableOfContents.title': 'Table of Contents',
+  'slash.tableOfContents.description': 'Insert a table of contents.',
 };
 
 const DICTS: Readonly<Record<Locale, Dict>> = {

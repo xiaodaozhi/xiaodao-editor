@@ -563,6 +563,13 @@ const currentBlock = computed<Block | undefined>(() =>
   props.blockId != null ? latestState.value.doc.blocks.get(props.blockId) : undefined,
 );
 
+/**
+ * 菜单打开时记录的块类型。删除块后 `currentBlock` 会变为 undefined，若用
+ * 它做区域显隐判断，会在菜单关闭前的那一帧闪现/隐藏错误区域。这里用打开
+ * 时的类型做门控，保证删除瞬间区域显示保持不变。
+ */
+const openedBlockType = ref<string | undefined>(undefined);
+
 const align = computed<AlignValue>(() => {
   const v = currentBlock.value?.attrs.align;
   return (typeof v === 'string' ? v : 'left') as AlignValue;
@@ -570,32 +577,34 @@ const align = computed<AlignValue>(() => {
 
 /** 当前块是否支持对齐属性（代码块只允许左对齐）。 */
 const alignDisabled = computed<boolean>(() => {
-  const b = currentBlock.value;
-  if (!b) return true;
-  const schema = editor.registries.schema.get(b.type);
+  const t = openedBlockType.value;
+  if (!t) return true;
+  const schema = editor.registries.schema.get(t);
   return !('align' in schema.attrs);
 });
 
 /** 图片块、表格块等非文本块：不显示"转为"、文字颜色、背景颜色，缩进也不可用 */
 const isImageBlock = computed<boolean>(() =>
-  currentBlock.value?.type === 'image' || currentBlock.value?.type === 'table',
+  openedBlockType.value === 'image' || openedBlockType.value === 'table',
 );
 
-/** 分割线块：隐藏"转为"、对齐与缩进、文字颜色、背景颜色，只保留操作区 */
+/** 分割线块、目录块等特殊块：隐藏"转为"、对齐与缩进、文字颜色、背景颜色，只保留操作区 */
 const isDividerBlock = computed<boolean>(() =>
-  currentBlock.value?.type === 'divider',
+  openedBlockType.value === 'divider' || openedBlockType.value === 'tableOfContents',
 );
 
-/** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格 */
+/** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格、目录 */
 const hideAlignSection = computed<boolean>(() =>
-  currentBlock.value?.type === 'divider' || currentBlock.value?.type === 'table',
+  openedBlockType.value === 'divider'
+  || openedBlockType.value === 'table'
+  || openedBlockType.value === 'tableOfContents',
 );
 
 /** 当前块是否支持颜色属性（代码块不支持 color / bgColor）。 */
 const colorsDisabled = computed<boolean>(() => {
-  const b = currentBlock.value;
-  if (!b) return true;
-  const schema = editor.registries.schema.get(b.type);
+  const t = openedBlockType.value;
+  if (!t) return true;
+  const schema = editor.registries.schema.get(t);
   return !('color' in schema.attrs) || !('bgColor' in schema.attrs);
 });
 
@@ -606,9 +615,9 @@ const currentIndent = computed<number>(() => {
 
 /** 当前块是否支持缩进属性 */
 const canIndent = computed<boolean>(() => {
-  const b = currentBlock.value;
-  if (!b) return false;
-  return ['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(b.type);
+  const t = openedBlockType.value;
+  if (!t) return false;
+  return ['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(t);
 });
 
 /** 增加缩进按钮是否可用 */
@@ -726,6 +735,13 @@ watch(
   () => props.visible,
   (visible) => {
     if (!visible) return;
+    // 记录打开时的块类型，作为本菜单会话的区域显隐依据。
+    // 注意：关闭时不能清空 openedBlockType —— shouldRender 有 300ms 淡出延迟，
+    // 若关闭瞬间将其置为 undefined，特殊块被隐藏的区域会在菜单消失前闪现。
+    // 每次打开都会经过 visible=false→true，因此这里会写入最新的块类型。
+    openedBlockType.value = props.blockId != null
+      ? latestState.value.doc.blocks.get(props.blockId)?.type
+      : undefined;
     const match = turnIntoActions.value.find((it) => isTurnIntoActive(it.id));
     activeId.value = match ? match.id : 'paragraph';
     // Reset all collapsible sections to collapsed state on each open

@@ -30,6 +30,7 @@ export type { ImageAttrs } from './extensions/Image';
 export { TableExtension } from './extensions/Table';
 export type { TableAttrs, TableCellData } from './extensions/tableModel';
 export { DividerExtension } from './extensions/Divider';
+export { TableOfContentsExtension } from './extensions/TableOfContents';
 export type { ImageUploadResult, UploadImageHandler } from './view/imageUpload';
 
 // I18n + theme (re-exported so consumers can type props safely)
