@@ -1530,6 +1530,12 @@ function measureHtOverflow(): void {
     htOverflow.value = false;
     return;
   }
+  // Preserve the current horizontal scroll offset. Temporarily removing
+  // maxWidth below makes the container as wide as its content (no overflow),
+  // which makes the browser reset scrollLeft to 0; we restore it afterwards
+  // (clamped) so the left/right nav buttons can actually scroll without the
+  // content snapping back to the start.
+  const prevScrollLeft = content.scrollLeft;
   // Temporarily remove any prior maxWidth so we can measure the true natural
   // scrollWidth (the total width of all flex children without wrapping).
   content.style.maxWidth = '';
@@ -1554,14 +1560,14 @@ function measureHtOverflow(): void {
   if (naturalWidth > contentAvailable) {
     htOverflow.value = true;
     content.style.maxWidth = `${contentAvailable}px`;
-    // Reset scroll offset to the leftmost position so the user starts at
-    // the beginning of the toolbar on each re-render.
-    content.scrollLeft = 0;
+    // Restore the previous scroll offset, clamped to the valid range after
+    // the re-layout.
+    const maxScroll = Math.max(0, content.scrollWidth - content.clientWidth);
+    content.scrollLeft = Math.min(prevScrollLeft, maxScroll);
     updateHtScrollState();
   } else {
     htOverflow.value = false;
     content.style.maxWidth = '';
-    content.scrollLeft = 0;
     canHtScrollLeft.value = false;
     canHtScrollRight.value = false;
   }
@@ -2326,6 +2332,20 @@ async function onScrollOrResize(): Promise<void> {
 
 // Close dropdown on outside click.
 function onWindowMouseDown(e: MouseEvent): void {
+  if (!props.visible) return;
+  const toolbar = toolbarEl.value;
+  // If the click was on the toolbar itself (including the left/right nav buttons
+  // for horizontal scroll), do NOT close the toolbar. Also preventDefault so the
+  // browser's default mousedown action (moving focus / clearing the selection)
+  // never fires — otherwise in table cell-edit mode the selected text loses its
+  // selection state and the toolbar disappears. This capture-phase handler runs
+  // before the individual buttons' own `@mousedown.prevent`, guaranteeing the
+  // selection is preserved even if a control forgets to preventDefault.
+  if (toolbar && toolbar.contains(e.target as Node)) {
+    e.preventDefault();
+    return;
+  }
+
   if (!openDropdown.value) return;
   const dropdowns = [typeDropdownEl.value, alignDropdownEl.value, verticalAlignDropdownEl.value, colorDropdownEl.value];
   const buttons = [typeBtnEl.value, alignBtnEl.value, verticalAlignBtnEl.value, colorBtnEl.value];

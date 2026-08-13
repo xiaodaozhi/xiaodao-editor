@@ -209,6 +209,33 @@ const TableBlock = defineComponent({
     const cellSel = ref<CellSel>(null);
     const focusedCell = ref<CellPos | null>(null);
 
+    // Track when the user last interacted with the HoverToolbar (teleported
+    // to body). Because the toolbar's mousedown handler calls preventDefault
+    // to preserve text selection, blur events will see a null relatedTarget
+    // (focus never actually lands on the button). We use a timestamp-based
+    // debounce instead of a simple boolean flag because mouseup may fire
+    // BEFORE the async selectionchange/blur events, causing a simple flag
+    // to be reset too early.
+    let lastToolbarInteraction = 0;
+    const TOOLBAR_INTERACTION_GRACE_MS = 500;
+    function isWithinToolbarGrace(): boolean {
+      return Date.now() - lastToolbarInteraction < TOOLBAR_INTERACTION_GRACE_MS;
+    }
+    function onDocMouseDownCaptureForHoverToolbar(e: MouseEvent): void {
+      const t = e.target as Node | null;
+      const inToolbar = !!(t && (t.nodeType === 1
+        ? (t as HTMLElement).closest('.hover-toolbar')
+        : (t as CharacterData).parentElement?.closest('.hover-toolbar')));
+      if (inToolbar) {
+        lastToolbarInteraction = Date.now();
+      }
+    }
+    function onDocMouseUpForHoverToolbar(): void {
+      // Refresh timestamp on mouseup too — a click is mousedown+mouseup,
+      // and the resulting scroll/selection events may fire after mouseup.
+      lastToolbarInteraction = Date.now();
+    }
+
     // Column-resize drag state.
     const resizingCol = ref<number | null>(null);
     let resizeStartX = 0;
@@ -652,10 +679,36 @@ const TableBlock = defineComponent({
         cellTextToolbar.selectionRect = null;
         return;
       }
+      // If the user just interacted with the HoverToolbar (e.g. clicked a
+      // scroll button), don't hide the toolbar even if the selection
+      // appears collapsed or missing. The toolbar's preventDefault on
+      // mousedown can cause async selectionchange events that momentarily
+      // report a collapsed selection. The grace period bridges this gap.
+      if (cellTextToolbar.visible && isWithinToolbarGrace()) {
+        return;
+      }
       const fc = focusedCell.value;
       if (!fc) {
-        cellTextToolbar.visible = false;
-        cellTextToolbar.selectionRect = null;
+        // focusedCell may be temporarily null (e.g. during toolbar scroll
+        // button clicks) while a valid native selection still exists within
+        // a table cell. In that case, keep the toolbar visible.
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+          cellTextToolbar.visible = false;
+          cellTextToolbar.selectionRect = null;
+          return;
+        }
+        const range = sel.getRangeAt(0);
+        const cellInner = (range.commonAncestorContainer.nodeType === 1
+          ? (range.commonAncestorContainer as HTMLElement)
+          : range.commonAncestorContainer.parentElement
+        )?.closest('.table-cell-inner');
+        if (!cellInner) {
+          cellTextToolbar.visible = false;
+          cellTextToolbar.selectionRect = null;
+          return;
+        }
+        // Has a valid selection inside a table cell — keep toolbar visible.
         return;
       }
       const sel = window.getSelection();
@@ -835,11 +888,41 @@ const TableBlock = defineComponent({
     }
 
     function onCellBlur(r: number, c: number, el: HTMLDivElement, e?: FocusEvent): void {
+      // If the user just interacted with the HoverToolbar (scroll buttons,
+      // format buttons, etc.), don't clear cell editing state. The toolbar's
+      // mousedown preventDefault stops focus from landing on the button, so
+      // relatedTarget is null and we can't use it. The timestamp-based grace
+      // period covers the async gap between mouseup and the resulting
+      // blur/selectionchange events.
+      if (cellTextToolbar.visible && isWithinToolbarGrace()) {
+        return;
+      }
       // If focus is moving to the link popover (teleported to body),
       // keep cell state alive so link save/remove can still sync content.
+      // If focus is moving to the HoverToolbar (cellTextToolbar, teleported to body),
+      // keep cell state alive — the toolbar is still interacting with the cell's text.
       const relatedTarget = e?.relatedTarget as HTMLElement | null;
       if (relatedTarget?.closest('.link-popover')) {
         return;
+      }
+      if (relatedTarget?.closest('.hover-toolbar')) {
+        return;
+      }
+      // Fallback when relatedTarget is null (e.g. mousedown on the HoverToolbar
+      // called preventDefault on the button, so focus never lands there and
+      // relatedTarget stays null). If the cell text toolbar is currently
+      // visible and a valid non-collapsed native selection still exists
+      // inside a table cell, keep the editing state alive.
+      if (cellTextToolbar.visible) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+          const range = sel.getRangeAt(0);
+          const cellInner = (range.commonAncestorContainer.nodeType === 1
+            ? (range.commonAncestorContainer as HTMLElement)
+            : range.commonAncestorContainer.parentElement
+          )?.closest('.table-cell-inner');
+          if (cellInner) return;
+        }
       }
       // Clear focus state so the blue outline follows the actual focused cell.
       if (focusedCell.value?.row === r && focusedCell.value?.col === c) {
@@ -854,6 +937,19 @@ const TableBlock = defineComponent({
 
     // When focus leaves the entire table container, clear all selections.
     function onContainerFocusOut(e: FocusEvent): void {
+      // If the user just interacted with the HoverToolbar, keep cell-editing
+      // state alive (focusedCell + cell text toolbar), but still clear
+      // whole-table selection state since focus did move outside the container.
+      if (cellTextToolbar.visible && isWithinToolbarGrace()) {
+        if (cellSel.value) cellSel.value = null;
+        if (tableSel.value.kind !== 'none') {
+          tableSel.value = { kind: 'none' };
+          hideToolbar(0);
+        }
+        closeTableOlMenu();
+        closeTableNumberPicker();
+        return;
+      }
       const container = e.currentTarget as HTMLElement;
       // relatedTarget is the element receiving focus. If it's still inside
       // the container, focus hasn't left the table.
@@ -861,6 +957,37 @@ const TableBlock = defineComponent({
       if (next && container.contains(next)) return;
       // Don't clear state if focus moved to the link popover.
       if (next?.closest('.link-popover')) return;
+      // Don't clear state if focus moved to the cell text toolbar
+      // (cellEditMode HoverToolbar, teleported to body) — the toolbar is
+      // still interacting with the cell's text selection.
+      if (next?.closest('.hover-toolbar')) return;
+      // Fallback when relatedTarget is null (mousedown on HoverToolbar called
+      // preventDefault so focus never lands on it). If cell text toolbar is
+      // visible with a valid non-collapsed native selection inside a table
+      // cell, keep the editing state alive instead of clearing everything.
+      if (cellTextToolbar.visible) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+          const range = sel.getRangeAt(0);
+          const cellInner = (range.commonAncestorContainer.nodeType === 1
+            ? (range.commonAncestorContainer as HTMLElement)
+            : range.commonAncestorContainer.parentElement
+          )?.closest('.table-cell-inner');
+          if (cellInner) {
+            // Don't clear cell-editing state, but still clear whole-cell
+            // selection state (cellSel / tableSel) since focus did leave
+            // the container; keep only the focusedCell + text toolbar.
+            if (cellSel.value) cellSel.value = null;
+            if (tableSel.value.kind !== 'none') {
+              tableSel.value = { kind: 'none' };
+              hideToolbar(0);
+            }
+            closeTableOlMenu();
+            closeTableNumberPicker();
+            return;
+          }
+        }
+      }
       // Focus has left the table — clear all selection / focus state.
       if (cellSel.value) cellSel.value = null;
       if (tableSel.value.kind !== 'none') {
@@ -1546,6 +1673,8 @@ const TableBlock = defineComponent({
       document.removeEventListener('mousedown', onDocMouseDownForCellLink, true);
       window.removeEventListener('scroll', onTableMenuScrollOrTouch, true);
       document.removeEventListener('touchmove', onTableMenuScrollOrTouch, true);
+      document.removeEventListener('mousedown', onDocMouseDownCaptureForHoverToolbar, true);
+      document.removeEventListener('mouseup', onDocMouseUpForHoverToolbar, true);
       if (singleSelectToolbarTimer) {
         clearTimeout(singleSelectToolbarTimer);
         singleSelectToolbarTimer = null;
@@ -1641,6 +1770,11 @@ const TableBlock = defineComponent({
       document.addEventListener('keydown', onDocKeyDown, true);
       document.addEventListener('selectionchange', onCellSelectionChange);
       document.addEventListener('mousedown', onDocMouseDownForCellLink, true);
+      // Capture-phase listener so the hover-toolbar mousedown flag is flipped
+      // BEFORE the focus/blur events that result from clicking on something
+      // outside the cell — otherwise blur would run with the flag still off.
+      document.addEventListener('mousedown', onDocMouseDownCaptureForHoverToolbar, true);
+      document.addEventListener('mouseup', onDocMouseUpForHoverToolbar, true);
       // Close table OL menu / number picker on page scroll or touch swipe.
       window.addEventListener('scroll', onTableMenuScrollOrTouch, true);
       document.addEventListener('touchmove', onTableMenuScrollOrTouch, { passive: true, capture: true });

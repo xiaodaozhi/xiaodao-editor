@@ -1419,6 +1419,15 @@ body.theme-light {
   display: none;
 }
 
+/* Prevent flex children from shrinking: when the toolbar overflows and we
+   clamp `.ht-content` with a max-width, buttons must keep their natural
+   width so the content truly overflows and `scrollLeft` (driven by the
+   left/right nav buttons) can actually scroll. Without this the buttons
+   would compress to fit and the nav buttons would appear but do nothing. */
+.ht-content > * {
+  flex-shrink: 0;
+}
+
 .ht-content.dropdown-open {
   overflow: visible;
 }
