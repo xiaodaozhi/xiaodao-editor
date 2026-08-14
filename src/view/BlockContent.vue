@@ -82,6 +82,8 @@ const emit = defineEmits<{
   inputChanged: [blockId: typeof props.block.id, text: string];
   /** Emitted when the user clicks a link inside this block. */
   linkClick: [blockId: typeof props.block.id, offset: number];
+  /** Emitted when the contenteditable receives DOM focus (cursor enters text). */
+  focusIn: [blockId: typeof props.block.id];
 }>();
 
 const editor = useEditor();
@@ -276,16 +278,20 @@ watch(
 
 // --- DOM → state sync (input) ------------------------------------------
 
-function onKeyDownCapture(_event: KeyboardEvent): void {
-  // Enter key for isolating blocks (code blocks) is handled centrally in
-  // BlockEditor.onKeyDown, NOT here. This avoids event-propagation issues
-  // and competing transactions (syncSelectionFromDom + dispatchKeymap).
+function onKeyDownCapture(event: KeyboardEvent): void {
+  // Prevent the browser's default Enter behavior (inserting <br>/<div>) at
+  // the TARGET level for all text blocks. The actual Enter handling (split
+  // block for text blocks, insert \n for code blocks) is done centrally in
+  // BlockEditor.onKeyDown via the keymap command system.
   //
-  // Code blocks use `isolating: true` so enterCommand returns false. After
-  // that, BlockEditor.onKeyDown detects the isolating block and dispatches
-  // a setText transaction to insert "\n" at the caret offset. The view
-  // layer's normal update flow (watch + applySelectionToDom) then updates
-  // the DOM and places the caret.
+  // Without this early preventDefault, some browsers may insert a newline
+  // in the DOM even though preventDefault() is called later in the bubbling
+  // phase — the browser's native "insertParagraph" action can race with the
+  // command dispatch. Calling preventDefault here at the target ensures the
+  // default is suppressed before any bubbling-phase logic runs.
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+  }
 }
 
 function onInput(event: InputEvent): void {
@@ -352,6 +358,8 @@ function onCompositionStart(_event: CompositionEvent): void {
 
 function onCompositionEnd(_event: CompositionEvent): void {
   isComposing.value = false;
+  // Read-only: no content mutation.
+  if (!editable.value) return;
   // After composition ends, sync the final content (with marks) to state.
   const node = el.value;
   if (!node) return;
@@ -848,15 +856,19 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 }
 
 // --- Focus tracking ----------------------------------------------------
+//
+// 注意：这里不再直接写入 editor.focusBlockId，而是通过 emit('focusIn') 把
+// 焦点事件冒泡给 BlockHost → BlockList → BlockEditor，由 BlockEditor 的
+// 统一入口 setFocusedBlock() 处理，确保 caret 和蓝框只有一个"真相来源"。
+// onBlur 不再做操作：因为从 P1 blur 到 P2 focus 之间 selectionchange 会
+// 重新读取 DOM 选区，覆盖旧的 focusedBlockId。
 
 function onFocus(): void {
-  editor.focusBlockId = props.block.id;
+  emit('focusIn', props.block.id);
 }
 
 function onBlur(): void {
-  if (editor.focusBlockId === props.block.id) {
-    editor.focusBlockId = null;
-  }
+  /* no-op: 焦点迁移交给 selectionchange + setFocusedBlock() 统一处理 */
 }
 
 // --- Link click handling -------------------------------------------------

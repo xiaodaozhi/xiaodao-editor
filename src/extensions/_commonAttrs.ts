@@ -69,11 +69,13 @@ export const COMMON_ATTRS_NO_INDENT_NO_ALIGN = {
 } as const satisfies BlockSchemaSpec['attrs'];
 
 /**
- * 代码块（codeBlock）单独使用的空 attrs 集合。
- * 代码块不允许 color / bgColor / align / indent，
- * coerceAttrs 会自动丢弃以上所有属性，转换时自动清除。
+ * 代码块（codeBlock）使用的 attrs 集合。
+ * 代码块不允许 color / bgColor / align，但允许 indent（作为子块时需要 be-indent-n 类）。
+ * coerceAttrs 会自动丢弃 color / bgColor / align 属性，转换时自动清除。
  */
-export const CODE_BLOCK_ATTRS = {} as const satisfies BlockSchemaSpec['attrs'];
+export const CODE_BLOCK_ATTRS = {
+  indent: COMMON_ATTRS.indent,
+} as const satisfies BlockSchemaSpec['attrs'];
 
 /**
  * Apply common attrs (align/color/bgColor) as CSS classes so the playground

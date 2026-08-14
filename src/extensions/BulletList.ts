@@ -35,7 +35,7 @@ export const BulletListExtension: Extension = {
   schema: {
     type: 'bulletList',
     content: 'text',
-    nestable: false,
+    nestable: true,
     listLike: true,
     attrs: { ...COMMON_ATTRS },
   },

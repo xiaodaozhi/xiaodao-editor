@@ -36,8 +36,12 @@ by an **extension**, so the core never switches on a block type.
   opens the file picker
 - **Block manipulation** — drag handle, hover toolbar, `+` insert button,
   grip menu with duplicate / copy / cut / move up / move down / delete;
-  image additionally exposes replace / remove / drag-resize corner handle
-  with locked aspect ratio and editable caption
+  **real nesting** (Tab/Shift-Tab indent/outdent builds a parent–child tree;
+  drag-and-drop supports before/after sibling insert plus a **drop-into**
+  mode — pause over a block's center to nest under it as its first child);
+  duplicate clones the whole subtree; image additionally exposes replace /
+  remove / drag-resize corner handle with locked aspect ratio and editable
+  caption
 - **Clipboard** — clean copy/cut/paste of HTML and plain text; multi-block
   selection overlay; **HTML `<img>` / image-file paste + drag-and-drop
   automatically create image blocks** and dispatch the upload; selecting text
@@ -164,7 +168,10 @@ interface Block {
   type: BlockType
   attrs: Attrs              // e.g. { level: 2, align: 'center', color: 'red' }
   content: InlineSeq        // text runs with optional marks
-  children: BlockId[]       // nesting (future: toggle, columns)
+  children: BlockId[]       // child block ids — real nesting:
+                            // paragraph/heading + the 3 list kinds can be parents;
+                            // any block type can be a child. `attrs.indent` is a
+                            // derived mirror of the nesting depth.
 }
 
 interface DocumentData {

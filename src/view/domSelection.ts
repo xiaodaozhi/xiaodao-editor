@@ -28,9 +28,22 @@ import { flatten as flattenDoc } from '../core/state/store';
 /** Selector for a block's contenteditable element by block id. */
 const BLOCK_SELECTOR = (id: BlockId) => `[data-block-id="${CSS.escape(id)}"]`;
 
-/** Find the contenteditable element for a block id within the editor root. */
+/**
+ * Find the contenteditable element for a block id within the editor root.
+ *
+ * The `data-block-id` attr appears BOTH on the outer `.block-host` wrapper AND
+ * on the inner contenteditable (BlockContent), so a plain querySelector returns
+ * the wrapper first. We must prefer the contenteditable editing element:
+ * focusing/placing the caret in the wrapper (a non-editable div) silences the
+ * blinking caret for EMPTY blocks (no text node to walk to). Non-text blocks
+ * (image/table/divider/TOC) have no inner contenteditable, so we fall back to
+ * the host wrapper for hit-testing / scroll-into-view.
+ */
 export function findBlockEl(root: HTMLElement, id: BlockId): HTMLElement | null {
-  return root.querySelector<HTMLElement>(BLOCK_SELECTOR(id));
+  const base = BLOCK_SELECTOR(id);
+  const editable = root.querySelector<HTMLElement>(`${base}[contenteditable], ${base} [contenteditable]`);
+  if (editable) return editable;
+  return root.querySelector<HTMLElement>(base);
 }
 
 // ---------------------------------------------------------------------------

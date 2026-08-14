@@ -77,7 +77,7 @@ export const HeadingExtension: Extension = {
   schema: {
     type: 'heading',
     content: 'text',
-    nestable: false,
+    nestable: true,
     attrs: {
       level: {
         default: 1,

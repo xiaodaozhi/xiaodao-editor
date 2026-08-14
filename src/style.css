@@ -141,10 +141,89 @@ body.theme-light {
      on the .block-editor element from the host stylesheet if needed. */
 }
 
+/* During block dragging, disable ALL text selection across the editor tree
+   so mousing over target blocks doesn't leave a half-visible text selection
+   that flickers with pointer movement. The class is set on the editor root
+   while draggingBlockId !== null (BlockEditor.vue template). */
+.block-editor-dragging,
+.block-editor-dragging .block-content,
+.block-editor-dragging [contenteditable="true"] {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* ==========================================================================
+   Block-level focus: 统一块级焦点蓝框
+   设置 focusedBlockId 时，.block-host 会自动获得 .block-focused 类。
+   文本类块依靠原生光标表示激活，不额外加样式；非文本块用轻量的
+   淡蓝背景 / 阴影提示当前 focus 目标。
+   ========================================================================== */
+
+/* 文本/代码类型块：原生光标已经是"激活"信号，不需要额外视觉 */
+.block-host.block-focused[data-block-type="paragraph"] > .block-host-content,
+.block-host.block-focused[data-block-type="heading"] > .block-host-content,
+.block-host.block-focused[data-block-type="bulletList"] > .block-host-content,
+.block-host.block-focused[data-block-type="orderedList"] > .block-host-content,
+.block-host.block-focused[data-block-type="todoList"] > .block-host-content,
+.block-host.block-focused[data-block-type="quote"] > .block-host-content,
+.block-host.block-focused[data-block-type="codeBlock"] > .block-host-content {
+  background: none;
+  box-shadow: none;
+}
+
+/* 图片块：focus 时给 wrapper 加一圈淡蓝内阴影
+   使用 inset 避免图片达到 max-width 时阴影被父容器裁切 */
+.block-host.block-focused[data-block-type="image"] .block-image-wrapper {
+  box-shadow: inset 0 0 0 2px rgba(51, 112, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* 分隔符：focus 时线条变蓝 + 整块淡蓝背景框选 */
+.block-host.block-focused[data-block-type="divider"] > .block-host-content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(51, 112, 255, 0.07);
+  border: 2px solid rgba(51, 112, 255, 0.35);
+  border-radius: 4px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.block-host.block-focused[data-block-type="divider"] .block-divider {
+  background-color: var(--be-focus, #3370ff);
+}
+
+/* TOC / 表格：focus 时用绝对定位伪元素画边框
+   inset box-shadow 会被子元素的 overflow 视觉遮挡（表格底部、滚动条右侧），
+   改用 ::after 绝对定位覆盖层，始终位于最上层，不受子元素 overflow 影响。 */
+.block-host.block-focused[data-block-type="tableOfContents"] > .block-host-content,
+.block-host.block-focused[data-block-type="table"] > .block-host-content {
+  box-shadow: none;
+}
+.block-host.block-focused[data-block-type="tableOfContents"] > .block-host-content::after,
+.block-host.block-focused[data-block-type="table"] > .block-host-content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(51, 112, 255, 0.35);
+  border-radius: 4px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
 .block-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Each recursively-rendered child list indents its
+   blocks by one level (24px). The block-host already owns a 48px gutter for
+   the handle; the nested list adds the *visual* indent without doubling the
+   handle gutter. Read-only hosts collapse the handle gutter anyway. */
+.block-list.block-children {
+  padding-left: 0;
+  margin-top: 0;
 }
 
 /* Block host: left gutter for handle + right area for content */
@@ -157,7 +236,13 @@ body.theme-light {
   min-height: 1.7em;
 }
 
+.block-host.block-host-readonly {
+  /* Read-only: no left handle gutter; content is flush to the left edge. */
+  padding-left: 0;
+}
+
 .block-host-content {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
@@ -762,6 +847,7 @@ body.theme-light {
   width: 100%;
   height: 1px;
   background: var(--be-border);
+  background-clip: content-box;
   margin: 14px 0;
   /* Make the divider look like a line but still give it a hit-area for
    * selection. */
@@ -770,6 +856,11 @@ body.theme-light {
   /* Ensure the divider sits on its own visual row with a bit of breathing
    * space above and below. */
   position: relative;
+  /* Expand the clickable area with transparent padding so the thin 1px
+   * line is easy to click. background-clip: content-box keeps the
+   * background only on the 1px content area, not the padding. */
+  padding: 7px 0;
+  box-sizing: content-box;
 }
 
 /* Hover feedback: subtly thicken so the divider is easy to notice when
@@ -788,10 +879,11 @@ body.theme-light {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 0 8px;
+  padding: 4px;
   user-select: none;
   /* The TOC is a computed view, never editable text — no caret. */
   cursor: default;
+  box-sizing: border-box;
 }
 
 .toc-title {
@@ -2047,6 +2139,26 @@ body.theme-light {
   z-index: 10;
 }
 
+/* Drop-"into" mode (central 50% band, ≥200ms hover over a nestable block).
+ * The entire target host is tinted with accent, clearly communicating
+ * "nest under this block as its first child". The top/bottom 3px drop lines
+ * are explicitly hidden so into vs before/after are visually distinct and
+ * mutually exclusive. */
+.block-host.block-drop-into {
+  background: color-mix(in srgb, var(--be-accent) 18%, transparent);
+  border-radius: 6px;
+  transition: background-color 0.12s ease;
+}
+.block-host.block-drop-into::before,
+.block-host.block-drop-into::after {
+  display: none !important;
+}
+/* When dropping into, also clear the first-child hover bg so the into-tint
+ * wins visually (it's on the host itself). */
+.block-host.block-drop-into > .block-host-content > :first-child {
+  background: transparent !important;
+}
+
 /* When dragging, the SOURCE block keeps its layout size (preserves document
    flow, no reflow jumping) but its content area becomes invisible, so to the
    user the block appears to be "lifted up" and following the cursor. */
@@ -2122,10 +2234,10 @@ body.theme-light {
 }
 
 /* --- Image block (Image.ts renderer) ------------------------------------- */
-
-.block-image-container {
-  width: 100%;
-}
+/* block-image-container: 使用默认 width: auto 而不是 100%，
+   这样 be-indent-n 的 margin-left 会被正确计算，
+   避免 width:100% + margin-left 导致溢出。
+   块级元素 width:auto 会自动占满父容器的可用宽度（减去 margin）。 */
 
 .image-block-img {
   max-width: 100%;
@@ -2134,6 +2246,7 @@ body.theme-light {
   height: auto;
   object-fit: contain;
   display: block;
+  box-sizing: border-box;
 }
 
 .block-image-wrapper {
@@ -2144,6 +2257,7 @@ body.theme-light {
   padding: 4px;
   border-radius: 4px;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .image-block-wrapper-error,
@@ -2408,6 +2522,7 @@ body.theme-dark .image-block-error-overlay {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   user-select: none;
   -webkit-user-drag: none;
+  box-sizing: border-box;
 }
 
 /* Container for <img> + resize handle — gives the handle a positioning
@@ -2417,6 +2532,7 @@ body.theme-dark .image-block-error-overlay {
   display: inline-block;
   line-height: 0;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Resize handle (bottom-right corner of the image). */

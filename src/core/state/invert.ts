@@ -15,6 +15,17 @@ import { indexOf, parentOf, requireBlock } from './store';
  * Invert a sequence of steps against the pre-state. Returns a new step list
  * that, when applied to the post-state, restores the pre-state. Steps are
  * inverted in reverse order so the last-applied change is undone first.
+ *
+ * Important — forward-step is a sequential program:
+ *   [ setAttrs(A, x'), insertBlock(B), replaceBlock(B), setAttrs(B) ]
+ * When reversing, we may see `replaceBlock(B)` / `setAttrs(B)` BEFORE we see
+ * the `insertBlock(B)` that actually added B to the document. In that case
+ * B is NOT present in `prevDoc` (prevDoc is the pre-transaction snapshot,
+ * not the mid-transaction intermediate). Inverting B's attribute/replace
+ * changes is redundant because the final `insertBlock(B)` → inverse
+ * `removeBlock(B)` already erases B entirely. So these "unknown id" cases
+ * are skipped — the block is handled by its matching insertBlock inverse
+ * further up the step list.
  */
 export function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[] {
   const inverse: Step[] = [];
@@ -29,7 +40,11 @@ export function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[] {
         inverse.push(...reinsertSubtree(step.id, prevDoc));
         break;
       case 'replaceBlock': {
-        const prev = requireBlock(prevDoc, step.id);
+        const prev = prevDoc.blocks.get(step.id);
+        if (!prev) {
+          // Same-tx freshly-inserted block: handled by insertBlock inverse.
+          break;
+        }
         inverse.push({ op: 'replaceBlock', id: step.id, type: prev.type, attrs: prev.attrs });
         break;
       }
@@ -43,12 +58,25 @@ export function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[] {
         break;
       }
       case 'setText': {
-        const prev = requireBlock(prevDoc, step.id);
+        const prev = prevDoc.blocks.get(step.id);
+        if (!prev) {
+          // Same-tx freshly-inserted block: handled by insertBlock inverse.
+          break;
+        }
         inverse.push({ op: 'setText', id: step.id, content: prev.content as InlineSeq });
         break;
       }
       case 'setAttrs': {
-        const prev = requireBlock(prevDoc, step.id);
+        const prev = prevDoc.blocks.get(step.id);
+        if (!prev) {
+          // Same-tx freshly-inserted block: handled by insertBlock inverse.
+          // This is the HIT CASE for splitBlock / insertBlock + indent sync:
+          //   insertBlock(X) → collectIndentSyncPatches → setAttrs(X, {indent:N})
+          // prevDoc has no X (it was inserted in this tx), so skipping avoids
+          // the "BlockEditor: unknown block X" throw and correctly leaves
+          // undo responsibility to the insertBlock → removeBlock inverse.
+          break;
+        }
         inverse.push({ op: 'setAttrs', id: step.id, attrs: prev.attrs });
         break;
       }

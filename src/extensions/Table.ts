@@ -84,10 +84,12 @@ import { applySteps } from '../core/state/Step';
 import {
   blockAfter,
   blockBefore,
+  depthOf,
   indexOf,
   parentOf,
 } from '../core/state/store';
 import { caretSelection } from '../core/selection/Selection';
+import { classesFromAttrs, COMMON_ATTRS } from './_commonAttrs';
 import {
   attrsToTable,
   buildEmptyCells,
@@ -145,6 +147,10 @@ const ICON_DELETE_TABLE = `<svg viewBox="0 0 1024 1024" width="14" height="14" f
 // (not used yet) or is handled directly by the renderer (header rows, etc.).
 
 const TABLE_ATTRS = {
+  // a table can be a CHILD block, so it needs `indent` to reflect its
+  // nesting depth and render the be-indent-N class. (nestable=false only means
+  // it can't be a parent.)
+  indent: COMMON_ATTRS.indent,
   rows: {
     default: 3,
     validate: (v: unknown): boolean =>
@@ -191,7 +197,7 @@ const TableBlock = defineComponent({
     block: { type: Object as PropType<Block>, required: true },
     placeholder: { type: String, default: undefined },
   },
-  setup(props) {
+  setup(props, { expose }) {
     void props.placeholder; // not used for tables
     const editor = useEditor();
     const editable = useEditable();
@@ -831,7 +837,7 @@ const TableBlock = defineComponent({
       tableSel.value = { kind: 'none' };
       cellSel.value = null;
       hideToolbar(0);
-      editor.commands.selectBlock?.({ blockId });
+      editor.commands.selectBlock?.({ id: blockId });
     }
 
     // --- Cell content syncing --------------------------------------------
@@ -1374,7 +1380,7 @@ const TableBlock = defineComponent({
       focusedCell.value = null;
       // Selecting a cell means the table is now the active block — clear
       // any caret / text selection in other blocks so they lose focus.
-      editor.commands.selectBlock?.({ blockId });
+      editor.commands.selectBlock?.({ id: blockId });
       // Focus the container so focusout fires when clicking outside the table.
       focusContainer();
 
@@ -1683,6 +1689,8 @@ const TableBlock = defineComponent({
 
     // Global keydown for when a row/col/cell/all is selected (not focused).
     function onDocKeyDown(ev: KeyboardEvent): void {
+      // Read-only: no table keyboard interaction.
+      if (!editable.value) return;
       const sel = tableSel.value;
       if (sel.kind === 'none') return;
       // Only handle if focus is not in a text input or contenteditable inside the table.
@@ -1691,6 +1699,7 @@ const TableBlock = defineComponent({
       // Escape clears any selection.
       if (ev.key === 'Escape') {
         ev.preventDefault();
+        ev.stopPropagation();
         tableSel.value = { kind: 'none' };
         cellSel.value = null;
         hideToolbar(0);
@@ -1699,6 +1708,7 @@ const TableBlock = defineComponent({
       const isDel = ev.key === 'Delete' || ev.key === 'Backspace';
       if (!isDel) return;
       ev.preventDefault();
+      ev.stopPropagation();
       if (sel.kind === 'row') action('tableRemoveRow', { row: sel.row });
       else if (sel.kind === 'col') action('tableRemoveCol', { col: sel.col });
       else if (sel.kind === 'all') action('tableDelete');
@@ -1947,6 +1957,7 @@ const TableBlock = defineComponent({
     });
 
     function onColResizeStart(col: number, ev: MouseEvent): void {
+      if (!editable.value) return;
       ev.preventDefault();
       ev.stopPropagation();
       resizingCol.value = col;
@@ -2110,6 +2121,24 @@ const TableBlock = defineComponent({
 
     // --- Render -----------------------------------------------------------
 
+    // Public API exposed via template ref for BlockEditor to clear internal
+    // table focus state (cell selection, focused cell, popovers, toolbar).
+    // MUST be called once in setup() BEFORE returning the render function —
+    // Vue's expose() is a one-shot per-setup API; calling it from inside the
+    // render closure triggers the "should be called only once per setup()"
+    // runtime warning on every re-render.
+    function clearInnerFocus(): void {
+      focusedCell.value = null;
+      cellSel.value = null;
+      if (tableSel.value.kind !== 'none') {
+        tableSel.value = { kind: 'none' };
+      }
+      hideToolbar(0);
+      closeTableOlMenu();
+      closeTableNumberPicker();
+    }
+    expose({ clearInnerFocus });
+
     return () => {
       const attr = tattrs.value;
       const rows = attr.rows;
@@ -2271,6 +2300,8 @@ const TableBlock = defineComponent({
               // state. We read the new state from the DOM and update the
               // data model. Vue re-renders with the correct `checked` prop.
               onchange: (e: Event) => {
+                // Read-only: don't modify cell data.
+                if (!editable.value) return;
                 const target = e.target as HTMLInputElement;
                 const next = setCellAttrs(tattrs.value, r, c, { checked: target.checked });
                 editor.commands.setAttrs?.({ id: blockId, attrs: next as unknown as Attrs });
@@ -2354,7 +2385,6 @@ const TableBlock = defineComponent({
           title: i18n.t('table.selectRow'),
           onClick: (e: MouseEvent) => {
             e.preventDefault();
-            e.stopPropagation();
             selectRow(r);
           },
         }));
@@ -2405,7 +2435,6 @@ const TableBlock = defineComponent({
           title: i18n.t('table.selectCol'),
           onClick: (e: MouseEvent) => {
             e.preventDefault();
-            e.stopPropagation();
             selectCol(c);
           },
         }));
@@ -2473,7 +2502,6 @@ const TableBlock = defineComponent({
         title: i18n.t('table.selectAll'),
         onClick: (e: MouseEvent) => {
           e.preventDefault();
-          e.stopPropagation();
           selectAll();
         },
       });
@@ -2991,7 +3019,7 @@ const TableBlock = defineComponent({
       return h(
         'div',
         {
-          class: 'block-table-container',
+          class: ['block-table-container', 'block-focus-root', ...classesFromAttrs(props.block.attrs)],
           ref: containerRef,
           tabindex: '-1',
           onClick: onSelectBlock,
@@ -3382,11 +3410,17 @@ function insertTableCommand(): CommandEntry<InsertTableArgs> {
 
       const builder = createTransaction();
       if (replaceId) builder.removeBlock(replaceId);
+      // a table may be inserted AS A CHILD block (e.g. indented under
+      // a nestable sibling). Its `attrs.indent` must mirror the nesting depth
+      // so the be-indent-N class renders correctly. Compute depth from the
+      // resolved parent (null → root level, indent 0).
+      const depth = parent === null ? 0 : depthOf(state.doc, parent) + 1;
+      const attachIndent = depth > 0 ? { ...(typedAttrs as object), indent: depth } : typedAttrs;
       const id = builder.insertBlock({
         parent,
         index,
         type: 'table' as BlockType,
-        attrs: typedAttrs,
+        attrs: attachIndent as Attrs,
         content: [],
       });
       // Post-insert selection: pick adjacent non-table block so caret lands in

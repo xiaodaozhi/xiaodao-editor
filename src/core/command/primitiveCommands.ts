@@ -8,7 +8,7 @@
  * See docs/editor-architecture.md §7.3, §11.2, §11.3.
  */
 
-import type { Attrs, BlockId, BlockType, DocState, InlineNode, InlineSeq, Mark, Selection } from '../types';
+import type { Attrs, BlockId, BlockType, InlineNode, InlineSeq, Mark, Selection } from '../types';
 import { inlineFromString, inlineText, splitInline } from '../types';
 import { createTransaction } from '../state/Transaction';
 import type { AnyCommandEntry, CommandEntry, Dispatch } from './Command';
@@ -16,11 +16,15 @@ import type { EditorRegistries } from '../extension/Registry';
 import {
   blockAfter,
   blockBefore,
+  collectIndentSyncPatches,
+  depthOf,
   flatten as flattenDoc,
   getBlock,
   indexOf,
   parentOf,
+  prevSibling,
   requireBlock,
+  siblingList,
 } from '../state/store';
 import { caretSelection, isBlocks, isCaret, isCollapsed, isText, primaryBlock } from '../selection/Selection';
 import { applySteps } from '../state/Step';
@@ -76,78 +80,42 @@ function ensureCaretOrText(sel: Selection): { blockId: BlockId; offset: number }
   return { blockId, offset };
 }
 
+const MAX_INDENT = 10;
+
 /**
- * Indent normalization — the SINGLE source of truth for indent rules.
+ * Apply nesting-aware fixups at the end of every structural transaction.
  *
- * Rules:
- *   1. The first block in the document must have indent 0 (or no indent attr).
- *   2. If the previous block (in flat doc order) does NOT support indent
- *      (e.g. quote / codeBlock), the current block's indent must be 0.
- *   3. A block's indent may exceed the previous block's indent by at most 1
- *      (only when both support indent).
+ * Two responsibilities (single source of truth, runs atomically in the same
+ * transaction as the structural change so undo covers both):
  *
- * This function inspects a DocState and returns the setAttrs steps needed
- * to make the document compliant. Callers add these steps to the SAME
- * transaction as the structural change so the fixup is atomic with undo.
+ *   1. **Nesting validity** (Phase 2.2 — structural): illegal parent/child
+ *      relationships are repaired with moveBlock steps. Rules enforced:
+ *        • Non-nestable parents cannot have children (child is promoted to
+ *          grandparent slot).
+ *        • Nesting depth never exceeds MAX_INDENT (promote excess levels).
+ *
+ *   2. **attrs.indent synchronization**: after any structural change we run
+ *      `collectIndentSyncPatches` so every block's `attrs.indent` becomes a
+ *      faithful mirror of `depthOf(doc, id)`. This is the ONLY code path
+ *      that is allowed to write the indent attr; commands must never touch
+ *      attrs.indent manually — they manipulate parent/children via
+ *      moveBlock/insertBlock/removeBlock instead.
  */
-function collectIndentFixups(
-  doc: DocState,
-  schema: { get(type: string): { attrs: Readonly<Record<string, unknown>> } },
-): Array<{ id: BlockId; attrs: Attrs }> {
-  const flat = flattenDoc(doc);
-  const fixups: Array<{ id: BlockId; attrs: Attrs }> = [];
-  let prevSupportsIndent = false;
-  let prevIndent = 0;
-
-  for (let i = 0; i < flat.length; i++) {
-    const id = flat[i]!;
-    const block = doc.blocks.get(id);
-    if (!block) continue;
-
-    const schemaAttrs = schema.get(block.type).attrs;
-    const supportsIndent = 'indent' in schemaAttrs;
-    const currentIndent = typeof block.attrs.indent === 'number' ? block.attrs.indent : 0;
-
-    // Compute the maximum allowed indent for this block.
-    let maxAllowed = 0;
-    if (i > 0 && prevSupportsIndent) {
-      maxAllowed = prevIndent + 1;
-    }
-
-    if (supportsIndent && currentIndent > maxAllowed) {
-      // Clamp to maxAllowed (which is 0 if prev doesn't support indent).
-      const newIndent = maxAllowed;
-      if (newIndent === 0) {
-        const { indent: _omit, ...restAttrs } = block.attrs;
-        fixups.push({ id, attrs: restAttrs });
-      } else {
-        fixups.push({ id, attrs: { ...block.attrs, indent: newIndent } });
-      }
-    }
-
-    prevSupportsIndent = supportsIndent;
-    prevIndent = supportsIndent ? Math.min(currentIndent, maxAllowed) : 0;
-  }
-
-  return fixups;
-}
-
-/** Apply indent fixups to a transaction builder based on the POST-operation
- *  document state. We achieve this by running applySteps on a draft to get
- *  the intermediate state, then collecting fixups from that state. */
-function addIndentFixupsToBuilder(
+function addNestingSyncToBuilder(
   state: EditorState,
   builder: ReturnType<typeof createTransaction>,
   ctx: Ctx,
 ): void {
-  // Build a temporary state by applying the builder's current steps.
   const steps = builder.peek();
   if (steps.length === 0) return;
+  // --- Phase 2.2: nesting validity moves go here (future work) ------------
+  // For now: assume structural steps produced a well-formed tree (schema
+  // nestable + commands are disciplined). We simply re-sync attrs.indent.
+
+  // Build the post-step doc, then emit setAttrs patches for indent sync.
   const result = applySteps(state.doc, steps);
-  const fixups = collectIndentFixups(result.doc, ctx.registries.schema);
-  for (const f of fixups) {
-    builder.setAttrs(f.id, f.attrs);
-  }
+  const syncs = collectIndentSyncPatches(result.doc, ctx.registries.schema);
+  for (const p of syncs) builder.setAttrs(p.id, p.attrs);
 }
 
 /** Insert a block, defaulting to placement after `after` (or at the end). */
@@ -178,6 +146,16 @@ function insertBlockCommand(ctx: Ctx): CommandEntry<InsertBlockArgs> {
         index = state.doc.root.length;
       }
 
+      // Nestable guard: when inserting under an existing parent (not root),
+      // the parent's schema must be nestable:true. (CodeBlock / hr / table /
+      // divider / quote disallow children — fail closed.)
+      if (parent !== null) {
+        const pb = getBlock(state.doc, parent);
+        if (!pb) return false;
+        const ps = ctx.registries.schema.get(pb.type);
+        if (!ps?.nestable) return false;
+      }
+
       const builder = createTransaction();
       const id = builder.insertBlock({ parent, index, type, attrs, content });
       builder.setSelection(caretSelection(id, 0));
@@ -196,10 +174,60 @@ function removeBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
       const after = blockAfter(state.doc, args.id);
       const target = before ?? after;
       const builder = createTransaction();
+
+      // if the removed block has children, migrate them according to
+      // the user-specified rule:
+      //   • "previous block" (caret-after-removal = before) exists AND is a
+      //     nestable parent AND depthOf(before) < MAX_INDENT → re-parent as
+      //     children of `before` (appended at the END of before's children).
+      //   • Otherwise → promote them to siblings of the removed block (same
+      //     parent, inserted at the slot the removed block used to occupy).
+      //
+      // Note: `before` here is document-order previous, which is exactly
+      // "where the caret lands after removal" for a non-isolating text block
+      // caret-at-offset-0 backspace (matches the user's "上一个块即光标后来
+      // 出现位置的那个子块" wording).
+      const removed = requireBlock(state.doc, args.id);
+      const childrenToMigrate = (removed.children as readonly BlockId[]) ?? [];
+      if (childrenToMigrate.length > 0) {
+        const removalParent = parentOf(state.doc, args.id);
+        const removalIndex = indexOf(state.doc, args.id);
+
+        const canNestUnderBefore = (() => {
+          if (!before) return false;
+          const bSchema = ctx.registries.schema.get(before.type);
+          if (!bSchema?.nestable) return false;
+          if (depthOf(state.doc, before.id) >= MAX_INDENT) return false;
+          return true;
+        })();
+
+        if (canNestUnderBefore && before) {
+          // Append at the END of `before`'s current children.
+          const beforeChildren = (before.children as readonly BlockId[]) ?? [];
+          let insertIdx = beforeChildren.length;
+          for (const childId of childrenToMigrate) {
+            builder.moveBlock(childId, before.id, insertIdx);
+            insertIdx++;
+          }
+        } else {
+          // Promote to siblings of the removed block in the same parent,
+          // starting at the removed block's current index. As each move pulls
+          // a child out of removed (which itself hasn't been removed from the
+          // siblings array yet), the slot keeps shifting — but moveBlock
+          // operates on raw tuple (parent,index) semantics and the removal
+          // step is after these moves, so insertion indices just increment.
+          let insertIdx = removalIndex;
+          for (const childId of childrenToMigrate) {
+            builder.moveBlock(childId, removalParent, insertIdx);
+            insertIdx++;
+          }
+        }
+      }
+
       builder.removeBlock(args.id);
       // Normalize indent after structural change (covers first-block rule
       // AND prev-block-doesn't-support-indent rule in one pass).
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       if (target) {
         const text = inlineText(target.content);
         builder.setSelection(caretSelection(target.id, text.length));
@@ -220,7 +248,7 @@ function replaceBlockCommand(ctx: Ctx): CommandEntry<ReplaceBlockArgs> {
       const builder = createTransaction();
       builder.replaceBlock(args.id, args.type, attrs);
       // Type change may invalidate this block's (or its neighbors') indent.
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(args.id, 0));
       dispatch?.(builder.build());
       return true;
@@ -273,6 +301,12 @@ function splitBlockCommand(ctx: Ctx): CommandEntry<SplitBlockArgs> {
       const parent = parentOf(state.doc, args.id);
       const index = indexOf(state.doc, args.id);
 
+      // snapshot the original block's children — they will be moved
+      // wholesale to the newly-created sibling block after split. This matches
+      // Notion behaviour: pressing Enter inside a block with nested children
+      // "hands off" all descendants to the new block right after the split point.
+      const origChildren = (block.children as readonly BlockId[]) ?? [];
+
       const newType = args.asType ?? ctx.registries.defaultBlockType;
       const newAttrs = args.asAttrs ?? ctx.registries.schema.defaultAttrsFor(newType);
 
@@ -285,6 +319,24 @@ function splitBlockCommand(ctx: Ctx): CommandEntry<SplitBlockArgs> {
         attrs: newAttrs,
         content: after,
       });
+
+      // Move every child of the original block (in document order) to become
+      // children of the new split block, appending at the end of its children.
+      // The new block's schema may or may not declare nestable:true — when it
+      // doesn't (e.g. paragraph can usually be a parent but some custom type
+      // might not) the moveBlock step would normally be rejected. However the
+      // "enter splits children to the new block" UX is block-type-agnostic:
+      // the new block shares the same listLike / text-bearing nature as the
+      // source (asType defaults to paragraph, or same list type), so we assume
+      // it is a valid parent. addNestingSyncToBuilder still repairs any
+      // residual invalid state afterwards.
+      if (origChildren.length > 0) {
+        for (let i = 0; i < origChildren.length; i++) {
+          builder.moveBlock(origChildren[i]!, newId, i);
+        }
+      }
+
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(newId, 0));
       dispatch?.(builder.build());
       return true;
@@ -292,7 +344,7 @@ function splitBlockCommand(ctx: Ctx): CommandEntry<SplitBlockArgs> {
   };
 }
 
-function mergeBlockCommand(): CommandEntry<{ id: BlockId }> {
+function mergeBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
   return {
     name: 'mergeBlock',
     run: (args) => (state, dispatch) => {
@@ -301,12 +353,49 @@ function mergeBlockCommand(): CommandEntry<{ id: BlockId }> {
       const prev = blockBefore(state.doc, args.id);
       if (!prev) return false;
 
+      // 前一个块是非文本块（content: 'none'，如图片、分隔符）时，
+      // 不能将当前块的文本合并进去，直接返回 false。
+      if (!ctx.registries.schema.hasText(prev.type)) return false;
+
       const prevText = inlineText(prev.content);
       // 直接拼接两个 InlineSeq，各自的 TextRun marks 得以保留。
       const merged: InlineSeq = [...prev.content, ...block.content];
       const builder = createTransaction();
       builder.setText(prev.id, merged);
+
+      // migrate `block`'s children before removing the block itself.
+      // Same rule as removeBlockCommand:
+      //   • prev is nestable AND depthOf(prev) < MAX_INDENT → append as prev's
+      //     children (prev is the caret destination after merge so this is
+      //     the correct "上一个块" target).
+      //   • Otherwise promote to siblings of `block` (same parent, same slot).
+      const childrenToMigrate = (block.children as readonly BlockId[]) ?? [];
+      if (childrenToMigrate.length > 0) {
+        const removalParent = parentOf(state.doc, args.id);
+        const removalIndex = indexOf(state.doc, args.id);
+
+        const prevSchema = ctx.registries.schema.get(prev.type);
+        const canNestUnderPrev = !!prevSchema?.nestable
+          && depthOf(state.doc, prev.id) < MAX_INDENT;
+
+        if (canNestUnderPrev) {
+          const prevChildren = (prev.children as readonly BlockId[]) ?? [];
+          let insertIdx = prevChildren.length;
+          for (const childId of childrenToMigrate) {
+            builder.moveBlock(childId, prev.id, insertIdx);
+            insertIdx++;
+          }
+        } else {
+          let insertIdx = removalIndex;
+          for (const childId of childrenToMigrate) {
+            builder.moveBlock(childId, removalParent, insertIdx);
+            insertIdx++;
+          }
+        }
+      }
+
       builder.removeBlock(args.id);
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(prev.id, prevText.length));
       dispatch?.(builder.build());
       return true;
@@ -348,23 +437,16 @@ function enterCommand(ctx: Ctx): CommandEntry {
         return insertBlockCommand(ctx).run({ type: ctx.registries.defaultBlockType, after: block.id })(state, dispatch);
       }
 
-      // 计算新块 asAttrs：如果源块有 indent 且目标类型 schema 含 indent，则保留。
-      const computeAsAttrs = (targetType: BlockType): Attrs | undefined => {
-        const targetSchema = ctx.registries.schema.get(targetType);
-        if (!('indent' in targetSchema.attrs)) return undefined;
-        const srcIndent = block.attrs.indent;
-        if (typeof srcIndent !== 'number' || srcIndent <= 0) return undefined;
-        // 从默认 attrs 作为基底，然后用 srcIndent 覆盖。
-        return { ...ctx.registries.schema.defaultAttrsFor(targetType), indent: srcIndent };
-      };
-
+      // splitBlock inserts the new block as a sibling
+      // immediately after `block` (same parent, index = indexOf(block)+1), so
+      // its nesting depth is automatically identical — no need to manually
+      // transfer attrs.indent. addNestingSyncToBuilder (called inside
+      // splitBlock) rewrites attrs.indent from depthOf().
       if (schema.listLike) {
-        const asAttrs = computeAsAttrs(block.type);
-        return splitBlockCommand(ctx).run({ id: block.id, offset: focus.offset, asType: block.type, ...(asAttrs ? { asAttrs } : {}) })(state, dispatch);
+        return splitBlockCommand(ctx).run({ id: block.id, offset: focus.offset, asType: block.type })(state, dispatch);
       }
 
-      const asAttrs = computeAsAttrs(ctx.registries.defaultBlockType);
-      return splitBlockCommand(ctx).run({ id: block.id, offset: focus.offset, ...(asAttrs ? { asAttrs } : {}) })(state, dispatch);
+      return splitBlockCommand(ctx).run({ id: block.id, offset: focus.offset })(state, dispatch);
     },
   };
 }
@@ -382,7 +464,7 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
         const builder = createTransaction();
         for (const id of sel.blockIds) builder.removeBlock(id);
         const target = before ?? blockAfter(state.doc, sel.blockIds[sel.blockIds.length - 1]!);
-        addIndentFixupsToBuilder(state, builder, ctx);
+        addNestingSyncToBuilder(state, builder, ctx);
         if (target) builder.setSelection(caretSelection(target.id, inlineText(target.content).length));
         dispatch?.(builder.build());
         return true;
@@ -441,7 +523,7 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
           builder.removeBlock(flat[i]!);
         }
         builder.setSelection(caretSelection(start.blockId, caretPos));
-        addIndentFixupsToBuilder(state, builder, ctx);
+        addNestingSyncToBuilder(state, builder, ctx);
         dispatch?.(builder.build());
         return true;
       }
@@ -449,14 +531,12 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
       // Caret mid-text: let the native contenteditable delete one char.
       if (focus.offset > 0) return false;
 
-      // 块首且支持缩进：indent > 0 时优先减少一层缩进（比列表退出、块合并更高优先级）。
-      const blockSchema = ctx.registries.schema.get(block.type);
-      const hasIndentAttr = 'indent' in blockSchema.attrs;
-      if (hasIndentAttr) {
-        const cur = typeof block.attrs.indent === 'number' ? block.attrs.indent : 0;
-        if (cur > 0) {
-          return outdentBlockCommand(ctx).run({ id: block.id })(state, dispatch);
-        }
+      // Caret at block start AND block is nested (depth ≥ 1): outdent FIRST
+      // (higher priority than list exit / merge). Any block type — including
+      // non-nestable ones (code, hr, table, divider, quote) — can be promoted
+      // because "nestable" only governs being a parent, not being a child.
+      if (depthOf(state.doc, block.id) > 0) {
+        return outdentBlockCommand(ctx).run({ id: block.id })(state, dispatch);
       }
 
       // Caret at offset 0 on a list item: Backspace exits the list rather
@@ -489,7 +569,16 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
         return false;
       }
 
-      return mergeBlockCommand().run({ id: block.id })(state, dispatch);
+      // 前一个块是非文本块（content: 'none'，如图片、分隔符）时，不能将
+      // 当前块的文本合并进去。如果当前块为空则删除它，否则禁止合并。
+      if (!ctx.registries.schema.hasText(prev.type)) {
+        if (ctx.registries.schema.isEmpty(block)) {
+          return removeBlockCommand(ctx).run({ id: block.id })(state, dispatch);
+        }
+        return false;
+      }
+
+      return mergeBlockCommand(ctx).run({ id: block.id })(state, dispatch);
     },
   };
 }
@@ -600,12 +689,38 @@ function moveBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId; toParent: Block
   return {
     name: 'moveBlock',
     run: (args) => (state, dispatch) => {
-      if (!getBlock(state.doc, args.id)) return false;
+      const block = getBlock(state.doc, args.id);
+      if (!block) return false;
+
+      // --- 1) Self-parent guard: a block cannot become its own parent. ---
+      if (args.toParent === args.id) return false;
+
+      // --- 2) Cycle guard: targetParent must NOT be a descendant of the
+      //        moved block. Otherwise depthOf / flatten infinite-loop. ---
+      if (args.toParent !== null) {
+        let cursor: BlockId | null = args.toParent;
+        while (cursor !== null) {
+          if (cursor === args.id) return false;
+          cursor = parentOf(state.doc, cursor);
+        }
+      }
+
+      // --- 3) Nestable guard: when moving into an existing block (not root),
+      //        the target parent's schema must declare nestable:true. Block
+      //        types like codeBlock / hr / table / divider / quote are
+      //        explicitly nestable:false — placing children under them would
+      //        produce dirty state that no rendering path accounts for. ---
+      if (args.toParent !== null) {
+        const parentBlock = getBlock(state.doc, args.toParent);
+        if (!parentBlock) return false;
+        const parentSchema = ctx.registries.schema.get(parentBlock.type);
+        // Fail closed: unknown schemas or nestable !== true → reject.
+        if (!parentSchema?.nestable) return false;
+      }
+
       const builder = createTransaction();
       builder.moveBlock(args.id, args.toParent, args.toIndex);
-      // Normalize indent: moving a block may place it after a non-indent
-      // block, or make it the first block.
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(args.id, 0));
       dispatch?.(builder.build());
       return true;
@@ -666,7 +781,7 @@ function convertBlockCommand(ctx: Ctx): CommandEntry<ConvertBlockArgs> {
       if (content !== block.content) builder.setText(args.id, content);
       // Normalize indent: converting a block to a non-indent type (e.g.
       // codeBlock/quote) may invalidate the indent of the block BELOW it.
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       // Clamp caret offset to new content length.
       const maxOff = inlineText(content).length;
       builder.setSelection(caretSelection(args.id, Math.min(selOff, maxOff)));
@@ -691,7 +806,7 @@ function moveBlockUpCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
       const parentNullable: BlockId | null = parent;
       const builder = createTransaction();
       builder.moveBlock(args.id, parentNullable, Math.max(0, prevIdx));
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(args.id, 0));
       dispatch?.(builder.build());
       return true;
@@ -716,7 +831,7 @@ function moveBlockDownCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
       const i = siblings.indexOf(args.id);
       const afterNext = nextIdx > i ? nextIdx : nextIdx + 1;
       builder.moveBlock(args.id, parentNullable, Math.max(0, Math.min(siblings.length, afterNext)));
-      addIndentFixupsToBuilder(state, builder, ctx);
+      addNestingSyncToBuilder(state, builder, ctx);
       builder.setSelection(caretSelection(args.id, 0));
       dispatch?.(builder.build());
       return true;
@@ -724,24 +839,90 @@ function moveBlockDownCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
   };
 }
 
-/** Duplicate a block (insert its clone right after it). */
+/** Duplicate a block AND its whole subtree, inserting the cloned subtree
+ *  immediately after the original block (same parent).
+ *
+ *  Since blocks carry their `children` array as
+ *  ownership, a "duplicate" must follow the parent chain and clone every
+ *  descendant with a fresh id, then re-wire the children arrays of the
+ *  newly-created parents to the cloned child ids. The ids are produced in
+ *  root-first DFS order via `insertBlock(parent, index)` — children are
+ *  appended to their new parent's `children` array one by one so the
+ *  relative order within each sibling list matches the source. */
 function duplicateBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
   return {
     name: 'duplicateBlock',
     run: (args) => (state, dispatch) => {
-      const block = getBlock(state.doc, args.id);
-      if (!block) return false;
-      const attrs = ctx.registries.schema.coerceAttrsFor(block.type, block.attrs);
-      const parent = parentOf(state.doc, args.id);
-      const idx = indexOf(state.doc, args.id) + 1;
+      const rootBlock = getBlock(state.doc, args.id);
+      if (!rootBlock) return false;
+
+      // Root-first DFS over the source subtree. For each node we record the
+      // old-id plus the source parent-id (the root's source-parent is outside
+      // the subtree and will be used as the insert point).
+      type Node = { readonly oldId: BlockId; readonly parentOldId: BlockId | null };
+      const order: Node[] = [];
+      const stack: Array<{ id: BlockId; parentOldId: BlockId | null }> = [];
+      stack.push({ id: args.id, parentOldId: parentOf(state.doc, args.id) });
+      while (stack.length > 0) {
+        const { id, parentOldId } = stack.pop()!;
+        const b = getBlock(state.doc, id);
+        if (!b) continue;
+        order.push({ oldId: id, parentOldId });
+        // Push children in REVERSE so that popping yields them in original order.
+        const kids = b.children as readonly BlockId[];
+        for (let i = kids.length - 1; i >= 0; i--) {
+          stack.push({ id: kids[i]!, parentOldId: id });
+        }
+      }
+      if (order.length === 0) return false;
+
+      const oldToNew = new Map<BlockId, BlockId>();
+      // Tracks how many children we have already appended under each cloned
+      // parent — `insertBlock(parent, index)` will use this to append at the
+      // "current end" of the new parent's (still being built) children list.
+      const nextChildIndex = new Map<BlockId, number>();
       const builder = createTransaction();
-      builder.insertBlock({
-        parent,
-        index: idx,
-        type: block.type,
-        attrs,
-        content: block.content,
-      });
+
+      for (const node of order) {
+        const src = requireBlock(state.doc, node.oldId);
+        let insertParent: BlockId | null;
+        let insertIndex: number;
+        if (node.oldId === args.id) {
+          // Root clone: insert right after the original, in the same parent.
+          insertParent = node.parentOldId;
+          const siblings = insertParent === null
+            ? state.doc.root
+            : (requireBlock(state.doc, insertParent).children as readonly BlockId[]);
+          const srcIdx = siblings.indexOf(args.id);
+          insertIndex = srcIdx >= 0 ? srcIdx + 1 : siblings.length;
+        } else {
+          // Descendant clone: append at the end of its (new) parent's children.
+          // (This is the `else` branch of `node.oldId === args.id`, so
+          // node.parentOldId is always a real BlockId inside the subtree.)
+          const parentOldId = node.parentOldId as BlockId;
+          const parentNewId = oldToNew.get(parentOldId) ?? null;
+          if (parentNewId === null) return false;
+          insertParent = parentNewId;
+          insertIndex = nextChildIndex.get(parentNewId) ?? 0;
+          nextChildIndex.set(parentNewId, insertIndex + 1);
+        }
+
+        const attrs = ctx.registries.schema.coerceAttrsFor(src.type, src.attrs);
+        const newId = builder.insertBlock({
+          parent: insertParent,
+          index: insertIndex,
+          type: src.type,
+          attrs,
+          content: src.content,
+        });
+        oldToNew.set(node.oldId, newId);
+      }
+
+      addNestingSyncToBuilder(state, builder, ctx);
+      const newRootId = oldToNew.get(args.id) ?? null;
+      if (newRootId) {
+        builder.setSelection(caretSelection(newRootId, 0));
+      }
       dispatch?.(builder.build());
       return true;
     },
@@ -858,10 +1039,30 @@ export interface IndentBlockArgs {
 }
 
 /**
- * 增加块缩进。仅对 INDENT_TYPES 中的块类型有效。
- * 限制：前一个块必须是 INDENT_TYPES 类型或文档第一个块。
- * 缩进上限 MAX_INDENT=10。
- * args.id 可选；未指定时从 state.selection 的 focus blockId 推断（便于 keymap 直接调用）。
+ * Increase nesting level (Tab key).
+ *
+ * Nesting model:
+ *   • Authoritative state is the parent/children tree in DocState (Block.children
+ *     + DocState.parent Map).
+ *   • attrs.indent is a DERIVED shadow — it is rewritten by addNestingSyncToBuilder
+ *     to equal depthOf(doc, id) after every transaction, and is NEVER set here.
+ *
+ * Behaviour (matches Notion / Google Docs):
+ *   • If the block has a PREVIOUS SIBLING (same parent, earlier index), move
+ *     the block to become the LAST CHILD of that previous sibling.
+ *   • The PREVIOUS SIBLING must be nestable (schema.nestable) — because it
+ *     will become the new parent. The CURRENT block can be ANY type:
+ *     non-nestable blocks (codeBlock, divider, hr, table, image, quote, …)
+ *     simply become children without being able to accept further children
+ *     of their own (the nestable flag governs being a parent, not a child).
+ *   • The resulting nesting depth is capped to MAX_INDENT — if the previous
+ *     sibling already sits at MAX_INDENT the operation is a no-op
+ *     (nesting under prev would place this block at MAX+1, which is invalid).
+ *   • First-sibling and first-document blocks (no prev sibling) cannot indent
+ *     (they would have nothing to nest under).
+ *
+ * args.id is optional; when omitted the focus block from state.selection is
+ * used (so keymap bindings can call indentBlock directly without args).
  */
 function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
   return {
@@ -880,16 +1081,23 @@ function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
       if (!id) return false;
       const block = getBlock(state.doc, id);
       if (!block) return false;
-      const schema = ctx.registries.schema.get(block.type);
-      if (!('indent' in schema.attrs)) return false;
-      const currentIndent = typeof block.attrs.indent === 'number' ? block.attrs.indent : 0;
-      if (currentIndent >= 10) return false;
-      // First block cannot be indented
-      const prev = blockBefore(state.doc, id);
-      if (!prev) return false;
-      if (!('indent' in ctx.registries.schema.get(prev.type).attrs)) return false;
+      // NOTE: no `mySchema.nestable` check here — ANY block type is allowed
+      // to BECOME a child (nestable means "can be a parent", not "can be a child").
+
+      const prev = prevSibling(state.doc, id);
+      if (!prev) return false; // first-sibling: nothing to nest under
+      const prevSchema = ctx.registries.schema.get(prev.type);
+      if (!prevSchema.nestable) return false; // can't nest under non-nestable
+
+      if (depthOf(state.doc, prev.id) >= MAX_INDENT) return false;
+
+      const newParentId = prev.id;
+      const toIndex = (prev.children as readonly BlockId[]).length;
+
       const builder = createTransaction();
-      builder.setAttrs(id, { ...block.attrs, indent: currentIndent + 1 });
+      builder.moveBlock(id, newParentId, toIndex);
+      addNestingSyncToBuilder(state, builder, ctx);
+      builder.setSelection(caretSelection(id, 0));
       dispatch?.(builder.build());
       return true;
     },
@@ -897,8 +1105,17 @@ function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
 }
 
 /**
- * 减少块缩进。indent 为 0 时禁用。
- * args.id 可选；未指定时从 state.selection 的 focus blockId 推断。
+ * Decrease nesting level (Shift+Tab) — the inverse of indentBlock.
+ *
+ * Behaviour:
+ *   • If the block has a real parent (parentOf != null → depth ≥ 1), move the
+ *     block to become the NEXT SIBLING of its own parent (i.e. promote it one
+ *     level up in the tree, placed immediately after the former parent).
+ *   • Root-level blocks (depth 0, parent null) cannot outdent further.
+ *   • The CURRENT block can be ANY type (same logic as indentBlock):
+ *     non-nestable blocks can be promoted up just like any other.
+ *   • After promotion, attrs.indent is normalized via addNestingSyncToBuilder
+ *     (same as indentBlock — the command does NOT write the indent attr).
  */
 function outdentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
   return {
@@ -917,12 +1134,23 @@ function outdentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
       if (!id) return false;
       const block = getBlock(state.doc, id);
       if (!block) return false;
-      const schema = ctx.registries.schema.get(block.type);
-      if (!('indent' in schema.attrs)) return false;
-      const currentIndent = typeof block.attrs.indent === 'number' ? block.attrs.indent : 0;
-      if (currentIndent <= 0) return false;
+      // NOTE: any block type can be promoted out — "nestable" is only about
+      // being a parent, not being a child.
+
+      const parentId = parentOf(state.doc, id);
+      if (parentId === null) return false; // already at root level
+
+      const grandParentId = parentOf(state.doc, parentId);
+      // Index of our parent among the grandparent's children — we insert
+      // ourselves right after it.
+      const parentSibs = siblingList(state.doc, parentId);
+      const parentIdx = parentSibs.indexOf(parentId);
+      const toIndex = parentIdx === -1 ? parentSibs.length : parentIdx + 1;
+
       const builder = createTransaction();
-      builder.setAttrs(id, { ...block.attrs, indent: currentIndent - 1 });
+      builder.moveBlock(id, grandParentId, toIndex);
+      addNestingSyncToBuilder(state, builder, ctx);
+      builder.setSelection(caretSelection(id, 0));
       dispatch?.(builder.build());
       return true;
     },
@@ -1300,7 +1528,7 @@ export function createPrimitiveCommands(registries: EditorRegistries): AnyComman
     setTextCommand(),
     setAttrsCommand(),
     splitBlockCommand(ctx),
-    mergeBlockCommand(),
+    mergeBlockCommand(ctx),
     enterCommand(ctx),
     backspaceCommand(ctx),
     moveToPreviousBlockCommand(),

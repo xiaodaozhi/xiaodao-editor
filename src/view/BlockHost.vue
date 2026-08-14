@@ -15,6 +15,7 @@
   <div
     ref="hostEl"
     class="block-host"
+    :data-block-id="block.id"
     :data-block-type="block.type"
     :class="{
       'block-dragging': isDragging,
@@ -22,11 +23,15 @@
       'block-drop-target': isDropTarget,
       'block-drop-before': isDropTarget && dropPos === 'before',
       'block-drop-after': isDropTarget && dropPos === 'after',
+      'block-drop-into': isDropTarget && dropPos === 'into',
+      'block-host-readonly': !editable,
+      'block-focused': focusedBlockId === block.id,
     }"
     @mouseenter="onHover"
     @mouseleave="onLeave"
   >
     <BlockHandle
+      v-if="editable"
       ref="handleRef"
       :block-id="block.id"
       :visible="showHandle"
@@ -43,6 +48,7 @@
         @slash-trigger="onSlashTrigger"
         @input-changed="onInputChanged"
         @link-click="onLinkClick"
+        @focus-in="onFocusIn"
       />
     </div>
   </div>
@@ -55,7 +61,7 @@ import { useEditor, useEditable } from './context';
 import BlockContent from './BlockContent.vue';
 import BlockHandle from './ui/BlockHandle.vue';
 
-type DropPosition = 'before' | 'after' | 'first' | 'last';
+type DropPosition = 'before' | 'after' | 'first' | 'last' | 'into';
 
 const props = defineProps<{
   block: Block;
@@ -78,6 +84,8 @@ const emit = defineEmits<{
   gripPointerDown: [blockId: BlockId, startX: number, startY: number, options: { thresholdPx: number }];
   gripPointerUp: [blockId: BlockId];
   linkClick: [blockId: BlockId, offset: number];
+  /** 文本块获得光标 / 非文本块获得焦点时冒泡，统一由 BlockEditor 处理。 */
+  focusIn: [blockId: BlockId];
 }>();
 
 const editor = useEditor();
@@ -133,6 +141,10 @@ function onInputChanged(id: BlockId, text: string): void {
 }
 function onLinkClick(blockId: BlockId, offset: number): void {
   emit('linkClick', blockId, offset);
+}
+
+function onFocusIn(blockId: BlockId): void {
+  emit('focusIn', blockId);
 }
 
 const resolvedComponent = computed<Component>(() => {

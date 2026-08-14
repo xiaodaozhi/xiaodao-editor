@@ -31,7 +31,7 @@ export type CommandSpec<TArgs = void> = CommandEntry<TArgs>;
 
 // Intentionally uses `any` for contravariance: AnyCommandEntry is the erased
 // supertype of all CommandEntry<T>. Users never touch this at definition sites.
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyCommandEntry = CommandEntry<any>;
 
 /** Resolves a command name + args to a boolean (handled?), given live state. */

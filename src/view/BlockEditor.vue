@@ -31,7 +31,7 @@
   <div
     ref="rootEl"
     class="block-editor"
-    :class="[themeClass]"
+    :class="[themeClass, { 'block-editor-dragging': draggingBlockId !== null }]"
     :contenteditable="false"
     @keydown="onKeyDown"
     @copy="onCopy"
@@ -43,6 +43,7 @@
     <BlockList
       ref="blockListRef"
       :items="renderItems"
+      :blocks-map="state.doc.blocks"
       :first-block-placeholder="effectivePlaceholder"
       :hovered-block-id="hoveredBlockId"
       :focused-block-id="focusedBlockId"
@@ -59,6 +60,7 @@
       @grip-pointer-down="onGripPointerDown"
       @grip-pointer-up="onGripPointerUp"
       @link-click="onBlockLinkClick"
+      @focus-in="onBlockFocusIn"
     />
     <!-- Cross-block text selection overlay.
          Teleported to <body> so ancestor transforms (scale/translate) don't
@@ -186,7 +188,7 @@ import NumberPicker from './ui/NumberPicker.vue';
 import CodeLangPicker from './ui/CodeLangPicker.vue';
 import LinkPopover from './ui/LinkPopover.vue';
 import type { SlashCommand } from '../core/command/SlashCommand';
-import { blockBefore, flatten as flattenDoc } from '../core/state/store';
+import { blockBefore, flatten as flattenDoc, indexOf as blockIndexOf, parentOf } from '../core/state/store';
 import { orderedListNumber } from '../extensions/OrderedList';
 import { inlineToHtml } from './inlineDom';
 import { BuiltinExtensions } from '../extensions/builtin';
@@ -334,6 +336,9 @@ watch(
       closeLinkPopover();
       closePlusMenu();
       closeSettingsMenu();
+      // 只读模式：清空块级 focus 蓝框（只读不应有"当前编辑块"的视觉信号），
+      // 并顺带清除任何活跃的编辑器 Selection（图片/表格/代码块的 blocks 选择）。
+      setFocusedBlock(null, { clearNativeSelection: true });
       editor.commands.clearSelection?.();
     }
   },
@@ -926,6 +931,15 @@ function onBlockLinkClick(blockId: BlockId, offset: number): void {
   linkPopover.visible = true;
 }
 
+/**
+ * BlockContent 获得 DOM focus（光标进入文本块）时触发；
+ * 非文本块通过事件委托走 onBlockRootClick，两者都汇聚到 setFocusedBlock()，
+ * 保证同一时刻最多只有一个 focusedBlockId 生效。
+ */
+function onBlockFocusIn(blockId: BlockId): void {
+  setFocusedBlock(blockId);
+}
+
 // --- Handle visibility: hovered + focused block tracking ----------------
 
 const hoveredBlockId = ref<BlockId | null>(null);
@@ -933,8 +947,41 @@ const focusedBlockId = ref<BlockId | null>(null);
 const draggingBlockId = ref<BlockId | null>(null);
 /** True while the primary mouse button is held down inside the editor. */
 let isMouseDown = false;
+/**
+ * True when the mousedown that set isMouseDown landed on a non-text block
+ * (table / TOC / image / divider / codeBlock etc.). When true, onMouseUp
+ * MUST NOT call onDocumentSelectionChange, because the DOM selection is
+ * either empty or stale (caret left-over from a previously-edited text
+ * block). Calling selectionchange here would overwrite focusedBlockId
+ * that was legitimately set by selectBlock / onBlockRootClick.
+ */
+let mouseDownOnNonTextBlock = false;
 
-type DropPosition = 'before' | 'after' | 'first' | 'last';
+type DropPosition = 'before' | 'after' | 'first' | 'last' | 'into';
+
+/**
+ * 统一的块级焦点设置入口 — focusedBlockId 的唯一写入点。
+ *
+ * @param id  要聚焦的块 id；传 null 表示清空所有块级焦点
+ * @param opts.clearNativeSelection  true 时顺带移除浏览器原生的 DOM 文本选区/光标。
+ *        用在"点击非文本块获得 focus"的场景：避免出现"文本光标还在 P1，
+ *        但 P3 的图片又显示蓝框"这种双焦点信号并存的情况。
+ */
+function setFocusedBlock(
+  id: BlockId | null,
+  opts: { clearNativeSelection?: boolean } = {},
+): void {
+  const { clearNativeSelection = false } = opts;
+  if (clearNativeSelection) {
+    try {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    } catch {
+      /* ignore */
+    }
+  }
+  focusedBlockId.value = id;
+}
 
 // --- Cross-block text selection -----------------------------------------
 //
@@ -1054,6 +1101,17 @@ function onSelectionMouseUp(): void {
 
 // --- Subscribe to editor updates ----------------------------------------
 
+/**
+ * Block types that own their own interaction surface and are NOT edited
+ * via a contenteditable text region. For these blocks, the focus state
+ * is driven by explicit click delegation (onBlockRootClick / selectBlock),
+ * NOT by DOM caret position. A stray caret left in a previously-edited
+ * text block must never overwrite focus on these blocks.
+ */
+const NON_TEXT_BLOCK_TYPES = new Set([
+  'image', 'divider', 'table', 'toc', 'tableOfContents', 'codeBlock',
+]);
+
 // fileId → reference-count (number of image blocks referencing the file).
 // When the count drops to zero (last referencing block is removed or
 // replaced), we emit `cleanup:image-file` so the consumer can reclaim
@@ -1161,13 +1219,37 @@ const unsubscribe = editor.subscribe((update) => {
   }
   const sel = update.state.selection;
   // Track focused block for handle visibility.
-  focusedBlockId.value = sel.kind === 'caret'
+  const nextFocused = sel.kind === 'caret'
     ? sel.blockId
     : sel.kind === 'text'
       ? sel.focus.blockId
       : sel.kind === 'blocks'
         ? (sel.blockIds[0] ?? null)
         : null;
+  // [Guard 3] Refuse stale caret overwrite in subscribe callback.
+  // Same rationale as Guard 2 in onDocumentSelectionChange. If the
+  // current focused block is a non-text type (table / TOC / etc.) AND
+  // the new selection is a caret/text pointing at a DIFFERENT block,
+  // keep the existing non-text focus — the caret change is from stale
+  // DOM state, not a real user intent to move focus. `kind: blocks`
+  // is an explicit block-level selection so it always wins — UNLESS
+  // blockIds is empty (a clearSelection dispatch), in which case we
+  // preserve non-text focus to prevent flicker during mousedown.
+  let finalFocused = nextFocused;
+  if (
+    focusedBlockId.value !== null
+    && finalFocused !== focusedBlockId.value
+  ) {
+    const curBlock = update.state.doc.blocks.get(focusedBlockId.value);
+    if (curBlock && NON_TEXT_BLOCK_TYPES.has(curBlock.type)) {
+      // For kind='blocks' with empty blockIds (clearSelection), keep focus.
+      // For kind='caret'/'text' pointing at a different block, keep focus.
+      if (sel.kind === 'blocks' ? (sel.blockIds.length === 0) : true) {
+        finalFocused = focusedBlockId.value;
+      }
+    }
+  }
+  setFocusedBlock(finalFocused);
   if (!suppressSelectionSync && sel !== prevSelection) {
     if (skipNextSelectionApply) {
       skipNextSelectionApply = false;
@@ -1602,6 +1684,24 @@ let ghostOffsetY = 0;
 let dragSrcHostEl: HTMLElement | null = null;
 let activeDragBlockId: BlockId | null = null;
 
+// Drop-"into" hover state. When the pointer pauses inside the MIDDLE 50%
+// vertical band of a nestable target host for >= INTO_HOVER_MS, we switch
+// the drop mode from before/after (sibling insert) to "into" (nest under
+// that block as its first child) with a whole-block highlight.
+const INTO_HOVER_MS = 200;
+const INTO_BAND_TOP = 0.25;    // top quarter → "before"
+const INTO_BAND_BOTTOM = 0.75; // bottom quarter → "after"
+let intoHoverBlockId: BlockId | null = null;
+let intoHoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearIntoHover(): void {
+  if (intoHoverTimer !== null) {
+    clearTimeout(intoHoverTimer);
+    intoHoverTimer = null;
+  }
+  intoHoverBlockId = null;
+}
+
 function cleanUpActiveDrag(): void {
   if (dragSrcHostEl) {
     dragSrcHostEl.classList.remove('block-being-dragged');
@@ -1620,6 +1720,7 @@ function cleanUpActiveDrag(): void {
   draggingBlockId.value = null;
   dropTargetBlockId.value = null;
   dropPosition.value = 'after';
+  clearIntoHover();
 }
 
 function removeGlobalDragListeners(): void {
@@ -1682,6 +1783,17 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
   // --- Phase 2: ACTIVE (ghost follows cursor + compute drop) -------------
   if (dragPhase !== 'active') return;
 
+  // Keep the native DOM selection empty throughout the ENTIRE drag.
+  // selectstart preventDefault catches new drag-selections, but on some
+  // browsers (particularly Chromium) a prior or partially-created range
+  // can still grow while the pointer moves over text nodes — we zap it
+  // on every mousemove to be absolutely sure. This is a no-op visually
+  // (the user is dragging a block, not selecting text) and cheap.
+  try {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+  } catch { /* ignore */ }
+
   // 2a. Move ghost.
   if (ghostEl) {
     ghostEl.style.left = `${e.clientX + ghostOffsetX}px`;
@@ -1701,11 +1813,13 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
   const lastRect = hosts[hosts.length - 1]!.getBoundingClientRect();
 
   if (e.clientY < firstRect.top + firstRect.height / 2) {
+    clearIntoHover();
     dropTargetBlockId.value = null;
     dropPosition.value = 'first';
     return;
   }
   if (e.clientY > lastRect.bottom - lastRect.height / 2) {
+    clearIntoHover();
     dropTargetBlockId.value = null;
     dropPosition.value = 'last';
     return;
@@ -1713,25 +1827,82 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el) {
+    clearIntoHover();
     dropTargetBlockId.value = null;
     return;
   }
   const host = el.closest('.block-host') as HTMLElement | null;
   if (!host) {
+    clearIntoHover();
     dropTargetBlockId.value = null;
     return;
   }
-  const targetIndex = hosts.indexOf(host);
-  const targetItem = renderItems.value[targetIndex];
-  if (!targetItem || targetItem.id === bid) {
+  const targetBlockId = host.dataset.blockId as BlockId | undefined;
+  if (!targetBlockId || targetBlockId === bid) {
+    clearIntoHover();
     dropTargetBlockId.value = null;
     return;
   }
 
   const hostRect = host.getBoundingClientRect();
-  const y = e.clientY - hostRect.top;
-  dropTargetBlockId.value = targetItem.id;
-  dropPosition.value = y < hostRect.height / 2 ? 'before' : 'after';
+  const yRatio = hostRect.height === 0 ? 0 : (e.clientY - hostRect.top) / hostRect.height;
+  // ---------- Drop-into candidate check ----------
+  // Cycle/nestable guard here purely for UX: don't arm the 200ms timer for
+  // targets that can never accept children. The command layer would still
+  // reject at drop time, but this avoids showing a misleading into state.
+  let targetCanInto = false;
+  const docNow = editor.getState().doc;
+  const tBlock = docNow.blocks.get(targetBlockId);
+  if (tBlock) {
+    const tSchema = editor.registries.schema.get(tBlock.type);
+    if (tSchema?.nestable) {
+      // Ensure we're not about to nest bid under one of its own descendants.
+      let cyc: BlockId | null = targetBlockId;
+      targetCanInto = true;
+      while (cyc !== null) {
+        if (cyc === bid) {
+          targetCanInto = false;
+          break;
+        }
+        cyc = parentOf(docNow, cyc);
+      }
+    }
+  }
+
+  const inCenterBand = yRatio > INTO_BAND_TOP && yRatio < INTO_BAND_BOTTOM;
+  const armInto = inCenterBand && targetCanInto;
+
+  if (armInto) {
+    // In the center band, over an eligible target — arm the 200ms timer.
+    // Until the timer fires we STILL show the immediate before/after line so
+    // fast movement is predictable.
+    dropTargetBlockId.value = targetBlockId;
+    // Compute a transient before/after to show while user hasn't paused yet.
+    const before = yRatio < 0.5;
+    if (intoHoverBlockId !== targetBlockId) {
+      clearIntoHover();
+      intoHoverBlockId = targetBlockId;
+      intoHoverTimer = setTimeout(() => {
+        // Only promote to "into" if pointer is still over the same band.
+        // (onGlobalDragMouseMove may set a fresh state, but we only flip here
+        //  when the timer actually fires for the currently-armed target.)
+        if (intoHoverBlockId === targetBlockId) {
+          dropTargetBlockId.value = targetBlockId;
+          dropPosition.value = 'into';
+        }
+      }, INTO_HOVER_MS);
+    }
+    // Timer armed but not yet fired → keep before/after lines visible.
+    if (dropPosition.value !== 'into') {
+      dropPosition.value = before ? 'before' : 'after';
+    }
+  } else {
+    // Outside center band, or ineligible target → instant before/after,
+    // cancel any pending into timer.
+    clearIntoHover();
+    dropTargetBlockId.value = targetBlockId;
+    dropPosition.value = yRatio < 0.5 ? 'before' : 'after';
+  }
 }
 
 /** SINGLE mouseup handler — runs once, teardown everything and maybe move. */
@@ -1753,9 +1924,9 @@ function onGlobalDragMouseUp(_e: MouseEvent): void {
   cleanUpActiveDrag();
 
   if (!bid) return;
-  if (!finalTarget && finalPos !== 'first' && finalPos !== 'last') {
-    return;
-  }
+  // into mode requires a concrete target; first/last are OK with null target.
+  if (finalPos === 'into' && !finalTarget) return;
+  if (!finalTarget && finalPos !== 'first' && finalPos !== 'last') return;
   onMoveBlock(bid, finalTarget, finalPos);
 }
 
@@ -1767,10 +1938,46 @@ function transitionPendingToActive(): void {
   const startX = dragStartX;
   const startY = dragStartY;
 
+  // 0. Clear any native text selection before the drag fully starts.
+  //    Without this, elementFromPoint during onGlobalDragMouseMove lands on
+  //    a contenteditable and the browser extends a text selection across
+  //    blocks as the pointer moves — visually wrong and fights overlays.
+  //    selectstart prevent-default (onDragSelectStart) stops NEW selections
+  //    from being started, but clearing here removes any pre-existing or
+  //    in-flight native range that started before the capture listener
+  //    attached (e.g. mousedown began on a text character, not the grip).
+  try {
+    const sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+  } catch { /* ignore */ }
+
+  // 0b. Cancel any pending cross-block text selection. The document-level
+  //     mousedown listener (onMouseDown) may have armed pendingSel before
+  //     onGripPointerDown ran; if we don't cancel it here, processSelectionMove
+  //     will keep firing during the drag and paint the cross-block highlight
+  //     overlay on target blocks — the exact "text selected" bug.
+  if (pendingSel) {
+    pendingSel = null;
+    if (selRafId) {
+      cancelAnimationFrame(selRafId);
+      selRafId = 0;
+    }
+    lastMoveEvent = null;
+    document.removeEventListener('mousemove', onSelectionMouseMove, true);
+    document.removeEventListener('mouseup', onSelectionMouseUp, true);
+    document.removeEventListener('selectstart', onCrossBlockSelectStart, true);
+    crossBlockRects.value = [];
+  }
+
+  // 0c. 拖动期间临时清空块级 focus，避免蓝框与拖放目标高亮叠加产生视觉冲突。
+  //     拖动结束后用户会重新点击或设置 Selection 恢复 focus。
+  setFocusedBlock(null);
+
   // 1. Locate the source block host in the DOM.
-  const hosts = Array.from(document.querySelectorAll<HTMLElement>('.block-host'));
-  const index = renderItems.value.findIndex((r) => r.id === blockId);
-  const srcHost = index >= 0 ? hosts[index] ?? null : null;
+  // use the data-block-id attribute (which BlockHost writes on
+  // every host, nested or not) to find the src host directly — no need to
+  // line up a flat renderItems index with document.querySelectorAll().
+  const srcHost = document.querySelector<HTMLElement>(`.block-host[data-block-id="${blockId}"]`);
   if (!srcHost) {
     // Can't find the DOM → bail out of this drag entirely.
     removeGlobalDragListeners();
@@ -1828,10 +2035,21 @@ function onMoveBlock(blockId: BlockId, targetBlockId: BlockId | null, position: 
   const block = doc.blocks.get(blockId);
   if (!block) return;
 
-  // Determine target parent and index
-  const root = doc.root;
-  const currentIndex = root.indexOf(blockId);
-  if (currentIndex === -1) return;
+  // Cycle guard: never allow a block to be dropped onto itself or onto any
+  // of its own descendants. Otherwise the parent chain becomes circular and
+  // depthOf / flatten infinite-loop.
+  if (targetBlockId) {
+    let cursor: BlockId | null = targetBlockId;
+    while (cursor !== null) {
+      if (cursor === blockId) return; // onto self → invalid drop.
+      cursor = parentOf(doc, cursor);
+    }
+  }
+
+  // Resolve source location (any nesting level) using the store helpers.
+  const srcParent = parentOf(doc, blockId);
+  const srcIdx = blockIndexOf(doc, blockId);
+  if (srcIdx === -1) return;
 
   let targetParent: BlockId | null = null;
   let targetIndex: number;
@@ -1841,29 +2059,52 @@ function onMoveBlock(blockId: BlockId, targetBlockId: BlockId | null, position: 
     targetIndex = 0;
   } else if (position === 'last') {
     targetParent = null;
-    targetIndex = root.length - 1;
-  } else if (position === 'before' && targetBlockId) {
-    const targetIndexInRoot = root.indexOf(targetBlockId);
-    if (targetIndexInRoot === -1) return;
-    targetParent = null;
-    targetIndex = targetIndexInRoot;
-  } else if (position === 'after' && targetBlockId) {
-    const targetIndexInRoot = root.indexOf(targetBlockId);
-    if (targetIndexInRoot === -1) return;
-    targetParent = null;
-    targetIndex = targetIndexInRoot + 1;
+    targetIndex = doc.root.length;
+  } else if (position === 'into' && targetBlockId) {
+    // Drop-INTO: place the dragged block as the FIRST child of targetBlockId.
+    // UX-level guards (nestable:true / not own descendant) were already
+    // checked before the into-timer armed; still double-check here and let
+    // the command layer reject firmly otherwise.
+    const tBlock = doc.blocks.get(targetBlockId);
+    if (!tBlock) return;
+    const tSchema = editor.registries.schema.get(tBlock.type);
+    if (!tSchema?.nestable) return;
+    // Still run the cycle guard to be safe against any state race.
+    let cursor: BlockId | null = targetBlockId;
+    while (cursor !== null) {
+      if (cursor === blockId) return;
+      cursor = parentOf(doc, cursor);
+    }
+    targetParent = targetBlockId;
+    targetIndex = 0;
+  } else if ((position === 'before' || position === 'after') && targetBlockId) {
+    const tParent = parentOf(doc, targetBlockId);
+    const tIdx = blockIndexOf(doc, targetBlockId);
+    if (tIdx === -1) return;
+    targetParent = tParent;
+    targetIndex = position === 'before' ? tIdx : tIdx + 1;
   } else {
     return;
   }
 
-  // Adjust index if moving forward (need to account for removal)
-  if (currentIndex < targetIndex) {
+  // Adjust index if the block is being moved to a LATER position within the
+  // SAME sibling list: removal of the source (at srcIdx) happens before the
+  // insert in the underlying Step semantics, so a later target shifts -1.
+  const sameSiblingList = srcParent === targetParent;
+  if (sameSiblingList && srcIdx < targetIndex) {
     targetIndex--;
+  } else if (!sameSiblingList) {
+    // Cross-parent move: if src and target share the same grand-sibling
+    // ordering via flat walk we don't need to adjust. The moveBlock Step
+    // operates on raw (parent,index) tuples and does not reinterpret indices.
   }
 
-  // Execute the move — indent normalization is handled inside the
-  // moveBlock command itself (collectIndentFixups), so no extra cleanup
-  // is needed here.
+  targetIndex = Math.max(0, targetIndex);
+  const siblings = targetParent === null
+    ? doc.root
+    : (doc.blocks.get(targetParent)?.children as readonly BlockId[] | undefined);
+  if (siblings) targetIndex = Math.min(targetIndex, siblings.length);
+
   editor.commands.moveBlock?.({ id: blockId, toParent: targetParent, toIndex: targetIndex });
 }
 
@@ -1960,14 +2201,14 @@ function onFileDragOver(e: DragEvent): void {
     return;
   }
   const hostRect = host.getBoundingClientRect();
-  const hostIndex = hosts.indexOf(host);
-  const targetItem = renderItems.value[hostIndex];
-  if (!targetItem) {
+  // host may be nested; read its id directly.
+  const targetBlockId = host.dataset.blockId as BlockId | undefined;
+  if (!targetBlockId) {
     dropTargetBlockId.value = null;
     dropPosition.value = 'last';
     return;
   }
-  dropTargetBlockId.value = targetItem.id;
+  dropTargetBlockId.value = targetBlockId;
   dropPosition.value = y < hostRect.top + hostRect.height / 2 ? 'before' : 'after';
 }
 
@@ -2243,16 +2484,10 @@ function stripSlashPrefix(text: string): string {
 // --- Hover toolbar: show on mouseup, not during drag -------------------
 
 function onDocumentSelectionChange(): void {
-  // Track which block the caret/focus sits in. A plain click into a
-  // contenteditable never dispatches an editor transaction, so the
-  // subscribe handler alone cannot maintain `focusedBlockId` — read it
-  // from the live DOM selection instead. This drives the handle-visibility
-  // fallback: when no block is hovered, the plus/grip handle shows on the
-  // caret's block.
   const editorRoot = rootEl.value;
   if (editorRoot) {
     const domSel = window.getSelection();
-    focusedBlockId.value = null;
+    let nextFocused: BlockId | null = null;
     if (domSel && domSel.rangeCount > 0) {
       const focusNode = domSel.focusNode;
       const contentEl = (focusNode?.nodeType === 1
@@ -2260,8 +2495,18 @@ function onDocumentSelectionChange(): void {
         : (focusNode?.parentElement?.closest<HTMLElement>('.block-content')));
       if (contentEl && editorRoot.contains(contentEl)) {
         const bid = contentEl.getAttribute('data-block-id');
-        if (bid) focusedBlockId.value = bid as BlockId;
+        if (bid) nextFocused = bid as BlockId;
       }
+    }
+    // [Guard 2] Refuse stale-caret overwrite.
+    if (nextFocused !== null && focusedBlockId.value !== null && nextFocused !== focusedBlockId.value) {
+      const curBlock = editor.getState().doc.blocks.get(focusedBlockId.value);
+      if (curBlock && NON_TEXT_BLOCK_TYPES.has(curBlock.type)) {
+        nextFocused = null;
+      }
+    }
+    if (nextFocused !== null) {
+      setFocusedBlock(nextFocused);
     }
   }
 
@@ -2442,6 +2687,12 @@ function onMouseDown(e: MouseEvent): void {
   // Only track mousedown inside the editor for drag-selection.
   // Clicks on the hover toolbar (teleported to <body>) must NOT hide it.
   if (!root.contains(e.target as Node)) return;
+  // Skip cross-block selection tracking when the press is on a block handle
+  // (grip / plus button) — those start a block DRAG, not a text selection,
+  // and leaving pendingSel active would cause the cross-block highlight
+  // overlay to follow the cursor during the drag.
+  const targetEl = e.target as HTMLElement | null;
+  if (targetEl && targetEl.closest('.block-handle')) return;
   isMouseDown = true;
   hoverToolbar.visible = false;
   // Clear any existing cross-block selection: the new click starts fresh.
@@ -2450,13 +2701,25 @@ function onMouseDown(e: MouseEvent): void {
     crossBlockRects.value = [];
   }
   // Start cross-block selection tracking if the press is inside a block content.
-  // Skip for table cells — the TableBlock renderer manages its own mouse
-  // events (cell selection, text editing) and cross-block tracking here
-  // would interfere with native text selection in editable cells.
+  // Skip for non-text blocks (table, TOC, image, divider, codeBlock, etc.)
+  // — these blocks manage their own mouse events. Mark mouseDownOnNonTextBlock
+  // so onMouseUp skips calling onDocumentSelectionChange (which would read
+  // a stale caret in a previously-edited text block and clear the focus
+  // border set by selectBlock / onBlockRootClick).
   if (e.button === 0 && !e.shiftKey) {
     const targetEl = e.target as HTMLElement | null;
-    if (targetEl && targetEl.closest('.table-cell-inner')) {
+    if (targetEl && (
+      targetEl.closest('.table-cell-inner, .block-table-container, .block-table-of-contents')
+      || (targetEl.closest('.block-focus-root') && !targetEl.closest('[contenteditable="true"]'))
+    )) {
+      mouseDownOnNonTextBlock = true;
+      try {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      } catch { /* ignore */ }
       return;
+    } else {
+      mouseDownOnNonTextBlock = false;
     }
     const hit = positionFromPoint(e.clientX, e.clientY, root, editor.getState().doc);
     if (hit) {
@@ -2479,6 +2742,16 @@ function onMouseDown(e: MouseEvent): void {
 function onMouseUp(): void {
   if (!isMouseDown) return;
   isMouseDown = false;
+  // [Guard 1] If this mouse-down→up cycle started on a non-text block
+  // (table / TOC / image / divider / codeBlock), the DOM selection is
+  // either empty or a stale caret left-over from a previously-edited text
+  // block. Calling onDocumentSelectionChange would read that stale caret
+  // and overwrite focusedBlockId — exactly the bug where the table focus
+  // border disappears on mouseup. Skip entirely.
+  if (mouseDownOnNonTextBlock) {
+    mouseDownOnNonTextBlock = false;
+    return;
+  }
   // Re-check selection now that the mouse is released.
   // If a cross-block selection is active, the native selection is empty —
   // onDocumentSelectionChange would hide the toolbar, so we skip it.
@@ -2534,6 +2807,11 @@ function onCopy(e: ClipboardEvent): void {
 }
 
 function onCut(e: ClipboardEvent): void {
+  // Read-only: cutting would delete content — block it entirely.
+  if (!editableRef.value) {
+    e.preventDefault();
+    return;
+  }
   const sel = editor.getState().selection;
   if (sel.kind !== 'text' || !isCrossBlockText(sel)) return;
   const data = serializeCrossBlockSelection(sel);
@@ -2748,6 +3026,37 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
   }
 }
 
+// --- Block-level focus via click delegation -----------------------------
+//
+// 非文本块（图片/分隔符/TOC/表格/代码等）没有 contenteditable 光标，
+// 所以靠"点击"来获得块级 focus。为了避免每个扩展各自绑定 click 事件，
+// 用事件委托统一处理：只要 renderer 的根元素有 .block-focus-root 类，
+// 点击后就会把该块设为 focused；同时清除原生文本选区，避免出现
+// "P1 有光标 + P3 图片有蓝框"的双焦点信号。
+//
+// 空白点击（直接点击 editor 根元素，即 padding 区域）：清空 focus。
+
+function onBlockRootClick(e: MouseEvent): void {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+  if (target.closest('.block-handle')) return;
+  const focusRoot = target.closest('.block-focus-root');
+  if (!focusRoot) return;
+  const host = (focusRoot as HTMLElement).closest('.block-host');
+  if (!host) return;
+  const root = rootEl.value;
+  if (!root || !root.contains(host)) return;
+  const blockId = host.getAttribute('data-block-id') as BlockId | null;
+  if (!blockId) return;
+  setFocusedBlock(blockId, { clearNativeSelection: true });
+}
+
+function onEditorBlankClick(e: MouseEvent): void {
+  if (e.target === rootEl.value) {
+    setFocusedBlock(null, { clearNativeSelection: true });
+  }
+}
+
 // --- Lifecycle ----------------------------------------------------------
 
 onMounted(() => {
@@ -2760,6 +3069,10 @@ onMounted(() => {
     root.addEventListener('ordered-list-marker-click', onOlMarkerClick as unknown as (e: Event) => void);
     // Code-block language label click CustomEvent listener (captured on root).
     root.addEventListener('code-lang-click', onCodeLangClick as unknown as (e: Event) => void);
+    // Non-text block click → block-level focus（事件委托）.
+    root.addEventListener('click', onBlockRootClick);
+    // Click on editor blank padding area → clear focus.
+    root.addEventListener('click', onEditorBlankClick);
   });
   document.addEventListener('selectionchange', onDocumentSelectionChange);
   document.addEventListener('mousedown', onMouseDown, true);
@@ -2783,6 +3096,8 @@ onBeforeUnmount(() => {
   if (root) {
     root.removeEventListener('ordered-list-marker-click', onOlMarkerClick as unknown as (e: Event) => void);
     root.removeEventListener('code-lang-click', onCodeLangClick as unknown as (e: Event) => void);
+    root.removeEventListener('click', onBlockRootClick);
+    root.removeEventListener('click', onEditorBlankClick);
   }
   document.removeEventListener('selectionchange', onDocumentSelectionChange);
   document.removeEventListener('mousedown', onMouseDown, true);

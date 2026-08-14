@@ -198,14 +198,14 @@ const CodeBlock = defineComponent({
         { class: 'block-code-highlight', 'aria-hidden': 'true' },
         [h('code', { class: 'hljs', innerHTML: highlightHtml.value })],
       );
-      return h('div', { class: 'block-code-wrapper', 'data-lang': lang }, [
+      return h('div', { class: ['block-code-wrapper', 'block-focus-root', ...classesFromAttrs(props.block.attrs)], 'data-lang': lang }, [
         titleLabel,
         langLabel,
         highlightLayer,
         h(BlockContent, {
           block: props.block,
           placeholder: props.placeholder,
-          class: ['block-code', ...classesFromAttrs(props.block.attrs)],
+          class: 'block-code',
         }),
       ]);
     };

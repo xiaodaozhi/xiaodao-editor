@@ -37,7 +37,7 @@ export const ParagraphExtension: Extension = {
   schema: {
     type: 'paragraph',
     content: 'text',
-    nestable: false,
+    nestable: true,
     attrs: { ...COMMON_ATTRS },
   },
   renderer: {

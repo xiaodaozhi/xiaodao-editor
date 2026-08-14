@@ -10,11 +10,10 @@
  * Design notes:
  *   - `content: 'none'` + `inlineMarks: false` + renderer `editable: false`
  *     make the block non-editable by construction — no caret, no inline text.
- *   - Headings are collected by walking the block tree (via `flatten`),
- *     filtering `type === 'heading'`. Table cells store their content in
- *     `Block.attrs` (not as blocks), so cell headings are automatically
- *     excluded — no special-casing needed (requirement: only count headings in
- *     plain text blocks, not table cells).
+ *   - Headings are collected by walking only the TOP-LEVEL blocks (`doc.root`),
+ *     filtering `type === 'heading'` — nested / indented headings are ignored.
+ *     Table cells store their content in `Block.attrs` (not as blocks), so cell
+ *     headings are automatically excluded — no special-casing needed.
  *   - Each entry maps to the heading's stable, unique `BlockId`. Clicking an
  *     entry dispatches the editor's existing `setSelection` command (which the
  *     view layer applies via `applySelectionToDom`) and then scrolls the
@@ -32,12 +31,12 @@ import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref
 import type { Extension } from '../core/extension/Extension';
 import type { Block, BlockId, DocState } from '../core/types';
 import { inlineText } from '../core/types';
-import { flatten } from '../core/state/store';
 import { caretSelection } from '../core/selection/Selection';
 import { findBlockEl } from '../view/domSelection';
 import { useEditor } from '../view/context';
 import { useI18n } from '../i18n';
 import { ICON_TOC } from '../view/ui/icons';
+import { classesFromAttrs, COMMON_ATTRS } from './_commonAttrs';
 
 // ---------------------------------------------------------------------------
 // Heading collection (pure)
@@ -51,16 +50,16 @@ export interface TocItem {
 }
 
 /**
- * Collect headings from a `DocState` in document order.
+ * Collect headings from a `DocState`, considering only TOP-LEVEL blocks
+ * (`doc.root`). Nested / indented heading blocks are ignored.
  *
- * Only headings that are real blocks in the block tree are included (they must
- * carry text — an empty heading is invisible and skipped). Table cells do not
- * live in the block tree (their content is in `Block.attrs`), so any headings
- * inside table cells are naturally excluded.
+ * Only headings that carry text are included (an empty heading is invisible
+ * and skipped). Table cells do not live in the block tree (their content is in
+ * `Block.attrs`), so any headings inside table cells are naturally excluded.
  */
 export function collectHeadings(doc: DocState): readonly TocItem[] {
   const items: TocItem[] = [];
-  for (const id of flatten(doc)) {
+  for (const id of doc.root) {
     const block = doc.blocks.get(id);
     if (!block || block.type !== 'heading') continue;
     const text = inlineText(block.content).trim();
@@ -147,7 +146,14 @@ const TocBlock = defineComponent({
         }
       }
 
-      return h('div', { ref: rootEl, class: 'block-table-of-contents' }, children);
+      return h(
+        'div',
+        {
+          ref: rootEl,
+          class: ['block-table-of-contents', 'block-focus-root', ...classesFromAttrs(props.block.attrs)],
+        },
+        children,
+      );
     };
   },
 });
@@ -164,8 +170,10 @@ export const TableOfContentsExtension: Extension = {
     content: 'none',
     nestable: false,
     inlineMarks: false,
-    // No persisted attrs of its own.
-    attrs: {},
+    // a TOC can be a CHILD block, so it needs `indent` to reflect its
+    // nesting depth and render the be-indent-N class. (nestable=false only
+    // means it can't be a parent.)
+    attrs: { indent: COMMON_ATTRS.indent },
     // Never "empty" in the placeholder sense — the TOC always renders its
     // panel (title + list or empty state). Return false so Enter handling
     // doesn't try to exit it.

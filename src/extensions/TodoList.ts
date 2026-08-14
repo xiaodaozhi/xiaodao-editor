@@ -73,7 +73,7 @@ export const TodoListExtension: Extension = {
   schema: {
     type: 'todoList',
     content: 'text',
-    nestable: false,
+    nestable: true,
     listLike: true,
     attrs: {
       ...COMMON_ATTRS,

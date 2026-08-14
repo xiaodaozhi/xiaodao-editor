@@ -18,6 +18,7 @@ import { defineComponent, h, type PropType } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { Block } from '../core/types';
 import { ICON_DIVIDER } from '../view/ui/icons';
+import { classesFromAttrs, COMMON_ATTRS } from './_commonAttrs';
 
 // ---------------------------------------------------------------------------
 // Renderer component
@@ -31,10 +32,9 @@ const DividerBlock = defineComponent({
   },
   setup(props) {
     void props.placeholder; // reserved for future use
-    void props.block; // attrs are intentionally empty; no dynamic fields
     return () =>
       h('div', {
-        class: 'block-divider',
+        class: ['block-divider', 'block-focus-root', ...classesFromAttrs(props.block.attrs)],
         'data-block-divider': true,
       });
   },
@@ -57,8 +57,10 @@ export const DividerExtension: Extension = {
     // use the standard merge/delete path which correctly handles non-text
     // blocks as "remove the block, don't merge text".
     inlineMarks: false,
-    // Dividers have no persisted attrs of their own.
-    attrs: {},
+    // a divider can be a CHILD block, so it needs `indent` to reflect
+    // its nesting depth and render the be-indent-N class. (nestable=false only
+    // means it can't be a parent.)
+    attrs: { indent: COMMON_ATTRS.indent },
     // A divider is never "empty" in the placeholder sense — it always shows
     // its line. Return false so Enter handling doesn't try to exit it.
     empty: (): boolean => false,

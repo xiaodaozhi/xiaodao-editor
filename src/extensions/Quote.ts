@@ -10,7 +10,7 @@ import type { Extension } from '../core/extension/Extension';
 import type { Block } from '../core/types';
 import BlockContent from '../view/BlockContent.vue';
 import { ICON_QUOTE } from '../view/ui/icons';
-import { classesFromAttrs, COMMON_ATTRS_NO_INDENT } from './_commonAttrs';
+import { classesFromAttrs, COMMON_ATTRS, COMMON_ATTRS_NO_INDENT } from './_commonAttrs';
 
 const QuoteBlock = defineComponent({
   name: 'QuoteBlock',
@@ -37,7 +37,10 @@ export const QuoteExtension: Extension = {
     // Quote blocks render italic globally via CSS, so an inline italic mark
     // would be redundant — disallow it.
     disallowedMarks: ['italic'],
-    attrs: { ...COMMON_ATTRS_NO_INDENT },
+    // quote can be a CHILD block (indented under a nestable sibling),
+    // so it needs the `indent` attr to reflect its nesting depth and render
+    // the be-indent-N class. (nestable=false only means it can't be a parent.)
+    attrs: { ...COMMON_ATTRS_NO_INDENT, indent: COMMON_ATTRS.indent },
   },
   renderer: { component: QuoteBlock },
   slashCommands: [

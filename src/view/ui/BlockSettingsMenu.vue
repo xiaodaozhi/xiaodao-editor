@@ -83,7 +83,7 @@
             role="menuitem"
             @mousedown.prevent="toggleSection('alignIndent')"
           >
-            <span class="bsm-collapse-title">{{ isImageBlock ? t('bsm.section.align') : t('bsm.section.alignIndent') }}</span>
+            <span class="bsm-collapse-title">{{ t('bsm.section.alignIndent') }}</span>
             <svg
               class="bsm-collapse-chevron"
               viewBox="0 0 12 12"
@@ -242,9 +242,88 @@
               </button>
             </div>
             <div
-              v-if="!isImageBlock"
               class="bsm-row"
             >
+              <button
+                class="bsm-icon-btn"
+                :disabled="outdentDisabled"
+                :class="{ 'bsm-disabled': outdentDisabled }"
+                :title="t('bsm.indent.decrease')"
+                role="menuitem"
+                @mousedown.prevent="!outdentDisabled && onPick({ id: 'outdent', run: doOutdent })"
+              >
+                <svg
+                  viewBox="0 0 1024 1024"
+                  width="15"
+                  height="15"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M906.666667 379.733333h-448c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h448c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM906.666667 580.266667h-448c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h448c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM117.333333 245.333333h789.333334c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32h-789.333334C100.266667 181.333333 85.333333 196.266667 85.333333 213.333333s14.933333 32 32 32zM906.666667 778.666667h-789.333334c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h789.333334c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM285.866667 657.066667c14.933333 8.533333 34.133333 0 34.133333-17.066667V384c0-17.066667-19.2-27.733333-34.133333-17.066667l-192 128c-12.8 8.533333-12.8 27.733333 0 36.266667l192 125.866667z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+              <button
+                class="bsm-icon-btn"
+                :disabled="indentDisabled"
+                :class="{ 'bsm-disabled': indentDisabled }"
+                :title="t('bsm.indent.increase')"
+                role="menuitem"
+                @mousedown.prevent="!indentDisabled && onPick({ id: 'indent', run: doIndent })"
+              >
+                <svg
+                  viewBox="0 0 1024 1024"
+                  width="15"
+                  height="15"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M906.666667 379.733333h-448c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h448c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM906.666667 580.266667h-448c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h448c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM117.333333 245.333333h789.333334c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32h-789.333334C100.266667 181.333333 85.333333 196.266667 85.333333 213.333333s14.933333 32 32 32zM906.666667 778.666667h-789.333334c-17.066667 0-32 14.933333-32 32s14.933333 32 32 32h789.333334c17.066667 0 32-14.933333 32-32s-14.933333-32-32-32zM119.466667 657.066667A21.333333 21.333333 0 0 1 85.333333 640V384c0-17.066667 19.2-27.733333 34.133334-17.066667l192 128c12.8 8.533333 12.8 27.733333 0 36.266667l-192 125.866667z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2b. Indent only (collapsible) — for blocks that don't support
+             alignment but can still be indented as children: table, TOC,
+             divider. Shows only the indent/outdent buttons. -->
+        <div
+          v-if="hideAlignSection"
+          class="bsm-group"
+        >
+          <button
+            class="bsm-collapse-header"
+            :class="{ 'bsm-disabled': !canIndent, 'expanded': expandedSections.indent }"
+            role="menuitem"
+            @mousedown.prevent="toggleSection('indent')"
+          >
+            <span class="bsm-collapse-title">{{ t('bsm.section.indent') }}</span>
+            <svg
+              class="bsm-collapse-chevron"
+              viewBox="0 0 12 12"
+              width="10"
+              height="10"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 4.5L6 7.5L9 4.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <div
+            v-show="expandedSections.indent"
+            class="bsm-collapse-body"
+          >
+            <div class="bsm-row">
               <button
                 class="bsm-icon-btn"
                 :disabled="outdentDisabled"
@@ -384,10 +463,7 @@
             </div>
           </div>
         </div>
-        <div
-          v-if="!hideAlignSection"
-          class="bsm-sep"
-        />
+        <div class="bsm-sep" />
 
         <!-- 5. Actions -->
         <div class="bsm-group">
@@ -460,7 +536,7 @@ import {
   type AlignValue,
   type ColorPreset,
 } from '../../extensions/_commonAttrs';
-import { flatten as flattenDoc } from '../../core/state/store';
+import { depthOf, prevSibling } from '../../core/state/store';
 import {
   ICON_PARAGRAPH,
   ICON_H1,
@@ -516,9 +592,10 @@ const MENU_MIN_HEIGHT = 80;
 const SCROLL_BTN_HEIGHT = 24;
 
 // Collapsible sections — all collapsed by default
-type SectionKey = 'alignIndent' | 'textColor' | 'bgColor';
+type SectionKey = 'alignIndent' | 'indent' | 'textColor' | 'bgColor';
 const expandedSections = reactive<Record<SectionKey, boolean>>({
   alignIndent: false,
+  indent: false,
   textColor: false,
   bgColor: false,
 });
@@ -608,37 +685,52 @@ const colorsDisabled = computed<boolean>(() => {
   return !('color' in schema.attrs) || !('bgColor' in schema.attrs);
 });
 
+/** indent level is authoritative from depthOf(doc, id).
+ *  `attrs.indent` is only kept as a synchronized shadow for legacy consumers. */
 const currentIndent = computed<number>(() => {
-  const v = currentBlock.value?.attrs.indent;
-  return typeof v === 'number' ? v : 0;
+  const b = currentBlock.value;
+  if (!b) return 0;
+  return depthOf(latestState.value.doc, b.id);
 });
 
-/** 当前块是否支持缩进属性 */
+/** Whether the prev sibling type can ACT as a parent (schema.nestable).
+ *  Mirrors the list inside indentBlockCommand — paragraph/heading + 3 list types. */
+function isParentableType(type: string): boolean {
+  return ['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(type);
+}
+
+/** Any block type can be INDENTED (made a child of something else) — the
+ *  "nestable: true" restriction is on WHETHER A BLOCK CAN BE A PARENT (i.e.
+ *  ACCEPT children), not on whether it can be a child. So codeBlock, hr,
+ *  table, divider, quote, image — any of them can be indented under a
+ *  nestable sibling. Therefore canIndent is always true for any existing
+ *  block; real availability is derived dynamically in indentDisabled. */
 const canIndent = computed<boolean>(() => {
-  const t = openedBlockType.value;
-  if (!t) return false;
-  return ['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(t);
+  return !!openedBlockType.value; // Always open the indent row in the menu for valid blocks.
 });
 
-/** 增加缩进按钮是否可用 */
+/** Increase indent button availability.
+ *  Matches `indentBlockCommand` exactly:
+ *    (1) depthOf(prev sibling) must already be < MAX_INDENT (10),
+ *        because indenting under prev makes this block sit at depthOf(prev)+1
+ *    (2) there must be a PREVIOUS SIBLING (same parent, earlier index)
+ *    (3) that previous sibling must be a NESTABLE type (can be a parent) */
 const indentDisabled = computed<boolean>(() => {
-  if (!canIndent.value) return true;
-  if (currentIndent.value >= 10) return true;
   const b = currentBlock.value;
   if (!b) return true;
   const doc = latestState.value.doc;
-  const flat = flattenDoc(doc);
-  const i = flat.indexOf(b.id);
-  // First block cannot be indented
-  if (i <= 0) return true;
-  const prev = doc.blocks.get(flat[i - 1]!);
-  if (!prev) return true;
-  return !['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(prev.type);
+  const prev = prevSibling(doc, b.id);
+  if (!prev) return true; // no sibling above → nothing to nest under
+  if (!isParentableType(prev.type)) return true; // sibling can't be a parent
+  // Note: the current block would be at depthOf(prev)+1. If prev is already at
+  // MAX_INDENT, the resulting depth would exceed MAX_INDENT → disallow.
+  if (depthOf(doc, prev.id) >= 10) return true;
+  return false;
 });
 
-/** 减少缩进按钮是否可用 */
+/** Decrease indent button availability: any block currently under a parent
+ *  (depthOf > 0) can be promoted one level up, regardless of its own type. */
 const outdentDisabled = computed<boolean>(() => {
-  if (!canIndent.value) return true;
   return currentIndent.value <= 0;
 });
 
@@ -746,6 +838,7 @@ watch(
     activeId.value = match ? match.id : 'paragraph';
     // Reset all collapsible sections to collapsed state on each open
     expandedSections.alignIndent = false;
+    expandedSections.indent = false;
     expandedSections.textColor = false;
     expandedSections.bgColor = false;
   },

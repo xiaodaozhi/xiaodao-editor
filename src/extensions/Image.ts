@@ -69,6 +69,10 @@ export interface ImageAttrs {
 
 const IMAGE_ATTRS = {
   align: COMMON_ATTRS.align,
+  // image can be a CHILD block, so it needs `indent` to reflect its
+  // nesting depth and render the be-indent-N class (nestable=false only means
+  // it can't be a parent).
+  indent: COMMON_ATTRS.indent,
   src: {
     default: '' as const,
     validate: (v: unknown): boolean => typeof v === 'string',
@@ -518,7 +522,7 @@ const ImageBlock = defineComponent({
       return h(
         'div',
         {
-          class: ['block-image-container', ...classesFromAttrs(attrs)],
+          class: ['block-image-container', 'block-focus-root', ...classesFromAttrs(attrs)],
         },
         [
           h(

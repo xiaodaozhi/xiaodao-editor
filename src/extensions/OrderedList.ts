@@ -24,7 +24,7 @@ import BlockContent from '../view/BlockContent.vue';
 import { useEditor, useEditable } from '../view/context';
 import { ICON_ORDERED_LIST } from '../view/ui/icons';
 import { classesFromAttrs, COMMON_ATTRS } from './_commonAttrs';
-import { flatten } from '../core/state/store';
+import { indexOf as blockIndexOf, siblingList } from '../core/state/store';
 
 // --- Schema attribute: explicit start number (optional integer ≥ 1) --------
 
@@ -41,57 +41,37 @@ const START_NUMBER_ATTR = {
 /**
  * Compute the displayed 1-based ordinal for an ordered-list block.
  *
- * Respects `attrs.startNumber` as an explicit override; otherwise chains
- * backwards through consecutive `orderedList` siblings and increments by 1
- * from the first non-override (or 1 if there is no ordered-list predecessor).
+ * Numbering is scoped per **sibling list** (i.e. per
+ * same parent). Consecutive `orderedList` siblings in that single list are
+ * numbered continuously; any non-orderedList sibling in between breaks the
+ * chain; an explicit `attrs.startNumber` acts as a reset anchor.
+ *
+ * This is strictly narrower than the old flat-indent model: blocks under a
+ * DIFFERENT parent (even at the same depthOf) never share a counter —
+ * crossing any parent boundary resets numbering by design. This matches the
+ * rendering (BlockList nests children) and user intuition.
  */
-export function orderedListNumber(doc: Parameters<typeof flatten>[0], id: BlockId): number {
-  const flat = flatten(doc);
-  const i = flat.indexOf(id);
+export function orderedListNumber(doc: Parameters<typeof siblingList>[0], id: BlockId): number {
+  const siblings = siblingList(doc, id);
+  const i = blockIndexOf(doc, id);
   if (i < 0) return 1;
 
   const self = doc.blocks.get(id);
   if (!self) return 1;
 
-  // 1) 当前块的显式 startNumber 优先级最高（「开始新列表」或「修改编号值」写入）。
+  // 1) 当前块的显式 startNumber 优先级最高。
   const selfSn = (self.attrs as { startNumber?: unknown }).startNumber;
   if (typeof selfSn === 'number') return selfSn;
 
-  // 缩进层级感知：不同缩进层级的有序列表编号互相独立。
-  //   - 更深层级（indent > L）的块：视为本层"子块"，跳过，不打断编号链
-  //   - 更浅层级（indent < L）的块：视为上下文边界，本层列表在此结束，编号从 1 起
-  //   - 同层级（indent == L）：
-  //       * 非 orderedList → 打断本层列表链
-  //       * 有 startNumber → 以此为锚点，后续列表项继续递增
-  //       * 普通 orderedList → 纳入连续计数
-  const L = typeof (self.attrs as { indent?: unknown }).indent === 'number'
-    ? (self.attrs as { indent: number }).indent
-    : 0;
-
-  // 单次遍历，同时找"锚点编号" + 统计锚点到当前之间同层无显式编号的列表项数量。
+  // 2) Walk backwards WITHIN THE SAME SIBLING LIST only.
+  //    - orderedList sibling: count (or anchor if startNumber).
+  //    - any other sibling: break (list chain ends here → next block is 1).
   let anchorNumber: number | null = null;
   let afterAnchorCount = 0;
-
   for (let j = i - 1; j >= 0; j--) {
-    const prev = doc.blocks.get(flat[j]!);
+    const prev = doc.blocks.get(siblings[j]!);
     if (!prev) break;
-    const pIndent = typeof (prev.attrs as { indent?: unknown }).indent === 'number'
-      ? (prev.attrs as { indent: number }).indent
-      : 0;
-
-    if (pIndent > L) {
-      // 更深缩进：是我们层级之下的"子内容"，不影响本层编号，跳过。
-      continue;
-    }
-    if (pIndent < L) {
-      // 更浅缩进：本层级的上下文边界，列表链到此终止（= 我们从 1 开始）。
-      break;
-    }
-    // pIndent === L：同层处理
-    if (prev.type !== 'orderedList') {
-      // 同层非有序块：打断列表链。
-      break;
-    }
+    if (prev.type !== 'orderedList') break;
     const pSn = (prev.attrs as { startNumber?: unknown }).startNumber;
     if (typeof pSn === 'number') {
       anchorNumber = pSn;
@@ -190,7 +170,7 @@ export const OrderedListExtension: Extension = {
   schema: {
     type: 'orderedList',
     content: 'text',
-    nestable: false,
+    nestable: true,
     listLike: true,
     attrs: { ...COMMON_ATTRS, startNumber: START_NUMBER_ATTR },
   },
