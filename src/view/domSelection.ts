@@ -209,16 +209,74 @@ export function positionFromPoint(
       range.collapse(true);
     }
   }
-  if (!range) return null;
-  const blockEl = findBlockAncestor(range.startContainer, root);
+  if (range) {
+    const blockEl = findBlockAncestor(range.startContainer, root);
+    if (blockEl) {
+      const blockId = blockEl.dataset.blockId;
+      if (blockId) {
+        const block = doc.blocks.get(blockId as BlockId);
+        if (block) {
+          const maxOffset = inlineText(block.content).length;
+          const offset = Math.min(offsetOfNode(blockEl, range.startContainer, range.startOffset), maxOffset);
+          return { blockEl, blockId: blockId as BlockId, offset };
+        }
+      }
+    }
+  }
+  // Fallback: some WebKit builds return null from caretRangeFromPoint over
+  // `user-select: none` content (used by mobile, where we own text selection).
+  // Walk the text nodes geometrically to find the nearest character offset.
+  return hitTestBlockByGeometry(x, y, root, doc);
+}
+
+/**
+ * Geometric hit-test fallback for positionFromPoint. Locates the block whose
+ * content is under the point via elementFromPoint, then walks its text nodes
+ * and returns the character offset closest to the given coordinates.
+ */
+function hitTestBlockByGeometry(
+  x: number,
+  y: number,
+  root: HTMLElement,
+  doc: DocState,
+): HitTestResult | null {
+  const el = document.elementFromPoint(x, y);
+  const blockEl = el ? findBlockAncestor(el, root) : null;
   if (!blockEl) return null;
-  const blockId = blockEl.dataset.blockId;
+  const blockId = blockEl.dataset.blockId as BlockId | undefined;
   if (!blockId) return null;
-  const block = doc.blocks.get(blockId as BlockId);
+  const block = doc.blocks.get(blockId);
   if (!block) return null;
-  const maxOffset = inlineText(block.content).length;
-  const offset = Math.min(offsetOfNode(blockEl, range.startContainer, range.startOffset), maxOffset);
-  return { blockEl, blockId: blockId as BlockId, offset };
+  // Prefer the inner contenteditable (BlockContent) over the host wrapper.
+  const contentEl = blockEl.matches('[contenteditable]') ? blockEl : blockEl.querySelector<HTMLElement>('[contenteditable]');
+  if (!contentEl) return null;
+  const textLen = inlineText(block.content).length;
+
+  let best: { offset: number; dist: number } | null = null;
+  let charCount = 0;
+  const walker = document.createTreeWalker(contentEl, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const t = node as Text;
+    const len = (t.nodeValue ?? '').length;
+    if (len === 0) continue;
+    const r = document.createRange();
+    r.setStart(t, 0);
+    r.setEnd(t, len);
+    const rect = r.getBoundingClientRect();
+    if (rect.width <= 0 && rect.height <= 0) continue;
+    const cx = Math.max(rect.left, Math.min(x, rect.right));
+    const cy = Math.max(rect.top, Math.min(y, rect.bottom));
+    const dist = Math.hypot(x - cx, y - cy);
+    const charOffset = rect.width > 0
+      ? Math.round(((x - rect.left) / rect.width) * len)
+      : 0;
+    const offset = charCount + Math.max(0, Math.min(len, charOffset));
+    if (!best || dist < best.dist) best = { offset, dist };
+    charCount += len;
+  }
+  if (!best) return { blockEl, blockId, offset: 0 };
+  return { blockEl, blockId, offset: Math.min(best.offset, textLen) };
 }
 
 // ---------------------------------------------------------------------------

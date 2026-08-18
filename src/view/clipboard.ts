@@ -272,7 +272,9 @@ function parseHtml(html: string): ParsedBlock[] {
       (c) => !isTrueBlock(c.tagName.toLowerCase()) && c.tagName.toLowerCase() !== 'div',
     );
     if (hasTrueBlockChild || hasTextChild || hasInlineChild) break;
-    // Otherwise peel off exactly one wrapper div/span.
+    // Only peel if there's exactly one element child (a true wrapper).
+    // Multiple element children means this is actual content, not a wrapper.
+    if (elementChildren.length !== 1) break;
     const onlyChild = elementChildren[0];
     if (onlyChild && (onlyChild.tagName.toLowerCase() === 'div' || onlyChild.tagName.toLowerCase() === 'span')) {
       root = onlyChild;
@@ -370,15 +372,16 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
 
     if (tag === 'pre') {
       flushInline();
-      const text = elem.textContent ?? '';
-      const lines = text.split('\n');
-      for (const line of lines) {
-        blocks.push({
-          type: 'codeBlock' as BlockType,
-          attrs: { language: 'plain' },
-          content: inlineFromString(line),
-        });
-      }
+      // Keep all lines in a single code block — splitting by '\n' produces
+      // one codeBlock per line, which breaks multi-line code pastes.
+      // Trim leading/trailing newlines (often injected by the browser)
+      // but preserve internal line breaks.
+      const text = (elem.textContent ?? '').replace(/^\n+|\n+$/g, '');
+      blocks.push({
+        type: 'codeBlock' as BlockType,
+        attrs: { language: 'plain' },
+        content: inlineFromString(text),
+      });
       consecutiveBr = 0;
       continue;
     }
@@ -449,16 +452,26 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
 
     // <div> / <span> and other generic containers.
     if (tag === 'div' || tag === 'span') {
-      const hasTrueBlockChildren = Array.from(elem.children).some(
-        (c) => isTrueBlock((c as HTMLElement).tagName.toLowerCase()),
+      const hasBlockChildren = Array.from(elem.children).some(
+        (c) => {
+          const t = (c as HTMLElement).tagName.toLowerCase();
+          return isTrueBlock(t) || t === 'div';
+        },
       );
       const hasImageDescendant = !!elem.querySelector('img');
-      if (hasTrueBlockChildren || hasImageDescendant) {
+      if (hasBlockChildren || hasImageDescendant) {
         flushInline();
         processChildren(elem.childNodes, doc, blocks);
         consecutiveBr = 0;
       } else {
-        // Treat as inline content — append individual children to buffer.
+        // Leaf div/span — treat as inline content. For <div> (which browsers
+        // use to wrap individual lines when copying from VSCode, textareas,
+        // etc.), insert a line break before its content so that multi-line
+        // text is preserved within a single block rather than being merged
+        // into one line or split into separate blocks.
+        if (tag === 'div' && inlineBuffer.length > 0) {
+          inlineBuffer.push(doc.createTextNode('\n'));
+        }
         for (const n of Array.from(elem.childNodes)) inlineBuffer.push(n);
         consecutiveBr = 0;
       }

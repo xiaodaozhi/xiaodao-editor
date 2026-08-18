@@ -20,6 +20,72 @@ import { inject, ref } from 'vue';
 import type { Editor } from '../core/Editor';
 import type { Block, BlockId } from '../core/types';
 
+/**
+ * Injection key for the reactive `isMobile` flag. Provided by BlockEditor so
+ * child components (TableBlock, MobileToolbar, …) can adapt their rendering
+ * for touch devices. Uses `(pointer: coarse)` matchMedia — matches iOS /
+ * iPadOS / Android browsers.
+ */
+export const mobileKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-mobile');
+
+/**
+ * A bag of props + event handlers that fully describes what the
+ * MobileToolbar should render inside its embedded HoverToolbar. Produced by
+ * whichever context currently owns the selection (text-block selection in
+ * BlockEditor, or table cell / cell-edit selection in TableBlock) and
+ * consumed by MobileToolbar which spreads it onto `<HoverToolbar mobile>`.
+ *
+ * This is the reuse mechanism: instead of duplicating HoverToolbar's buttons
+ * and logic, the source context builds the exact same prop/handler bag it
+ * would normally pass to a floating HoverToolbar, and hands it to the
+ * MobileToolbar via the bridge so a SINGLE HoverToolbar instance (in mobile
+ * mode) renders the buttons.
+ */
+export interface MobileToolbarDescriptor {
+  visible: boolean;
+  selectionRect: DOMRect | null;
+  blockId: BlockId | null;
+  blockType: string | null;
+  blockAttrs: Readonly<Record<string, unknown>>;
+  rootEl: HTMLElement | null;
+  tableMode?: boolean;
+  cellEditMode?: boolean;
+  tableActiveMarks?: Set<string>;
+  tableActiveColor?: string;
+  tableActiveBgColor?: string;
+  tableActiveVerticalAlign?: string;
+  showDelete?: boolean;
+  deleteLabel?: string;
+  deleteIcon?: string;
+  showMerge?: boolean;
+  showSplit?: boolean;
+  showHeaderRow?: boolean;
+  headerRowActive?: boolean;
+  // Event handlers (Vue maps emits to onXxx props).
+  onClose?: () => void;
+  onLinkClick?: (blockId: BlockId, from: number, to: number) => void;
+  onDelete?: () => void;
+  onMerge?: () => void;
+  onSplit?: () => void;
+  onTableHeaderRow?: () => void;
+  onTableType?: (cellType: string) => void;
+  onTableAlign?: (align: string) => void;
+  onTableVerticalAlign?: (verticalAlign: string) => void;
+  onTableMark?: (markType: string) => void;
+  onTableTextColor?: (color: string | null) => void;
+  onTableBgColor?: (color: string | null) => void;
+  onTableCopy?: () => void;
+}
+
+/**
+ * Injection key for the mobile-toolbar bridge — a reactive ref holding the
+ * **table-sourced** descriptor (or null). BlockEditor provides it; TableBlock
+ * injects it and publishes its toolbar state when running on a mobile device.
+ * The text-block descriptor is computed directly inside MobileToolbar from
+ * BlockEditor's hoverToolbar state (no bridge needed for that path).
+ */
+export const mobileToolbarBridgeKey: InjectionKey<Ref<MobileToolbarDescriptor | null>> = Symbol('block-editor-mobile-toolbar-bridge');
+
 export const editorKey: InjectionKey<Editor> = Symbol('block-editor');
 
 /**

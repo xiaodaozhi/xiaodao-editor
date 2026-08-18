@@ -31,7 +31,7 @@
   <div
     ref="rootEl"
     class="block-editor"
-    :class="[themeClass, { 'block-editor-dragging': draggingBlockId !== null }]"
+    :class="[themeClass, { 'block-editor-dragging': draggingBlockId !== null, 'is-mobile': isMobile }]"
     :contenteditable="false"
     @keydown="onKeyDown"
     @copy="onCopy"
@@ -106,8 +106,9 @@
       :root-el="rootEl"
       @close="closeSettingsMenu"
     />
-    <!-- Hover Toolbar -->
+    <!-- Hover Toolbar (desktop only — replaced by MobileToolbar on touch devices) -->
     <HoverToolbar
+      v-if="!isMobile"
       :visible="hoverToolbar.visible"
       :selection-rect="hoverToolbar.selectionRect"
       :block-id="hoverToolbar.blockId"
@@ -116,6 +117,21 @@
       :root-el="rootEl"
       @close="hoverToolbar.visible = false"
       @link-click="onHoverToolbarLinkClick"
+    />
+    <!-- Mobile bottom toolbar (touch devices only) -->
+    <MobileToolbar
+      v-else
+      :root-el="rootEl"
+      :focus-block-id="focusedBlockId"
+      :hover-visible="hoverToolbar.visible"
+      :hover-selection-rect="hoverToolbar.selectionRect"
+      :hover-block-id="hoverToolbar.blockId"
+      :hover-block-type="hoverToolbar.blockType"
+      :hover-block-attrs="hoverToolbar.blockAttrs"
+      @open-plus-menu="onOpenPlusMenu"
+      @open-settings-menu="onOpenSettingsMenu"
+      @link-click="onHoverToolbarLinkClick"
+      @hover-close="hoverToolbar.visible = false"
     />
     <!-- Ordered-list marker click menu -->
     <OrderedListMenu
@@ -174,8 +190,9 @@ import { inlineText, inlineFromString, splitInline } from '../core/types';
 import { Editor } from '../core/Editor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
-import { editorKey, imageUploadKey, editableKey } from './context';
-import type { BlockRenderItem, BeginImageUploadFn } from './context';
+import { editorKey, imageUploadKey, editableKey, mobileKey, mobileToolbarBridgeKey } from './context';
+import type { MobileToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
+
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
 import { caretSelection, isBlocks, textSelection } from '../core/selection/Selection';
@@ -183,6 +200,7 @@ import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
 import BlockSettingsMenu from './ui/BlockSettingsMenu.vue';
 import HoverToolbar from './ui/HoverToolbar.vue';
+import MobileToolbar from './ui/MobileToolbar.vue';
 import OrderedListMenu from './ui/OrderedListMenu.vue';
 import NumberPicker from './ui/NumberPicker.vue';
 import CodeLangPicker from './ui/CodeLangPicker.vue';
@@ -315,6 +333,31 @@ const editor = new Editor({
 const editableRef = ref(props.editable);
 provide(editableKey, editableRef);
 provide(editorKey, editor);
+
+// --- Mobile detection -----------------------------------------------------
+// `(pointer: coarse)` matches touch-first devices (iOS / iPadOS / Android).
+// This is provided to child components (TableBlock, MobileToolbar) so they
+// can adapt their rendering for mobile. The floating HoverToolbar is hidden
+// on mobile and replaced by the fixed-bottom MobileToolbar.
+//
+// NOTE: matchMedia is synchronous — create the MQL and read `.matches`
+// IMMEDIATELY during setup so the FIRST render already uses the correct
+// mobile state. Otherwise we'd render the desktop layout (block handles,
+// HoverToolbar, etc.) for one frame before flipping to mobile, causing
+// an obvious flash.
+const mobileMql: MediaQueryList | null
+  = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)')
+    : null;
+const isMobile = ref<boolean>(!!mobileMql?.matches);
+function updateMobile(): void {
+  isMobile.value = !!mobileMql?.matches;
+}
+// Provide the bridge BEFORE TableBlock's setup reads it (provide is hoisted
+// in the component tree, so this is fine as long as it's in setup scope).
+const mobileToolbarBridge = ref<MobileToolbarDescriptor | null>(null);
+provide(mobileKey, isMobile);
+provide(mobileToolbarBridgeKey, mobileToolbarBridge);
 
 // Keep both the ref and the Editor instance in sync when the prop changes.
 watch(
@@ -2378,9 +2421,15 @@ function closePlusMenu(): void {
 // When text is selected, the HoverToolbar takes over — close any open menus
 // and hide block handles (handles are hidden via hasTextSelection prop).
 watch(() => hoverToolbar.visible, (visible) => {
+  // On mobile the user can tap the handle / plus buttons on the bottom
+  // toolbar while text is selected — that path opens PlusMenu /
+  // BlockSettingsMenu directly (onOpenPlusMenu / onOpenSettingsMenu set
+  // them visible), then a subsequent selectionchange updates hoverToolbar
+  // and fires this watch. Without the guards the newly-opened menu is
+  // closed immediately, producing a one-frame flash.
   if (visible) {
-    closePlusMenu();
-    closeSettingsMenu();
+    if (!plusMenu.visible) closePlusMenu();
+    if (!settingsMenu.visible) closeSettingsMenu();
   }
 });
 
@@ -2684,6 +2733,11 @@ function showHoverToolbarForCrossBlock(sel: Extract<EditorSelection, { kind: 'te
 function onMouseDown(e: MouseEvent): void {
   const root = rootEl.value;
   if (!root) return;
+  // On touch devices the browser fires synthetic mouse events AFTER the
+  // touch sequence completes. Letting onMouseDown run there would collapse
+  // a just-completed mobile cross-block selection to a caret and clear the
+  // overlay/toolbar. Mobile selection is handled entirely by touch handlers.
+  if (isMobile.value) return;
   // Only track mousedown inside the editor for drag-selection.
   // Clicks on the hover toolbar (teleported to <body>) must NOT hide it.
   if (!root.contains(e.target as Node)) return;
@@ -2741,6 +2795,14 @@ function onMouseDown(e: MouseEvent): void {
 
 function onMouseUp(): void {
   if (!isMouseDown) return;
+  // Synthetic mouse events from mobile touch sequences must not interfere
+  // with mobile cross-block selection (which is handled entirely by touch
+  // handlers). Already handled by the early return in onMouseDown, but
+  // guard here too for safety.
+  if (isMobile.value) {
+    isMouseDown = false;
+    return;
+  }
   isMouseDown = false;
   // [Guard 1] If this mouse-down→up cycle started on a non-text block
   // (table / TOC / image / divider / codeBlock), the DOM selection is
@@ -2758,6 +2820,196 @@ function onMouseUp(): void {
   const sel = editor.getState().selection;
   if (sel.kind === 'text' && isCrossBlockText(sel)) return;
   onDocumentSelectionChange();
+}
+
+// --- Mobile touch cross-block selection -----------------------------------
+// On mobile:
+//   1. Long-press (> 400ms) on text inside block content initiates
+//      cross-block selection. Prevents native selection (which can't cross
+//      independent contenteditable elements).
+//   2. After selection is initiated, drag finger across blocks extends
+//      selection exactly like on desktop.
+//   3. Lift finger to end selection. MobileToolbar shows for copy/edit.
+
+interface MobileTouchGesture {
+  longPressTimer: number;
+  startTouch: Touch;
+}
+
+let mobileTouchGesture: MobileTouchGesture | null = null;
+let isMobileTouchMoved = false;
+
+const LONG_PRESS_DELAY_MS = 400;
+
+function onTouchStart(e: TouchEvent): void {
+  if (!isMobile.value) return;
+  const root = rootEl.value;
+  if (!root || !root.contains(e.target as Node)) return;
+
+  const targetEl = e.target as HTMLElement | null;
+  if (!targetEl) return;
+
+  // Only intercept touches inside block content (text editing areas).
+  const contentEl = targetEl.closest('.block-content');
+  if (!contentEl) return;
+
+  // Skip handles, buttons, links — let them handle their own events.
+  if (targetEl.closest('.block-handle, .mt-btn, .ht-btn, a[href]')) return;
+
+  const touch = e.touches[0];
+  if (!touch) return;
+
+  // Store pending gesture. We'll start cross-block selection after the
+  // long-press delay if the finger hasn't moved far enough to be a scroll.
+  isMobileTouchMoved = false;
+  mobileTouchGesture = {
+    longPressTimer: window.setTimeout(() => {
+      // Long-press confirmed: start cross-block selection.
+      if (!mobileTouchGesture) return;
+      startMobileSelection(root, mobileTouchGesture.startTouch);
+    }, LONG_PRESS_DELAY_MS),
+    startTouch: touch,
+  };
+
+  // Track the rest of the gesture so we can (a) cancel the long-press when
+  // the finger moves into a scroll, and (b) once selection starts, drag
+  // across blocks. touchmove must be non-passive so we can preventDefault
+  // to stop scrolling after selection begins. These are removed in onTouchEnd.
+  document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
+  document.addEventListener('touchend', onTouchEnd, true);
+  document.addEventListener('touchcancel', onTouchEnd, true);
+
+  // Do NOT prevent default on touchstart — this lets normal scrolling
+  // and single-tap caret positioning continue unmodified.
+}
+
+function onTouchMove(e: TouchEvent): void {
+  if (!mobileTouchGesture) return;
+  isMobileTouchMoved = true;
+
+  const root = rootEl.value;
+  if (!root) return;
+
+  // If selection hasn't started yet (still within the long-press window)
+  // and the finger has moved a lot, it's just a normal scroll — cancel the
+  // long-press timer and let the browser handle scrolling.
+  if (!pendingSel) {
+    const touch = e.touches[0];
+    if (!touch) return;
+    const dx = touch.clientX - mobileTouchGesture.startTouch.clientX;
+    const dy = touch.clientY - mobileTouchGesture.startTouch.clientY;
+    if (Math.hypot(dx, dy) > 10) {
+      if (mobileTouchGesture.longPressTimer) {
+        clearTimeout(mobileTouchGesture.longPressTimer);
+      }
+      mobileTouchGesture = null;
+      return;
+    }
+    return;
+  }
+
+  // Selection is active: hit-test the finger position.
+  const touch = e.touches[0];
+  if (!touch) return;
+  const hit = positionFromPoint(touch.clientX, touch.clientY, root, editor.getState().doc);
+  if (!hit) return;
+
+  const start = pendingSel.start;
+  if (hit.blockId === start.blockId) {
+    // Same block as the start: let the native selection handle it (native
+    // selection handles can select within a single contenteditable). Do NOT
+    // preventDefault here so native selection/scroll can proceed.
+    if (pendingSel.crossBlock) {
+      pendingSel.crossBlock = false;
+      crossBlockRects.value = [];
+      document.removeEventListener('selectstart', onCrossBlockSelectStart, true);
+      const ns = window.getSelection();
+      if (ns) ns.removeAllRanges();
+    }
+    return;
+  }
+
+  // Cross-block: prevent scrolling, suppress native selection, and take
+  // over rendering the selection with the overlay.
+  e.preventDefault();
+  if (!pendingSel.crossBlock) {
+    pendingSel.crossBlock = true;
+    document.addEventListener('selectstart', onCrossBlockSelectStart, true);
+    const ns = window.getSelection();
+    if (ns) ns.removeAllRanges();
+  }
+
+  const focus: Anchor = { blockId: hit.blockId, offset: hit.offset };
+  const sel = textSelection(start, focus);
+  suppressSelectionSync = true;
+  editor.commands.setSelection?.({ selection: sel });
+  suppressSelectionSync = false;
+  updateCrossBlockOverlay();
+}
+
+function startMobileSelection(root: HTMLElement, touch: Touch): void {
+  const hit = positionFromPoint(touch.clientX, touch.clientY, root, editor.getState().doc);
+  if (!hit) {
+    mobileTouchGesture = null;
+    return;
+  }
+
+  hoverToolbar.visible = false;
+
+  // Clear any existing cross-block selection overlay.
+  const prevSel = editor.getState().selection;
+  if (prevSel.kind === 'text' && isCrossBlockText(prevSel)) {
+    crossBlockRects.value = [];
+  }
+
+  // Start pending selection tracking.
+  pendingSel = {
+    start: { blockId: hit.blockId, offset: hit.offset },
+    crossBlock: false,
+  };
+}
+
+function onTouchEnd(): void {
+  // If gesture was started but selection hasn't started (the timer fired
+  // but we were cancelled by a large move), just clean up.
+  if (mobileTouchGesture) {
+    if (mobileTouchGesture.longPressTimer) {
+      clearTimeout(mobileTouchGesture.longPressTimer);
+    }
+    mobileTouchGesture = null;
+  }
+
+  if (!pendingSel) {
+    // Cleanup stale listeners.
+    document.removeEventListener('touchmove', onTouchMove, true);
+    document.removeEventListener('touchend', onTouchEnd, true);
+    document.removeEventListener('touchcancel', onTouchEnd, true);
+    return;
+  }
+
+  pendingSel = null;
+
+  document.removeEventListener('touchmove', onTouchMove, true);
+  document.removeEventListener('touchend', onTouchEnd, true);
+  document.removeEventListener('touchcancel', onTouchEnd, true);
+  document.removeEventListener('selectstart', onCrossBlockSelectStart, true);
+
+  if (!isMobileTouchMoved) {
+    // Long-press released without dragging: let the browser's native
+    // word-selection (or caret) behavior stand. We must NOT touch the
+    // selection here — placing a caret would destroy the native handles
+    // the OS just showed. pendingSel has already been cleared above.
+    return;
+  }
+
+  // Drag completed: refresh overlay.
+  updateCrossBlockOverlay();
+
+  // Show MobileToolbar if cross-block selection is active.
+  const sel = editor.getState().selection;
+  if (sel.kind === 'text' && isCrossBlockText(sel)) {
+    showHoverToolbarForCrossBlock(sel);
+  }
 }
 
 // --- Cross-block copy / cut ---------------------------------------------
@@ -3040,6 +3292,11 @@ function onBlockRootClick(e: MouseEvent): void {
   const target = e.target as HTMLElement | null;
   if (!target) return;
   if (target.closest('.block-handle')) return;
+  // Clicks inside a contenteditable text region (e.g. the code block's
+  // .block-code) must NOT clear the native selection: the contenteditable
+  // owns its own caret. Clearing it here is what makes the caret vanish
+  // the instant the mouse is released.
+  if (target.closest('[contenteditable="true"]')) return;
   const focusRoot = target.closest('.block-focus-root');
   if (!focusRoot) return;
   const host = (focusRoot as HTMLElement).closest('.block-host');
@@ -3089,6 +3346,13 @@ onMounted(() => {
   document.addEventListener('touchmove', onScrollOrTouchClose, { passive: true, capture: true });
   // Escape drops any active block selection, even when focus is outside the root.
   document.addEventListener('keydown', onGlobalKeyDown, true);
+  // Mobile detection listener. The MQL was created synchronously in setup
+  // so the initial render already has the correct value; here we just
+  // subscribe to changes (e.g. iPad user toggles pointer settings).
+  mobileMql?.addEventListener('change', updateMobile);
+  // Mobile cross-block selection: touchstart intercepts long-press so we can
+  // build selections spanning contenteditable blocks (native selection cannot).
+  document.addEventListener('touchstart', onTouchStart, { passive: false, capture: true });
 });
 
 onBeforeUnmount(() => {
@@ -3109,6 +3373,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScrollOrTouchClose, true);
   document.removeEventListener('touchmove', onScrollOrTouchClose, true);
   document.removeEventListener('keydown', onGlobalKeyDown, true);
+  mobileMql?.removeEventListener('change', updateMobile);
+  document.removeEventListener('touchstart', onTouchStart, true);
+  // Clean up any in-flight mobile selection listeners.
+  document.removeEventListener('touchmove', onTouchMove, true);
+  document.removeEventListener('touchend', onTouchEnd, true);
+  document.removeEventListener('touchcancel', onTouchEnd, true);
   unsubscribe();
   editor.destroy();
   // Image upload side-channel cleanup.

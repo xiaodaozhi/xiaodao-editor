@@ -15,6 +15,21 @@ export interface PopupPlacement {
   readonly above: boolean;
   /** Available height (px) in the viewport below the anchor. */
   readonly availableHeight: number;
+  /**
+   * When `above=true`, the popup should expand *upward* from this
+   * viewport-relative "bottom" coordinate (the baseline next to the
+   * anchor). This lets callers set the popup's CSS `bottom` property
+   * instead of `top`, so height changes grow upward rather than
+   * downward.  When `above=false` this equals the same numeric value
+   * as `top` so callers can always fall back to `top`.
+   */
+  readonly bottom: number;
+  /**
+   * Viewport-relative "top" coordinate of the anchor baseline (same
+   * semantics as `bottom`): used when `above=false` (popup expands
+   * downward from this point).  Provided for symmetry.
+   */
+  readonly topBaseline: number;
 }
 
 /**
@@ -68,12 +83,17 @@ export function placeBelow(
   const above = !fitsBelow && (fitsAbove || spaceAbove > spaceBelow);
 
   let top: number;
+  let bottom: number;
   let availableHeight: number;
+  const topBaseline = anchorRect.bottom + margin;
+  const bottomBaseline = anchorRect.top - margin;
   if (above) {
-    top = Math.max(margin, anchorRect.top - popupSize.height - margin);
+    top = Math.max(margin, bottomBaseline - popupSize.height);
+    bottom = bottomBaseline;
     availableHeight = Math.max(120, spaceAbove);
   } else {
-    top = Math.max(margin, anchorRect.bottom + margin);
+    top = topBaseline;
+    bottom = top + popupSize.height;
     availableHeight = Math.max(120, spaceBelow);
   }
 
@@ -81,7 +101,7 @@ export function placeBelow(
   const maxLeft = vw - popupSize.width - margin;
   const left = Math.max(margin, Math.min(maxLeft, anchorRect.left));
 
-  return { top, left, above, availableHeight };
+  return { top, left, above, availableHeight, bottom, topBaseline };
 }
 
 /**
@@ -113,15 +133,20 @@ export function placeBelowSelection(
   const fitsAbove = spaceAbove >= popupSize.height;
   const above = !fitsBelow && (fitsAbove || spaceAbove > spaceBelow);
 
+  const topBaseline = selectionRect.bottom + margin;
+  const bottomBaseline = selectionRect.top - margin;
   const top = above
-    ? Math.max(margin, selectionRect.top - popupSize.height - margin)
-    : selectionRect.bottom + margin;
+    ? Math.max(margin, bottomBaseline - popupSize.height)
+    : topBaseline;
+  const bottom = above
+    ? bottomBaseline
+    : top + popupSize.height;
 
   const availableHeight = above
-    ? Math.max(120, selectionRect.top - margin)
+    ? Math.max(120, spaceAbove)
     : Math.max(120, spaceBelow);
 
-  return { top, left, above, availableHeight };
+  return { top, left, above, availableHeight, bottom, topBaseline };
 }
 
 /** Kept for backward compatibility — delegates to placeBelowSelection. */
@@ -158,15 +183,20 @@ export function placePreferAbove(
   // Prefer above; only go below if above doesn't fit AND below has more room.
   const above = fitsAbove || (!fitsBelow && spaceAbove > spaceBelow) || spaceAbove >= spaceBelow;
 
+  const topBaseline = selectionRect.bottom + margin;
+  const bottomBaseline = selectionRect.top - margin;
   const top = above
-    ? Math.max(margin, selectionRect.top - popupSize.height - margin)
-    : selectionRect.bottom + margin;
+    ? Math.max(margin, bottomBaseline - popupSize.height)
+    : topBaseline;
+  const bottom = above
+    ? bottomBaseline
+    : top + popupSize.height;
 
   const availableHeight = above
     ? Math.max(120, spaceAbove)
     : Math.max(120, spaceBelow);
 
-  return { top, left, above, availableHeight };
+  return { top, left, above, availableHeight, bottom, topBaseline };
 }
 
 /**

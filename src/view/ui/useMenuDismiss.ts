@@ -22,11 +22,26 @@ export function useMenuDismiss(
   menuEl: Ref<HTMLElement | null>,
   isVisible: () => boolean,
   onClose: () => void,
+  /** Optional extra elements that should also be treated as "inside the menu"
+   *  (e.g. the trigger/anchor button). This is critical for mobile when the
+   *  menu is teleported to <body>: a capture-phase `touchstart` listener on
+   *  window fires BEFORE the element-level `@touchstart.stop` handler on the
+   *  trigger; without treating the trigger as inside, the newly-opened menu
+   *  closes instantly on the very same tap. */
+  extraInside?: () => (HTMLElement | null)[] | HTMLElement | null,
 ): void {
   function isInsideMenu(target: EventTarget | null): boolean {
     const el = menuEl.value;
     if (!el || !target) return false;
-    return target instanceof Node && el.contains(target);
+    if (target instanceof Node && el.contains(target)) return true;
+    if (extraInside) {
+      const extras = extraInside();
+      const arr = Array.isArray(extras) ? extras : [extras];
+      for (const extra of arr) {
+        if (extra && target instanceof Node && extra.contains(target)) return true;
+      }
+    }
+    return false;
   }
 
   function onPointerDown(e: MouseEvent | TouchEvent): void {

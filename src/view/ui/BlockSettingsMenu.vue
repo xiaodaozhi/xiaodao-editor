@@ -583,7 +583,7 @@ const editor = useEditor();
 const menuEl = ref<HTMLElement | null>(null);
 const scrollEl = ref<HTMLElement | null>(null);
 const activeId = ref<string>('paragraph');
-const position = ref({ top: 0, left: 0, availableHeight: 520 });
+const position = ref({ top: 0, left: 0, availableHeight: 520, above: false, bottom: 0, topBaseline: 0 });
 const positioned = ref(false);
 const canScrollUp = ref(false);
 const canScrollDown = ref(false);
@@ -599,12 +599,6 @@ const expandedSections = reactive<Record<SectionKey, boolean>>({
   textColor: false,
   bgColor: false,
 });
-function toggleSection(key: SectionKey): void {
-  expandedSections[key] = !expandedSections[key];
-  nextTick(updateScrollState);
-}
-
-// --- Delayed unmount for fade-out animation ------------------------------
 // Keep the element in the DOM for 300ms after `visible` becomes false so
 // the CSS fade-out transition can play. Matches HoverToolbar timing.
 const shouldRender = ref(false);
@@ -1043,29 +1037,40 @@ watch(
   (v) => {
     if (v) {
       positioned.value = false;
-      position.value = { top: 0, left: 0, availableHeight: 520 };
+      position.value = { top: 0, left: 0, availableHeight: 520, above: false, bottom: 0, topBaseline: 0 };
     }
   },
 );
 
-watch(
-  [() => props.visible, () => props.anchorEl, menuEl],
-  async () => {
-    if (!props.visible || !props.anchorEl || !props.rootEl) return;
-    await nextTick();
+function recomputePlacement(): void {
+  const anchor = props.anchorEl;
+  const root = props.rootEl;
+  const me = menuEl.value;
+  if (!props.visible || !anchor || !root || !me) return;
+  void nextTick().then(() => {
     const el = menuEl.value;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const placement = placeBelow(props.rootEl, props.anchorEl, {
+    const placement = placeBelow(root, anchor, {
       width: Math.max(rect.width, MENU_WIDTH),
       height: rect.height,
     }, 8);
     position.value = placement;
     positioned.value = true;
     nextTick(updateScrollState);
-  },
+  });
+}
+
+watch(
+  [() => props.visible, () => props.anchorEl, menuEl, canScrollUp, canScrollDown],
+  recomputePlacement,
   { flush: 'post' },
 );
+
+function toggleSection(key: SectionKey): void {
+  expandedSections[key] = !expandedSections[key];
+  nextTick(recomputePlacement);
+}
 
 // --- Scroll state tracking -----------------------------------------------
 
@@ -1103,17 +1108,25 @@ const menuStyle = computed(() => {
   // produce a wrong placeBelow `top`, causing the positioned menu to
   // overflow the viewport bottom).
   if (!positioned.value) return { visibility: 'hidden', top: '0px', left: '0px', width: `${MENU_WIDTH}px`, '--scroll-max-height': '100vh' };
-  const top = position.value.top;
+  const above = position.value.above;
   const left = position.value.left;
   const scrollBtnsH = (canScrollUp.value ? SCROLL_BTN_HEIGHT : 0) + (canScrollDown.value ? SCROLL_BTN_HEIGHT : 0);
   const maxScrollAreaHeight = position.value.availableHeight - scrollBtnsH;
-  return {
-    top: `${top}px`,
+  const base: Record<string, string> = {
     left: `${left}px`,
     width: `${MENU_WIDTH}px`,
     maxHeight: `${position.value.availableHeight}px`,
     '--scroll-max-height': `${Math.max(MENU_MIN_HEIGHT, maxScrollAreaHeight)}px`,
-  } as Record<string, string>;
+  };
+  if (above) {
+    const viewportH = document.documentElement.clientHeight;
+    base.bottom = `${Math.max(0, viewportH - position.value.bottom)}px`;
+    base.top = 'auto';
+  } else {
+    base.top = `${position.value.top}px`;
+    base.bottom = 'auto';
+  }
+  return base;
 });
 
 // --- Running + closing ---------------------------------------------------
@@ -1167,7 +1180,12 @@ defineExpose({ onKeyDown });
 // --- Auto-dismiss on outside interaction --------------------------------
 // Closes the menu on: mousedown/touchstart outside, wheel outside, and
 // mouseleave from the menu. Replaces the old manual click-outside handler.
-useMenuDismiss(menuEl, () => props.visible, () => emit('close'));
+useMenuDismiss(
+  menuEl,
+  () => props.visible,
+  () => emit('close'),
+  () => props.anchorEl,
+);
 
 onMounted(() => {
   unsubscribe = editor.subscribe((update) => {

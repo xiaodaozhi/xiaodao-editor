@@ -312,6 +312,7 @@ body.theme-light {
 .block-content {
   outline: none;
   min-height: 1.5em;
+  font-size: 16px;
   line-height: 1.6;
   padding: 3px 2px;
   word-break: break-word;
@@ -587,6 +588,7 @@ body.theme-light {
   position: relative;
   display: flex;
   align-items: flex-start;
+  font-size: 16px;
 }
 
 .ol-marker {
@@ -601,6 +603,7 @@ body.theme-light {
   justify-content: left;
   font-weight: 500;
   color: inherit;
+  font-size: inherit;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   user-select: none;
@@ -629,12 +632,21 @@ body.theme-light {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  --todo-font-size: 16px;
+  --todo-line-height: 1.6;
+  --todo-padding-top: 3px;
+  --todo-checkbox-size: calc(var(--todo-font-size) * 1);
+  font-size: var(--todo-font-size);
 }
 
 .block-todo-checkbox {
-  margin-top: 0.7em;
-  width: 16px;
-  height: 16px;
+  margin-top: calc(
+    var(--todo-padding-top) +
+    (var(--todo-line-height) * var(--todo-font-size) - var(--todo-checkbox-size)) / 2
+    + 2px
+  );
+  width: var(--todo-checkbox-size);
+  height: var(--todo-checkbox-size);
   accent-color: var(--be-accent);
   cursor: pointer;
   flex-shrink: 0;
@@ -3273,5 +3285,197 @@ body.theme-dark .table-block {
 .theme-dark .table-cell-inner,
 body.theme-dark .table-cell-inner {
   color: var(--be-text);
+}
+
+/* --- Mobile toolbar (MobileToolbar.vue) --------------------------------- */
+/* Bottom-fixed action bar for touch devices. The .is-mobile class is set
+   on .block-editor when matchMedia('(pointer: coarse)') matches. */
+
+/* On mobile: hide the left handle gutter so content is flush-left, and
+   hide the block handle (plus/grip) — those actions move to MobileToolbar. */
+.block-editor.is-mobile .block-host {
+  padding-left: 0;
+}
+
+.block-editor.is-mobile .block-handle {
+  display: none !important;
+}
+
+/* The MobileToolbar component itself — a horizontal bar fixed at the
+   viewport bottom. */
+.mobile-toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: #1f1f1f;
+  color: #fff;
+  /* Safe area: the bottom padding accounts for the iPhone home indicator.
+     When the keyboard is open the inline `bottom` style lifts the whole
+     bar above the keyboard, and the OS collapses the safe-area inset to
+     ~0 so there's no double-padding. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -1px 0 rgba(255 255 255 / 0.06), 0 -4px 12px rgb(0 0 0 / 0.22);
+  /* Prevent horizontal overflow — the inner scroll area handles button
+     overflow instead of the page. */
+  overflow: hidden;
+  max-width: 100vw;
+}
+
+/* Left fixed section: plus + handle buttons. */
+.mobile-toolbar .mt-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.mobile-toolbar .mt-btn {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-toolbar .mt-btn:active {
+  background: rgba(255 255 255 / 0.16);
+}
+
+.mobile-toolbar .mt-btn.disabled,
+.mobile-toolbar .mt-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Separator between fixed buttons and contextual buttons. */
+.mobile-toolbar .mt-sep {
+  flex-shrink: 0;
+  width: 1px;
+  align-self: center;
+  height: 24px;
+  background: rgba(255 255 255 / 0.15);
+  margin: 0 4px;
+}
+
+/* --- HoverToolbar in mobile mode (embedded inside MobileToolbar) -------- */
+/* When the `mobile` prop is true, HoverToolbar is NOT teleported and NOT
+   absolutely positioned. It renders inline as a flex child of .mobile-toolbar,
+   filling the remaining width and using the existing ht-content overflow /
+   nav-button mechanism for horizontal scrolling. */
+
+.hover-toolbar-shell.mobile-shell {
+  position: static;
+  z-index: auto;
+  pointer-events: auto;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.hover-toolbar.mobile-mode {
+  position: static;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  border-radius: 0;
+  /* Match the 40px height of the left-side plus/handle buttons so the
+     toolbar bar does NOT get taller when contextual buttons appear. */
+  padding: 0;
+  height: 40px;
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: none;
+  pointer-events: auto;
+}
+
+/* In mobile mode this is a static bottom bar, not a floating toolbar
+   anchored to a selection — hide the selection-pointer arrow entirely. */
+.hover-toolbar.mobile-mode.above::after,
+.hover-toolbar.mobile-mode.below::after {
+  display: none;
+}
+
+/* When no contextual buttons are visible, hide the toolbar shell entirely
+   so only the plus/handle buttons show. */
+.hover-toolbar-shell.mobile-shell:not(.mobile-visible) {
+  display: none;
+}
+
+/* In mobile mode the toolbar buttons inherit the bar's styling. Override
+   the dark-toolbar-specific hover/active states to match a bottom bar.
+   Height matches .mt-btn (40px) so the two sides share one grid line. */
+.hover-toolbar.mobile-mode .ht-btn {
+  height: 40px;
+  min-width: 40px;
+  padding: 0 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hover-toolbar.mobile-mode .ht-btn:active {
+  background: rgba(255 255 255 / 0.16);
+}
+
+/* Mobile mode nav buttons also use the 40px touch target. */
+.hover-toolbar.mobile-mode .ht-nav-btn {
+  width: 32px;
+  height: 40px;
+  border-radius: 4px;
+}
+
+/* Allow the toolbar's button strip to be swiped horizontally on touch
+   devices. Without this the browser treats any horizontal swipe inside the
+   scroll container as a scroll gesture and may suppress it, or the fixed
+   bottom bar's overflow handling interferes. pan-x keeps vertical page
+   scrolling untouched while permitting horizontal panning of the strip. */
+.hover-toolbar.mobile-mode .ht-content {
+  touch-action: pan-x;
+}
+
+/* Mobile dropdowns: teleported to <body> with position:fixed so they are NOT
+   clipped by .mobile-toolbar's overflow:hidden. bottom/left/right are set
+   via inline style using viewport-relative coords. */
+.ht-dropdown-mobile {
+  position: fixed;
+  /* Override the default absolute-position offsets (these will be replaced
+     by the inline fixed style, but setting them to auto prevents overlap). */
+  top: auto;
+  left: auto;
+  z-index: 5000;
+}
+
+/* When not teleported (desktop / floating), keep the above-below absolute
+   positioning within the ht-dropdown-wrap container. */
+.hover-toolbar:not(.mobile-mode) .ht-dropdown.above {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* Add bottom padding to the editor content so the fixed toolbar doesn't
+   overlap the last block. The padding accounts for the toolbar height
+   (~40px) plus safe-area inset. */
+.block-editor.is-mobile {
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
 }
 

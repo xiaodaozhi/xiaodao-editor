@@ -1,12 +1,20 @@
 {
   "name": "xiaodao-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Notion-style block editor for Vue 3",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "vue",
+    "vue3",
+    "editor",
+    "block-editor",
+    "notion",
+    "rich-text",
+    "wysiwyg"
+  ],
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "main": "./dist/block-editor.umd.cjs",
   "module": "./dist/block-editor.js",
@@ -16,15 +24,20 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/block-editor.js",
       "require": "./dist/block-editor.umd.cjs"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue,.js --fix",
     "lint:check": "eslint . --ext .ts,.vue,.js",
-    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"playground/**/*.{ts,vue}\""
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"playground/**/*.{ts,vue}\"",
+    "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "vue": "^3.4.0"
@@ -46,6 +59,9 @@
     "vite-plugin-dts": "^4.0.3",
     "vue": "^3.4.38",
     "vue-tsc": "^2.0.29"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -176,7 +176,7 @@ const editor = useEditor();
 const menuEl = ref<HTMLElement | null>(null);
 const scrollEl = ref<HTMLElement | null>(null);
 const selectedIndex = ref(0);
-const position = ref({ top: 0, left: 0, availableHeight: 360 });
+const position = ref({ top: 0, left: 0, availableHeight: 360, above: false, bottom: 0, topBaseline: 0 });
 const positioned = ref(false);
 const canScrollUp = ref(false);
 const canScrollDown = ref(false);
@@ -295,13 +295,13 @@ watch(
   (v) => {
     if (v) {
       positioned.value = false;
-      position.value = { top: 0, left: 0, availableHeight: 360 };
+      position.value = { top: 0, left: 0, availableHeight: 360, above: false, bottom: 0, topBaseline: 0 };
     }
   },
 );
 
 watch(
-  [() => props.visible, () => props.anchorEl, menuEl],
+  [() => props.visible, () => props.anchorEl, menuEl, filtered, canScrollUp, canScrollDown],
   async () => {
     if (!props.visible || !props.anchorEl || !props.rootEl) return;
     await nextTick();
@@ -333,17 +333,28 @@ const menuStyle = computed(() => {
   // the viewport bottom, that small measured height caused placeBelow to
   // miscalculate `top` such that the menu still overflowed downward.
   if (!positioned.value) return { visibility: 'hidden', top: '0px', left: '0px', width: `${MENU_WIDTH}px`, '--scroll-max-height': '100vh' };
-  const top = position.value.top;
+  const above = position.value.above;
   const left = position.value.left;
   const scrollBtnsH = (canScrollUp.value ? SCROLL_BTN_HEIGHT : 0) + (canScrollDown.value ? SCROLL_BTN_HEIGHT : 0);
   const maxScrollAreaHeight = position.value.availableHeight - scrollBtnsH;
-  return {
-    top: `${top}px`,
+  const base: Record<string, string> = {
     left: `${left}px`,
     width: `${MENU_WIDTH}px`,
     maxHeight: `${position.value.availableHeight}px`,
     '--scroll-max-height': `${Math.max(MENU_MIN_HEIGHT, maxScrollAreaHeight)}px`,
-  } as Record<string, string>;
+  };
+  if (above) {
+    // Anchor the menu's bottom edge to `position.bottom` so any change in
+    // height (search narrowing, scroll buttons appearing/disappearing)
+    // expands or shrinks the menu UPWARD instead of down.
+    const viewportH = document.documentElement.clientHeight;
+    base.bottom = `${Math.max(0, viewportH - position.value.bottom)}px`;
+    base.top = 'auto';
+  } else {
+    base.top = `${position.value.top}px`;
+    base.bottom = 'auto';
+  }
+  return base;
 });
 
 // --- Keyboard navigation --------------------------------------------------
@@ -422,7 +433,12 @@ defineExpose({ onKeyDown });
 // --- Auto-dismiss on outside interaction --------------------------------
 // Closes the menu on: mousedown/touchstart outside, wheel outside, and
 // mouseleave from the menu. Replaces the old manual click-outside handler.
-useMenuDismiss(menuEl, () => props.visible, () => emit('close'));
+useMenuDismiss(
+  menuEl,
+  () => props.visible,
+  () => emit('close'),
+  () => props.anchorEl,
+);
 
 onMounted(() => {
   window.addEventListener('resize', updateScrollState);

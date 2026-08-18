@@ -19,18 +19,26 @@
 -->
 
 <template>
-  <Teleport to="body">
+  <Teleport
+    to="body"
+    :disabled="mobile"
+  >
     <div
       class="hover-toolbar-shell"
-      :class="{ visible }"
-      :style="shellStyle"
+      :class="{ visible, 'mobile-shell': mobile, 'mobile-visible': mobile && visible }"
+      :style="mobile ? undefined : shellStyle"
       :aria-hidden="!visible"
     >
       <div
         ref="toolbarEl"
         class="hover-toolbar"
-        :class="{ 'above': placement.above, 'below': !placement.above, 'ht-overflow': htOverflow }"
-        :style="toolbarStyle"
+        :class="{
+          'above': placement.above,
+          'below': !placement.above,
+          'ht-overflow': htOverflow,
+          'mobile-mode': mobile,
+        }"
+        :style="mobile ? undefined : toolbarStyle"
         role="toolbar"
         :aria-label="t('hoverToolbar.label')"
       >
@@ -42,6 +50,9 @@
           :title="t('ui.scrollLeft')"
           :aria-label="t('ui.scrollLeft')"
           @mousedown.prevent.stop="htScrollBy(-1)"
+          @touchstart.stop
+          @touchend.stop="onHtNavTouchEnd(-1, $event)"
+          @click.prevent.stop
         >
           <svg
             viewBox="0 0 12 12"
@@ -63,17 +74,22 @@
         <div
           ref="htContentEl"
           class="ht-content"
-          :class="{ 'dropdown-open': !!openDropdown }"
+          :class="{ 'dropdown-open': !mobile && !!openDropdown }"
           @scroll="updateHtScrollState"
+          @touchmove.passive="onHtTouchMove"
+          @touchend.stop="onHtTouchEnd"
         >
           <!-- Block type dropdown (shown in all modes) -->
           <div class="ht-dropdown-wrap">
             <button
               ref="typeBtnEl"
               class="ht-btn ht-type-btn"
-              :class="{ open: openDropdown === 'type' }"
+              :class="{ open: openDropdown === 'type', disabled: noTextSelection }"
               :title="t('hoverToolbar.typeBtnTitle')"
-              @mousedown.prevent.stop="toggleDropdown('type')"
+              :disabled="noTextSelection"
+              @mousedown.prevent.stop="!noTextSelection && toggleDropdown('type')"
+              @touchstart.stop="hireTap(() => { if (!noTextSelection) toggleDropdown('type'); }, $event)"
+              @click.prevent.stop
             >
               <span class="ht-type-label">{{ currentTypeLabel }}</span>
               <svg
@@ -93,63 +109,93 @@
                 />
               </svg>
             </button>
-            <div
-              v-if="openDropdown === 'type'"
-              ref="typeDropdownEl"
-              class="ht-dropdown"
-              :class="{ above: dropdownAbove }"
-              :style="dropdownStyle"
+            <!-- Teleport to body on mobile so the menu escapes the
+                 .mobile-toolbar overflow:hidden clip. -->
+            <Teleport
+              to="body"
+              :disabled="!mobile"
             >
-              <button
-                v-if="canScrollUp"
-                class="menu-scroll-btn menu-scroll-up"
-                type="button"
-                :aria-label="t('ui.scrollUp')"
-                @mousedown.prevent="scrollUp"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 7.5L6 4.5L9 7.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
               <div
-                ref="scrollEl"
-                class="ht-dropdown-scroll"
-                @scroll="updateScrollState"
+                v-if="openDropdown === 'type'"
+                ref="typeDropdownEl"
+                class="ht-dropdown"
+                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
-                  v-for="opt in typeOptions"
-                  :key="opt.id"
-                  class="ht-dropdown-item"
-                  :class="{ active: opt.active }"
-                  @mousedown.prevent.stop="onTypePick(opt)"
+                  v-if="canScrollUp"
+                  class="menu-scroll-btn menu-scroll-up"
+                  type="button"
+                  :aria-label="t('ui.scrollUp')"
+                  @mousedown.prevent="scrollUp"
                 >
-                  <SafeHtml
-                    class="ht-dropdown-icon"
-                    :html="opt.iconHtml"
-                  />
-                  <span>{{ opt.label }}</span>
                   <svg
-                    v-if="opt.active"
-                    class="ht-check"
                     viewBox="0 0 12 12"
-                    width="14"
-                    height="14"
+                    width="10"
+                    height="10"
                     aria-hidden="true"
                   >
                     <path
-                      d="M2.5 6L5 8.5L9.5 4"
+                      d="M3 7.5L6 4.5L9 7.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+                <div
+                  ref="scrollEl"
+                  class="ht-dropdown-scroll"
+                  @scroll="updateScrollState"
+                >
+                  <button
+                    v-for="opt in typeOptions"
+                    :key="opt.id"
+                    class="ht-dropdown-item"
+                    :class="{ active: opt.active }"
+                    @mousedown.prevent.stop="onTypePick(opt)"
+                  >
+                    <SafeHtml
+                      class="ht-dropdown-icon"
+                      :html="opt.iconHtml"
+                    />
+                    <span>{{ opt.label }}</span>
+                    <svg
+                      v-if="opt.active"
+                      class="ht-check"
+                      viewBox="0 0 12 12"
+                      width="14"
+                      height="14"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2.5 6L5 8.5L9.5 4"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  v-if="canScrollDown"
+                  class="menu-scroll-btn menu-scroll-down"
+                  type="button"
+                  :aria-label="t('ui.scrollDown')"
+                  @mousedown.prevent="scrollDown"
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
                       stroke="currentColor"
                       stroke-width="1.5"
                       fill="none"
@@ -159,30 +205,7 @@
                   </svg>
                 </button>
               </div>
-              <button
-                v-if="canScrollDown"
-                class="menu-scroll-btn menu-scroll-down"
-                type="button"
-                :aria-label="t('ui.scrollDown')"
-                @mousedown.prevent="scrollDown"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+            </Teleport>
           </div>
           <!-- Align dropdown (shown in all modes) -->
           <div class="ht-dropdown-wrap">
@@ -193,6 +216,8 @@
               :title="t('hoverToolbar.alignBtnTitle')"
               :disabled="alignDisabled"
               @mousedown.prevent.stop="!alignDisabled && toggleDropdown('align')"
+              @touchstart.stop="hireTap(() => { if (!alignDisabled) toggleDropdown('align'); }, $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 16 16"
@@ -318,182 +343,212 @@
                 </template>
               </svg>
             </button>
-            <div
-              v-if="openDropdown === 'align'"
-              ref="alignDropdownEl"
-              class="ht-dropdown"
-              :class="{ above: dropdownAbove }"
-              :style="dropdownStyle"
+            <!-- Teleport to body on mobile so the menu escapes the
+                 .mobile-toolbar overflow:hidden clip. -->
+            <Teleport
+              to="body"
+              :disabled="!mobile"
             >
-              <button
-                v-if="canScrollUp"
-                class="menu-scroll-btn menu-scroll-up"
-                type="button"
-                :aria-label="t('ui.scrollUp')"
-                @mousedown.prevent="scrollUp"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 7.5L6 4.5L9 7.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
               <div
-                ref="scrollEl"
-                class="ht-dropdown-scroll"
-                @scroll="updateScrollState"
+                v-if="openDropdown === 'align'"
+                ref="alignDropdownEl"
+                class="ht-dropdown"
+                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
-                  v-for="a in alignOptions"
-                  :key="a.id"
-                  class="ht-dropdown-item ht-align-item"
-                  :class="{ active: currentAlign === a.value }"
-                  @mousedown.prevent.stop="onAlignPick(a.value)"
+                  v-if="canScrollUp"
+                  class="menu-scroll-btn menu-scroll-up"
+                  type="button"
+                  :aria-label="t('ui.scrollUp')"
+                  @mousedown.prevent="scrollUp"
                 >
                   <svg
-                    viewBox="0 0 16 16"
-                    width="15"
-                    height="15"
-                    aria-hidden="true"
-                  >
-                    <template v-if="a.value === 'left'">
-                      <line
-                        x1="2"
-                        y1="4"
-                        x2="14"
-                        y2="4"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="2"
-                        y1="8"
-                        x2="10"
-                        y2="8"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="2"
-                        y1="12"
-                        x2="12"
-                        y2="12"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                    <template v-else-if="a.value === 'center'">
-                      <line
-                        x1="2"
-                        y1="4"
-                        x2="14"
-                        y2="4"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="4"
-                        y1="8"
-                        x2="12"
-                        y2="8"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="3"
-                        y1="12"
-                        x2="13"
-                        y2="12"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                    <template v-else-if="a.value === 'right'">
-                      <line
-                        x1="2"
-                        y1="4"
-                        x2="14"
-                        y2="4"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="6"
-                        y1="8"
-                        x2="14"
-                        y2="8"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="4"
-                        y1="12"
-                        x2="14"
-                        y2="12"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                    <template v-else>
-                      <line
-                        x1="2"
-                        y1="4"
-                        x2="14"
-                        y2="4"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="2"
-                        y1="8"
-                        x2="14"
-                        y2="8"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="2"
-                        y1="12"
-                        x2="14"
-                        y2="12"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                  </svg>
-                  <span>{{ a.label }}</span>
-                  <svg
-                    v-if="currentAlign === a.value"
-                    class="ht-check"
                     viewBox="0 0 12 12"
-                    width="14"
-                    height="14"
+                    width="10"
+                    height="10"
                     aria-hidden="true"
                   >
                     <path
-                      d="M2.5 6L5 8.5L9.5 4"
+                      d="M3 7.5L6 4.5L9 7.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+                <div
+                  ref="scrollEl"
+                  class="ht-dropdown-scroll"
+                  @scroll="updateScrollState"
+                >
+                  <button
+                    v-for="a in alignOptions"
+                    :key="a.id"
+                    class="ht-dropdown-item ht-align-item"
+                    :class="{ active: currentAlign === a.value }"
+                    @mousedown.prevent.stop="onAlignPick(a.value)"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="15"
+                      height="15"
+                      aria-hidden="true"
+                    >
+                      <template v-if="a.value === 'left'">
+                        <line
+                          x1="2"
+                          y1="4"
+                          x2="14"
+                          y2="4"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="2"
+                          y1="8"
+                          x2="10"
+                          y2="8"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="2"
+                          y1="12"
+                          x2="12"
+                          y2="12"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                      <template v-else-if="a.value === 'center'">
+                        <line
+                          x1="2"
+                          y1="4"
+                          x2="14"
+                          y2="4"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="4"
+                          y1="8"
+                          x2="12"
+                          y2="8"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="3"
+                          y1="12"
+                          x2="13"
+                          y2="12"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                      <template v-else-if="a.value === 'right'">
+                        <line
+                          x1="2"
+                          y1="4"
+                          x2="14"
+                          y2="4"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="6"
+                          y1="8"
+                          x2="14"
+                          y2="8"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="4"
+                          y1="12"
+                          x2="14"
+                          y2="12"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                      <template v-else>
+                        <line
+                          x1="2"
+                          y1="4"
+                          x2="14"
+                          y2="4"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="2"
+                          y1="8"
+                          x2="14"
+                          y2="8"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="2"
+                          y1="12"
+                          x2="14"
+                          y2="12"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                    </svg>
+                    <span>{{ a.label }}</span>
+                    <svg
+                      v-if="currentAlign === a.value"
+                      class="ht-check"
+                      viewBox="0 0 12 12"
+                      width="14"
+                      height="14"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2.5 6L5 8.5L9.5 4"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  v-if="canScrollDown"
+                  class="menu-scroll-btn menu-scroll-down"
+                  type="button"
+                  :aria-label="t('ui.scrollDown')"
+                  @mousedown.prevent="scrollDown"
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
                       stroke="currentColor"
                       stroke-width="1.5"
                       fill="none"
@@ -503,30 +558,7 @@
                   </svg>
                 </button>
               </div>
-              <button
-                v-if="canScrollDown"
-                class="menu-scroll-btn menu-scroll-down"
-                type="button"
-                :aria-label="t('ui.scrollDown')"
-                @mousedown.prevent="scrollDown"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+            </Teleport>
           </div>
           <!-- Vertical align dropdown (only in table mode / cell edit mode) -->
           <div
@@ -540,6 +572,8 @@
               :title="t('hoverToolbar.verticalAlignBtnTitle')"
               :disabled="alignDisabled"
               @mousedown.prevent.stop="!alignDisabled && toggleDropdown('verticalAlign')"
+              @touchstart.stop="hireTap(() => { if (!alignDisabled) toggleDropdown('verticalAlign'); }, $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 16 16"
@@ -636,153 +670,183 @@
                 </template>
               </svg>
             </button>
-            <div
-              v-if="openDropdown === 'verticalAlign'"
-              ref="verticalAlignDropdownEl"
-              class="ht-dropdown"
-              :class="{ above: dropdownAbove }"
-              :style="dropdownStyle"
+            <!-- Teleport to body on mobile so the menu escapes the
+                 .mobile-toolbar overflow:hidden clip. -->
+            <Teleport
+              to="body"
+              :disabled="!mobile"
             >
-              <button
-                v-if="canScrollUp"
-                class="menu-scroll-btn menu-scroll-up"
-                type="button"
-                :aria-label="t('ui.scrollUp')"
-                @mousedown.prevent="scrollUp"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 7.5L6 4.5L9 7.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
               <div
-                ref="scrollEl"
-                class="ht-dropdown-scroll"
-                @scroll="updateScrollState"
+                v-if="openDropdown === 'verticalAlign'"
+                ref="verticalAlignDropdownEl"
+                class="ht-dropdown"
+                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
-                  v-for="va in verticalAlignOptions"
-                  :key="va.id"
-                  class="ht-dropdown-item ht-align-item"
-                  :class="{ active: currentVerticalAlign === va.value }"
-                  @mousedown.prevent.stop="onVerticalAlignPick(va.value)"
+                  v-if="canScrollUp"
+                  class="menu-scroll-btn menu-scroll-up"
+                  type="button"
+                  :aria-label="t('ui.scrollUp')"
+                  @mousedown.prevent="scrollUp"
                 >
                   <svg
-                    viewBox="0 0 16 16"
-                    width="15"
-                    height="15"
-                    aria-hidden="true"
-                  >
-                    <template v-if="va.value === 'top'">
-                      <line
-                        x1="2"
-                        y1="3"
-                        x2="14"
-                        y2="3"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="4"
-                        y1="7"
-                        x2="12"
-                        y2="7"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="5"
-                        y1="11"
-                        x2="11"
-                        y2="11"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                    <template v-else-if="va.value === 'bottom'">
-                      <line
-                        x1="5"
-                        y1="5"
-                        x2="11"
-                        y2="5"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="4"
-                        y1="9"
-                        x2="12"
-                        y2="9"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="2"
-                        y1="13"
-                        x2="14"
-                        y2="13"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                    <template v-else>
-                      <line
-                        x1="5"
-                        y1="3"
-                        x2="11"
-                        y2="3"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="3"
-                        y1="8"
-                        x2="13"
-                        y2="8"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                      <line
-                        x1="5"
-                        y1="13"
-                        x2="11"
-                        y2="13"
-                        stroke="currentColor"
-                        stroke-width="1.3"
-                        stroke-linecap="round"
-                      />
-                    </template>
-                  </svg>
-                  <span>{{ va.label }}</span>
-                  <svg
-                    v-if="currentVerticalAlign === va.value"
-                    class="ht-check"
                     viewBox="0 0 12 12"
-                    width="14"
-                    height="14"
+                    width="10"
+                    height="10"
                     aria-hidden="true"
                   >
                     <path
-                      d="M2.5 6L5 8.5L9.5 4"
+                      d="M3 7.5L6 4.5L9 7.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+                <div
+                  ref="scrollEl"
+                  class="ht-dropdown-scroll"
+                  @scroll="updateScrollState"
+                >
+                  <button
+                    v-for="va in verticalAlignOptions"
+                    :key="va.id"
+                    class="ht-dropdown-item ht-align-item"
+                    :class="{ active: currentVerticalAlign === va.value }"
+                    @mousedown.prevent.stop="onVerticalAlignPick(va.value)"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="15"
+                      height="15"
+                      aria-hidden="true"
+                    >
+                      <template v-if="va.value === 'top'">
+                        <line
+                          x1="2"
+                          y1="3"
+                          x2="14"
+                          y2="3"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="4"
+                          y1="7"
+                          x2="12"
+                          y2="7"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="5"
+                          y1="11"
+                          x2="11"
+                          y2="11"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                      <template v-else-if="va.value === 'bottom'">
+                        <line
+                          x1="5"
+                          y1="5"
+                          x2="11"
+                          y2="5"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="4"
+                          y1="9"
+                          x2="12"
+                          y2="9"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="2"
+                          y1="13"
+                          x2="14"
+                          y2="13"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                      <template v-else>
+                        <line
+                          x1="5"
+                          y1="3"
+                          x2="11"
+                          y2="3"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="3"
+                          y1="8"
+                          x2="13"
+                          y2="8"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="5"
+                          y1="13"
+                          x2="11"
+                          y2="13"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                      </template>
+                    </svg>
+                    <span>{{ va.label }}</span>
+                    <svg
+                      v-if="currentVerticalAlign === va.value"
+                      class="ht-check"
+                      viewBox="0 0 12 12"
+                      width="14"
+                      height="14"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2.5 6L5 8.5L9.5 4"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  v-if="canScrollDown"
+                  class="menu-scroll-btn menu-scroll-down"
+                  type="button"
+                  :aria-label="t('ui.scrollDown')"
+                  @mousedown.prevent="scrollDown"
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
                       stroke="currentColor"
                       stroke-width="1.5"
                       fill="none"
@@ -792,30 +856,7 @@
                   </svg>
                 </button>
               </div>
-              <button
-                v-if="canScrollDown"
-                class="menu-scroll-btn menu-scroll-down"
-                type="button"
-                :aria-label="t('ui.scrollDown')"
-                @mousedown.prevent="scrollDown"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+            </Teleport>
           </div>
           <div class="ht-sep" />
           <!-- Inline marks -->
@@ -827,6 +868,8 @@
             :title="m.title"
             :disabled="isMarkBtnDisabled(m.id)"
             @mousedown.prevent.stop="!isMarkBtnDisabled(m.id) && onToggleMark(m.id)"
+            @touchstart.stop="hireTap(() => { if (!isMarkBtnDisabled(m.id)) onToggleMark(m.id); }, $event)"
+            @click.prevent.stop
           >
             <SafeHtml :html="m.iconHtml" />
           </button>
@@ -838,6 +881,8 @@
             :title="t('hoverToolbar.linkBtnTitle')"
             :disabled="isMarkBtnDisabled('link')"
             @mousedown.prevent.stop="!isMarkBtnDisabled('link') && onLinkClick()"
+            @touchstart.stop="hireTap(() => { if (!isMarkBtnDisabled('link')) onLinkClick(); }, $event)"
+            @click.prevent.stop
           >
             <svg
               viewBox="0 0 1024 1024"
@@ -861,6 +906,8 @@
               :title="t('hoverToolbar.colorBtnTitle')"
               :disabled="isMarkBtnDisabled('color')"
               @mousedown.prevent.stop="!isMarkBtnDisabled('color') && toggleDropdown('color')"
+              @touchstart.stop="hireTap(() => { if (!isMarkBtnDisabled('color')) toggleDropdown('color'); }, $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 1024 1024"
@@ -874,106 +921,117 @@
                 />
               </svg>
             </button>
-            <div
-              v-if="openDropdown === 'color'"
-              ref="colorDropdownEl"
-              class="ht-dropdown ht-color-dropdown"
-              :class="{ above: dropdownAbove }"
-              :style="dropdownStyle"
+            <!-- Teleport to body on mobile so the menu escapes the
+                 .mobile-toolbar overflow:hidden clip. -->
+            <Teleport
+              to="body"
+              :disabled="!mobile"
             >
-              <button
-                v-if="canScrollUp"
-                class="menu-scroll-btn menu-scroll-up"
-                type="button"
-                :aria-label="t('ui.scrollUp')"
-                @mousedown.prevent="scrollUp"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 7.5L6 4.5L9 7.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
               <div
-                ref="scrollEl"
-                class="ht-dropdown-scroll"
-                @scroll="updateScrollState"
+                v-if="openDropdown === 'color'"
+                ref="colorDropdownEl"
+                class="ht-dropdown ht-color-dropdown"
+                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :style="[dropdownStyle, dropdownFixedStyle]"
               >
-                <div class="ht-color-section">
-                  <div class="ht-color-label">
-                    {{ t('hoverToolbar.textColor') }}
-                  </div>
-                  <div class="ht-swatches">
-                    <button
-                      v-for="c in textColors"
-                      :key="'tc-' + c.key"
-                      class="ht-swatch"
-                      :class="{ active: activeColor === c.key }"
-                      :title="t(c.key === 'default' ? 'color.default' : 'color.' + c.key)"
-                      :style="{ backgroundColor: c.cssValue }"
-                      @mousedown.prevent.stop="onTextColorPick(c.key)"
-                    />
-                  </div>
-                </div>
-                <div class="ht-color-section">
-                  <div class="ht-color-label">
-                    {{ t('hoverToolbar.bgColor') }}
-                  </div>
-                  <div class="ht-swatches">
-                    <button
-                      v-for="c in bgColors"
-                      :key="'bc-' + c.key"
-                      class="ht-swatch"
-                      :class="{ active: activeBgColor === c.key }"
-                      :title="t(c.key === 'default' ? 'color.none' : 'color.' + c.key)"
-                      :style="{ backgroundColor: c.cssValue }"
-                      @mousedown.prevent.stop="onBgColorPick(c.key)"
-                    />
-                  </div>
-                </div>
-              </div>
-              <button
-                v-if="canScrollDown"
-                class="menu-scroll-btn menu-scroll-down"
-                type="button"
-                :aria-label="t('ui.scrollDown')"
-                @mousedown.prevent="scrollDown"
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  width="10"
-                  height="10"
-                  aria-hidden="true"
+                <button
+                  v-if="canScrollUp"
+                  class="menu-scroll-btn menu-scroll-up"
+                  type="button"
+                  :aria-label="t('ui.scrollUp')"
+                  @mousedown.prevent="scrollUp"
                 >
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+                  <svg
+                    viewBox="0 0 12 12"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 7.5L6 4.5L9 7.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+                <div
+                  ref="scrollEl"
+                  class="ht-dropdown-scroll"
+                  @scroll="updateScrollState"
+                >
+                  <div class="ht-color-section">
+                    <div class="ht-color-label">
+                      {{ t('hoverToolbar.textColor') }}
+                    </div>
+                    <div class="ht-swatches">
+                      <button
+                        v-for="c in textColors"
+                        :key="'tc-' + c.key"
+                        class="ht-swatch"
+                        :class="{ active: activeColor === c.key }"
+                        :title="t(c.key === 'default' ? 'color.default' : 'color.' + c.key)"
+                        :style="{ backgroundColor: c.cssValue }"
+                        @mousedown.prevent.stop="onTextColorPick(c.key)"
+                      />
+                    </div>
+                  </div>
+                  <div class="ht-color-section">
+                    <div class="ht-color-label">
+                      {{ t('hoverToolbar.bgColor') }}
+                    </div>
+                    <div class="ht-swatches">
+                      <button
+                        v-for="c in bgColors"
+                        :key="'bc-' + c.key"
+                        class="ht-swatch"
+                        :class="{ active: activeBgColor === c.key }"
+                        :title="t(c.key === 'default' ? 'color.none' : 'color.' + c.key)"
+                        :style="{ backgroundColor: c.cssValue }"
+                        @mousedown.prevent.stop="onBgColorPick(c.key)"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  v-if="canScrollDown"
+                  class="menu-scroll-btn menu-scroll-down"
+                  type="button"
+                  :aria-label="t('ui.scrollDown')"
+                  @mousedown.prevent="scrollDown"
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </Teleport>
           </div>
           <div class="ht-sep" />
           <!-- Copy (selection only) -->
           <button
             class="ht-btn ht-icon-only"
+            :class="{ disabled: noTextSelection }"
             :title="t('hoverToolbar.copySelection')"
             :aria-label="t('hoverToolbar.copySelection')"
-            @mousedown.prevent.stop="onCopy"
+            :disabled="noTextSelection"
+            @mousedown.prevent.stop="!noTextSelection && onCopy()"
+            @touchstart.stop="hireTap(() => { if (!noTextSelection) onCopy(); }, $event)"
+            @click.prevent.stop
           >
             <svg
               viewBox="0 0 16 16"
@@ -1012,6 +1070,8 @@
               class="ht-btn ht-icon-only"
               :title="t('table.mergeCells')"
               @mousedown.prevent.stop="emit('merge')"
+              @touchstart.stop="hireTap(() => emit('merge'), $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 1024 1024"
@@ -1027,6 +1087,8 @@
               class="ht-btn ht-icon-only"
               :title="t('table.splitCell')"
               @mousedown.prevent.stop="emit('split')"
+              @touchstart.stop="hireTap(() => emit('split'), $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 1024 1024"
@@ -1043,6 +1105,8 @@
               :class="{ active: headerRowActive }"
               :title="t('table.toggleHeader')"
               @mousedown.prevent.stop="emit('tableHeaderRow')"
+              @touchstart.stop="hireTap(() => emit('tableHeaderRow'), $event)"
+              @click.prevent.stop
             >
               <svg
                 viewBox="0 0 16 16"
@@ -1072,6 +1136,8 @@
                 class="ht-btn ht-danger ht-icon-only"
                 :title="deleteLabel || t('hoverToolbar.deleteBlock')"
                 @mousedown.prevent.stop="emit('delete')"
+                @touchstart.stop="hireTap(() => emit('delete'), $event)"
+                @click.prevent.stop
               >
                 <SafeHtml :html="deleteIcon || '<svg viewBox=\'0 0 1024 1024\' width=\'15\' height=\'15\' fill=\'currentColor\' aria-hidden=\'true\'><path d=\'M128 266.666667A138.666667 138.666667 0 0 1 266.666667 128h490.666666A138.666667 138.666667 0 0 1 896 266.666667v246.272a276.096 276.096 0 0 0-64-30.250667V426.666667h-170.666667v56.021333a276.096 276.096 0 0 0-64 30.250667V426.666667h-170.666666v170.666666h86.272a276.096 276.096 0 0 0-30.250667 64H426.666667v170.666667h56.021333c7.381333 22.784 17.578667 44.245333 30.250667 64H266.666667A138.666667 138.666667 0 0 1 128 757.333333V266.666667zM266.666667 192A74.666667 74.666667 0 0 0 192 266.666667V362.666667h170.666667v-170.666667H266.666667zM192 426.666667v170.666666h170.666667v-170.666666h-170.666667z m469.333333-64h170.666667V266.666667a74.666667 74.666667 0 0 0-74.666667-74.666667H661.333333v170.666667z m-64-170.666667h-170.666666v170.666667h170.666666v-170.666667z m-405.333333 469.333333v96c0 41.216 33.450667 74.666667 74.666667 74.666667H362.666667v-170.666667h-170.666667z\'/><path d=\'M981.333333 746.666667a234.666667 234.666667 0 1 1-469.333333 0 234.666667 234.666667 0 0 1 469.333333 0z m-234.666666-30.165334l-70.229334-70.272a21.333333 21.333333 0 0 0-30.208 30.208l70.272 70.229334-70.272 70.229333a21.333333 21.333333 0 0 0 30.208 30.208l70.229334-70.272 70.229333 70.272a21.333333 21.333333 0 0 0 30.208-30.208L776.832 746.666667l70.272-70.229334a21.333333 21.333333 0 0 0-30.208-30.208L746.666667 716.501333z\'/></svg>'" />
               </button>
@@ -1086,6 +1152,9 @@
           :title="t('ui.scrollRight')"
           :aria-label="t('ui.scrollRight')"
           @mousedown.prevent.stop="htScrollBy(1)"
+          @touchstart.stop
+          @touchend.stop="onHtNavTouchEnd(1, $event)"
+          @click.prevent.stop
         >
           <svg
             viewBox="0 0 12 12"
@@ -1185,6 +1254,10 @@ const props = defineProps<{
   tableActiveColor?: string;
   tableActiveBgColor?: string;
   tableActiveVerticalAlign?: string;
+  // Mobile mode: render as a static bottom bar instead of a floating toolbar.
+  // Disables Teleport, absolute positioning, arrow, and fade animation.
+  // The parent (MobileToolbar) provides the fixed-bottom container.
+  mobile?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -1235,6 +1308,22 @@ const HT_NAV_BTN_WIDTH = 24; // px each (left + right nav buttons when overflowi
 const dropdownStyle = computed(() => ({
   maxHeight: dropdownMaxHeight.value !== null ? `${dropdownMaxHeight.value}px` : undefined,
 }));
+// In mobile mode, dropdowns are teleported to <body> (to escape the
+// .mobile-toolbar overflow:hidden clip). We need position:fixed coords
+// (left/bottom relative to the viewport), computed from the trigger
+// button's getBoundingClientRect.
+const dropdownFixedRect = ref<{ left: number; bottom: number; right?: number } | null>(null);
+const dropdownFixedStyle = computed(() => {
+  if (!props.mobile || !dropdownFixedRect.value) return undefined;
+  const r = dropdownFixedRect.value;
+  const style: Record<string, string> = {
+    position: 'fixed',
+    left: `${r.left}px`,
+    bottom: `${r.bottom}px`,
+  };
+  if (r.right !== undefined) style.right = `${r.right}px`;
+  return style;
+});
 const TOOLBAR_HEIGHT = 36;
 const TOOLBAR_WIDTH_EST = 360;
 const currentBlockId = shallowRef<BlockId | null>(null);
@@ -1359,24 +1448,50 @@ function updateActiveMarks(): void {
             });
             if (allHave) marks.add(markType);
           }
-          activeMarks.value = marks;
-          return;
+          // Only commit the DOM-derived set when it actually found a mark. If
+          // the DOM selection is momentarily unavailable or still reflects a
+          // just-rewritten tree (e.g. right after toggling bold/italic/color —
+          // Chromium briefly collapses the selection before BlockContent
+          // re-applies it), fall through to the authoritative editor-state
+          // computation below. Otherwise the buttons would blank to "not
+          // active" for one frame and stay that way because the DOM read
+          // races the re-render.
+          if (marks.size > 0) {
+            activeMarks.value = marks;
+            return;
+          }
         }
       }
     }
   }
 
-  // ---- State-based fallback: used when the DOM watcher rewrites innerHTML
-  // and the browser fires `selectionchange` has not yet re-added the range.
-  const st = editor.getState();
+  // ---- State-based fallback: used when the DOM selection is unavailable or
+  // has not yet been re-added after a DOM rewrite (e.g. right after a mark
+  // command rewrites innerHTML, or on mobile where the touch interaction
+  // transiently clears the DOM selection). We read the authoritative editor
+  // selection (latestState) instead of the DOM, which is reliable on mobile.
+  const st = latestState.value;
   const blk = props.blockId ? st.doc.blocks.get(props.blockId) : undefined;
   if (!blk) {
     activeMarks.value = marks;
     return;
   }
-  const offsets = getSelectionOffsets();
-  const from = offsets ? offsets.from : 0;
-  const to = offsets ? offsets.to : inlineText(blk.content).length;
+  // Resolve [from, to) from the editor selection for THIS block. For a text
+  // selection that spans this block, use the anchor/focus offsets; otherwise
+  // fall back to the DOM selection offsets.
+  const stSel = st.selection;
+  let from = 0;
+  let to = inlineText(blk.content).length;
+  if (stSel.kind === 'text' && stSel.anchor.blockId === props.blockId && stSel.focus.blockId === props.blockId) {
+    from = Math.min(stSel.anchor.offset, stSel.focus.offset);
+    to = Math.max(stSel.anchor.offset, stSel.focus.offset);
+  } else {
+    const offsets = getSelectionOffsets();
+    if (offsets) {
+      from = offsets.from;
+      to = offsets.to;
+    }
+  }
   if (from >= to) {
     activeMarks.value = marks;
     return;
@@ -1407,11 +1522,22 @@ function updateActiveMarks(): void {
 
 // --- Mark button definitions -----------------------------------------------
 
+// In mobile mode without a text selection, the bottom toolbar is always shown
+// but its selection-dependent buttons (marks / align / color / copy) are
+// disabled. tableMode and cellEditMode are handled separately (their own
+// selectionRect is supplied by the table renderer).
+const noTextSelection = computed(() =>
+  props.mobile && !props.tableMode && !props.cellEditMode && !props.selectionRect,
+);
+
 // Block-level: code blocks disallow all inline marks.
-const marksDisabled = computed(() => props.blockType === 'codeBlock');
+const marksDisabled = computed(() =>
+  noTextSelection.value || props.blockType === 'codeBlock',
+);
 
 /** 当前块是否支持对齐属性（代码块只允许左对齐）。 */
 const alignDisabled = computed(() => {
+  if (noTextSelection.value) return true;
   if (props.tableMode || props.cellEditMode) {
     // In table/cell-edit mode, code block cells disallow alignment.
     return props.blockType === 'codeBlock';
@@ -1543,15 +1669,16 @@ function measureHtOverflow(): void {
   const _unused = content.offsetWidth;
   void _unused;
   const naturalWidth = content.scrollWidth;
-  // Available viewport width for the ENTIRE toolbar (with 16px margin
-  // on each side of the viewport so it doesn't stick to the edges).
-  // Use clientWidth instead of innerWidth so the 15–17px vertical
-  // scrollbar is excluded — otherwise the max-width is computed against
-  // a viewport that's wider than the actually visible area, and the
-  // toolbar right edge still overflows.
-  const viewportW = document.documentElement.clientWidth;
-  const margin = 16;
-  const totalAvailable = Math.max(200, viewportW - margin * 2);
+  // Available width for the toolbar content area.
+  // - Mobile mode: the toolbar lives inside MobileToolbar's content row
+  //   (which already subtracts the plus/handle buttons). Use the parent
+  //   element's clientWidth so the overflow threshold matches the actual
+  //   container, not the full viewport.
+  // - Floating mode: use the viewport clientWidth (excluding scrollbar)
+  //   with a 16px margin on each side.
+  const totalAvailable = props.mobile
+    ? Math.max(120, (el.parentElement?.clientWidth ?? el.clientWidth) - 8)
+    : Math.max(200, document.documentElement.clientWidth - 32);
 
   // If overflowing, we need 2 × HT_NAV_BTN_WIDTH for the left/right buttons.
   const navOverhead = HT_NAV_BTN_WIDTH * 2;
@@ -1589,9 +1716,87 @@ function htScrollBy(dir: 1 | -1): void {
   updateHtScrollState();
 }
 
+// --- Mobile tap vs. horizontal-swipe discrimination -----------------------
+//
+// The buttons used to run their action from `touchstart` with `.prevent`,
+// but `preventDefault()` on touchstart cancels the native `pan-x` scroll of
+// the .ht-content strip, so the user could not swipe the toolbar left/right
+// (and a swipe starting on a button would also fire that button's action).
+//
+// New scheme:
+//   • Button `touchstart` no longer prevents anything and only registers the
+//     pending action + start point (`hireTap`). No `.prevent` → the OS can
+//     still start a horizontal pan.
+//   • The .ht-content container owns `touchmove` (marks a swipe once the
+//     finger travels far enough) and `touchend` (runs the pending action
+//     ONLY if it was a tap, and `preventDefault()`s to suppress the synthetic
+//     mouse events so the desktop `mousedown` action doesn't fire twice).
+//   • Desktop keeps using `mousedown` (touch events never fire there).
+const HT_TAP_SLOP = 10; // px of movement that still counts as a tap
+let pendingTapAction: (() => void) | null = null;
+let pressedStartX = 0;
+let pressedStartY = 0;
+let pressActive = false;
+let swipeDetected = false;
+
+function onHtTouchMove(e: TouchEvent): void {
+  if (!pressActive) return;
+  const t = e.touches[0];
+  if (!t) return;
+  const dx = Math.abs(t.clientX - pressedStartX);
+  const dy = Math.abs(t.clientY - pressedStartY);
+  if (dx > HT_TAP_SLOP || dy > HT_TAP_SLOP) {
+    swipeDetected = true;
+  }
+}
+
+function onHtTouchEnd(e: TouchEvent): void {
+  if (!pressActive) return;
+  const act = pendingTapAction;
+  pendingTapAction = null;
+  pressActive = false;
+  const swipe = swipeDetected;
+  swipeDetected = false;
+  if (!swipe) {
+    // Only a tap needs to suppress the synthetic mouse events (the desktop
+    // mousedown handler would otherwise fire the same action twice). During
+    // a swipe the browser may be mid-scroll and the event is non-cancelable,
+    // so guard with `cancelable` to avoid the console intervention warning.
+    if (e.cancelable) e.preventDefault();
+    if (act) act();
+  }
+}
+
+/** Run the left/right scroll button action on touchend. `preventDefault`
+ *  suppresses the synthetic mousedown that would double-fire `htScrollBy`,
+ *  but only when the event is cancelable (it is not during an active scroll). */
+function onHtNavTouchEnd(dir: 1 | -1, e: TouchEvent): void {
+  if (e.cancelable) e.preventDefault();
+  htScrollBy(dir);
+}
+
+/** Register a button's action so it runs on `touchend` only when the touch
+ *  turns out to be a tap (not a horizontal swipe of the toolbar strip). */
+function hireTap(act: () => void, e: TouchEvent): void {
+  const t = e.touches[0];
+  if (t) {
+    pressedStartX = t.clientX;
+    pressedStartY = t.clientY;
+  }
+  pendingTapAction = act;
+  pressActive = true;
+  swipeDetected = false;
+}
+
 watch(
-  [() => props.visible, () => props.selectionRect, toolbarEl],
+  [() => props.visible, () => props.selectionRect, toolbarEl, () => props.mobile],
   async () => {
+    // Mobile mode: no floating placement — just measure overflow so the
+    // left/right nav buttons work inside the fixed bottom bar.
+    if (props.mobile) {
+      if (props.visible) measureHtOverflow();
+      return;
+    }
     if (!props.visible || !props.selectionRect || !props.rootEl) return;
     const el = toolbarEl.value;
     if (!el) return;
@@ -1716,6 +1921,34 @@ function positionActiveDropdown(): void {
   const spaceBelow = Math.floor(viewportH - btnRect.bottom - margin);
   const spaceAbove = Math.floor(btnRect.top - margin);
   const natural = dropdown.scrollHeight;
+
+  // Mobile mode: the toolbar is pinned to the viewport bottom, so dropdowns
+  // must ALWAYS pop upward (above the trigger button). They are teleported
+  // to <body>, so we compute position:fixed coords using the viewport-
+  // relative button rect (escapes the .mobile-toolbar overflow:hidden clip).
+  if (props.mobile) {
+    dropdownAbove.value = true;
+    dropdownMaxHeight.value = Math.max(120, Math.min(spaceAbove, 360));
+    // Color dropdown is right-aligned (to the right edge of the button),
+    // so anchor on right instead of left.
+    if (kind === 'color') {
+      const vw = document.documentElement.clientWidth;
+      dropdownFixedRect.value = {
+        left: 8,
+        bottom: Math.max(8, viewportH - btnRect.top + 6),
+        right: Math.max(8, vw - btnRect.right),
+      };
+    } else {
+      dropdownFixedRect.value = {
+        left: Math.max(8, btnRect.left),
+        bottom: Math.max(8, viewportH - btnRect.top + 6),
+      };
+    }
+    nextTick(updateScrollState);
+    return;
+  }
+  // Desktop / floating mode: no fixed rect needed (absolute within wrap).
+  dropdownFixedRect.value = null;
 
   // Extra rule: toolbar near container bottom + lots of space above → force up.
   let forceAbove = false;
@@ -2051,29 +2284,43 @@ function updateActiveColors(): void {
             el = el.parentNode;
           }
         }
-        activeColor.value = colorKeys.size === 1 ? [...colorKeys][0]! : '';
-        activeBgColor.value = bgKeys.size === 1 ? [...bgKeys][0]! : '';
-        return;
+        // Only commit the DOM-derived colors when at least one is found; if
+        // the DOM selection races a just-rewritten tree (same as marks above),
+        // fall through to the editor-state computation below.
+        if (colorKeys.size > 0 || bgKeys.size > 0) {
+          activeColor.value = colorKeys.size === 1 ? [...colorKeys][0]! : '';
+          activeBgColor.value = bgKeys.size === 1 ? [...bgKeys][0]! : '';
+          return;
+        }
       }
     }
   }
   // Fallback: read directly from editor state. This path fires after the
   // BlockContent watcher rewrites `innerHTML` and Chromium temporarily
-  // collapses the native selection before our restore logic runs.
-  const st = editor.getState();
+  // collapses the native selection before our restore logic runs (and on
+  // mobile where the touch interaction may clear the DOM selection).
+  const st = latestState.value;
   const blk = props.blockId ? st.doc.blocks.get(props.blockId) : undefined;
   if (!blk) {
     activeColor.value = '';
     activeBgColor.value = '';
     return;
   }
-  // Determine the effective character range. Prefer the current DOM offsets;
-  // otherwise assume the entire block text is selected (covers the
-  // "tool was just opened" and "selection was lost after innerHTML write"
-  // scenarios where the caller previously had a valid text selection).
-  const offsets = getSelectionOffsets();
-  const from = offsets ? offsets.from : 0;
-  const to = offsets ? offsets.to : inlineText(blk.content).length;
+  // Determine the effective character range. Prefer the authoritative editor
+  // selection for this block; otherwise the current DOM offsets; finally fall
+  // back to the entire block (covers "tool just opened" and "selection lost
+  // after innerHTML write" / mobile touch scenarios).
+  const stSel = st.selection;
+  let from: number;
+  let to: number;
+  if (stSel.kind === 'text' && stSel.anchor.blockId === props.blockId && stSel.focus.blockId === props.blockId) {
+    from = Math.min(stSel.anchor.offset, stSel.focus.offset);
+    to = Math.max(stSel.anchor.offset, stSel.focus.offset);
+  } else {
+    const offsets = getSelectionOffsets();
+    from = offsets ? offsets.from : 0;
+    to = offsets ? offsets.to : inlineText(blk.content).length;
+  }
   if (from >= to) {
     activeColor.value = '';
     activeBgColor.value = '';
@@ -2307,6 +2554,16 @@ defineExpose({});
 
 // Reposition on scroll/resize.
 async function onScrollOrResize(): Promise<void> {
+  if (props.mobile) {
+    // Mobile: no floating placement to refresh — just re-measure overflow
+    // and update dropdown position if one is open.
+    if (props.visible) measureHtOverflow();
+    if (openDropdown.value) positionActiveDropdown();
+    updateScrollState();
+    updateActiveMarks();
+    updateActiveColors();
+    return;
+  }
   if (props.visible && props.selectionRect && props.rootEl && toolbarEl.value) {
     // Same ordering as the watch callback: measure overflow → await reflow
     // → read actual rect → compute placement.
@@ -2330,6 +2587,19 @@ async function onScrollOrResize(): Promise<void> {
   updateActiveColors();
 }
 
+function closeDropdownIfOutside(target: EventTarget | null): void {
+  if (!openDropdown.value) return;
+  const dropdowns = [typeDropdownEl.value, alignDropdownEl.value, verticalAlignDropdownEl.value, colorDropdownEl.value];
+  const buttons = [typeBtnEl.value, alignBtnEl.value, verticalAlignBtnEl.value, colorBtnEl.value];
+  for (const d of dropdowns) {
+    if (d && d.contains(target as Node)) return;
+  }
+  for (const b of buttons) {
+    if (b && b.contains(target as Node)) return;
+  }
+  openDropdown.value = null;
+}
+
 // Close dropdown on outside click.
 function onWindowMouseDown(e: MouseEvent): void {
   if (!props.visible) return;
@@ -2346,16 +2616,38 @@ function onWindowMouseDown(e: MouseEvent): void {
     return;
   }
 
-  if (!openDropdown.value) return;
-  const dropdowns = [typeDropdownEl.value, alignDropdownEl.value, verticalAlignDropdownEl.value, colorDropdownEl.value];
-  const buttons = [typeBtnEl.value, alignBtnEl.value, verticalAlignBtnEl.value, colorBtnEl.value];
-  for (const d of dropdowns) {
-    if (d && d.contains(e.target as Node)) return;
+  closeDropdownIfOutside(e.target);
+}
+
+// Touch variant of the above. On touch devices mousedown is synthesized only
+// if no touch handler called preventDefault(), so the buttons use
+// `@touchstart.prevent.stop` to trigger reliably. We add a capture touchstart
+// listener here to mirror the mousedown logic: keep selection when tapping
+// inside the toolbar, and close an open dropdown when tapping outside.
+//
+// IMPORTANT: we must NOT preventDefault touches inside the horizontal-scroll
+// container (.ht-content), otherwise the touch scroll gesture is blocked and
+// the user cannot swipe the toolbar left/right. We only preventDefault on the
+// toolbar chrome OUTSIDE that container (nav buttons are outside it; the
+// content strip scrolls natively).
+function onWindowTouchStart(e: TouchEvent): void {
+  if (!props.visible) return;
+  const t = e.touches[0];
+  if (!t) return;
+  const target = e.target;
+  const toolbar = toolbarEl.value;
+  if (toolbar && toolbar.contains(target as Node)) {
+    // Allow the scrollable content strip to receive touches (for horizontal
+    // swiping). Only preserve the selection for touches on the fixed chrome
+    // (nav buttons / separators) that sit outside the scroll container.
+    const content = htContentEl.value;
+    if (content && content.contains(target as Node)) {
+      return;
+    }
+    e.preventDefault();
+    return;
   }
-  for (const b of buttons) {
-    if (b && b.contains(e.target as Node)) return;
-  }
-  openDropdown.value = null;
+  closeDropdownIfOutside(target);
 }
 
 // Update active marks when toolbar becomes visible.
@@ -2372,6 +2664,12 @@ onMounted(() => {
   window.addEventListener('scroll', onScrollOrResize, true);
   window.addEventListener('resize', onScrollOrResize);
   window.addEventListener('mousedown', onWindowMouseDown, true);
+  window.addEventListener('touchstart', onWindowTouchStart, true);
+  // Refresh active mark/color state whenever the DOM selection changes (e.g.
+  // the user selects a different text range). The editor only notifies on
+  // document dispatch, so selection-only changes would otherwise never update
+  // the button highlight until a scroll/resize happens.
+  document.addEventListener('selectionchange', onDocumentSelectionChange);
   unsubscribe = editor.subscribe(() => {
     nextTick(() => {
       const state = editor.getState();
@@ -2386,7 +2684,22 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScrollOrResize, true);
   window.removeEventListener('resize', onScrollOrResize);
   window.removeEventListener('mousedown', onWindowMouseDown, true);
+  window.removeEventListener('touchstart', onWindowTouchStart, true);
+  document.removeEventListener('selectionchange', onDocumentSelectionChange);
   unsubscribe?.();
   unsubscribe = null;
 });
+
+function onDocumentSelectionChange(): void {
+  if (!props.visible) return;
+  // Debounce via rAF so rapid selection changes don't thrash the DOM reads.
+  if (selectionRaf !== null) return;
+  selectionRaf = requestAnimationFrame(() => {
+    selectionRaf = null;
+    if (!props.visible) return;
+    updateActiveMarks();
+    updateActiveColors();
+  });
+}
+let selectionRaf: number | null = null;
 </script>

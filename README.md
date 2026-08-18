@@ -60,11 +60,17 @@ by an **extension**, so the core never switches on a block type.
 
 ## Quick start
 
+```sh
+npm install xiaodao-editor
+# or: pnpm add xiaodao-editor
+```
+
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { BlockEditor } from './xiaodao-editor'
-import type { DocumentData } from './xiaodao-editor'
+import { BlockEditor } from 'xiaodao-editor'
+import type { DocumentData } from 'xiaodao-editor'
+import 'xiaodao-editor/style.css'
 
 const doc = ref<DocumentData>({ blocks: [] })
 </script>
@@ -152,7 +158,7 @@ To use a **custom subset**, pass `extensions` explicitly:
 import {
   ParagraphExtension, HeadingExtension,
   KeymapExtension, HistoryExtension,
-} from './xiaodao-editor'
+} from 'xiaodao-editor'
 
 const extensions = [
   ParagraphExtension, HeadingExtension,
@@ -227,8 +233,8 @@ renderer:
 
 ```ts
 import { defineComponent, h } from 'vue'
-import type { Extension } from './xiaodao-editor'
-import BlockContent from './xiaodao-editor/BlockContent.vue'
+import type { Extension } from 'xiaodao-editor'
+import { BlockContent } from 'xiaodao-editor'
 
 const CalloutBlock = defineComponent({
   props: ['block', 'placeholder'],
@@ -258,7 +264,7 @@ export const CalloutExtension: Extension = {
 Register it alongside the built-ins:
 
 ```ts
-import { BuiltinExtensions, BlockEditor } from './xiaodao-editor'
+import { BuiltinExtensions, BlockEditor } from 'xiaodao-editor'
 import { CalloutExtension } from './callout'
 
 const extensions = [...BuiltinExtensions, CalloutExtension]

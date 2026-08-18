@@ -1,22 +1,35 @@
 <template>
   <div class="playground" :class="`pg-theme-${theme}`">
     <header class="playground-title">
-      <span class="pg-title-text">Block Editor Playground</span>
+      <span class="pg-title-text">{{ locale === 'zh-CN' ? '小刀编辑器' : 'Xiaodao Editor' }}</span>
       <div class="pg-toolbar">
         <!-- Language switch -->
         <div class="pg-switch" role="group" aria-label="Language">
           <button
             type="button"
-            class="pg-switch-btn"
+            class="pg-switch-btn pg-switch-btn-icon"
             :class="{ active: locale === 'zh-CN' }"
+            :title="locale === 'zh-CN' ? '中文' : 'Chinese'"
             @click="locale = 'zh-CN'"
-          >中文</button>
+          >
+            <!-- Chinese character '中' icon -->
+            <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <path d="M555.231787 330.203429v-107.997284h-68.202727v108.038827H263.433935v273.457531H487.02906v210.976899h68.202727V603.70431h224.21827V330.203429H555.231787z m-68.202727 209.074952h-157.337694v-144.605675h157.335888v144.605675z m226.131053 0H555.195662v-144.605675h157.962645v144.605675z" />
+            </svg>
+          </button>
           <button
             type="button"
-            class="pg-switch-btn"
+            class="pg-switch-btn pg-switch-btn-icon"
             :class="{ active: locale === 'en-US' }"
+            :title="locale === 'zh-CN' ? '英文' : 'English'"
             @click="locale = 'en-US'"
-          >EN</button>
+          >
+            <!-- Latin letter A icon -->
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 13L8 3l5 10" />
+              <path d="M5 9h6" />
+            </svg>
+          </button>
         </div>
         <!-- Theme switch -->
         <div class="pg-switch" role="group" aria-label="Theme">
@@ -57,18 +70,29 @@
         <div class="pg-switch" role="group" aria-label="Editable">
           <button
             type="button"
-            class="pg-switch-btn"
+            class="pg-switch-btn pg-switch-btn-icon"
             :class="{ active: !editable }"
             :title="locale === 'zh-CN' ? '只读模式' : 'Read-only mode'"
             @click="editable = false"
-          >{{ locale === 'zh-CN' ? '只读' : 'RO' }}</button>
+          >
+            <!-- Open book icon (read-only) -->
+            <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <path d="M192 768h640V192h-160a128 128 0 0 0-128 128h-64a128 128 0 0 0-128-128H192v576z m426.666667 64a106.773333 106.773333 0 0 0-92.309334 53.333333v0.042667a16.426667 16.426667 0 0 1-28.458666-0.042667A106.389333 106.389333 0 0 0 405.333333 832H170.666667a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667h181.333333a191.829333 191.829333 0 0 1 160 85.824A191.829333 191.829333 0 0 1 672 128H853.333333a42.666667 42.666667 0 0 1 42.666667 42.666667v618.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H618.666667z m-170.666667-64c23.765333 0 44.501333 12.778667 55.530667 32a9.856 9.856 0 0 0 17.066666 0.021333l0.021334-0.021333A64.064 64.064 0 0 1 576 768h-128z m32-448h64v352a32 32 0 0 1-64 0V320z" />
+            </svg>
+          </button>
           <button
             type="button"
-            class="pg-switch-btn"
+            class="pg-switch-btn pg-switch-btn-icon"
             :class="{ active: editable }"
             :title="locale === 'zh-CN' ? '编辑模式' : 'Edit mode'"
             @click="editable = true"
-          >{{ locale === 'zh-CN' ? '编辑' : 'Edit' }}</button>
+          >
+            <!-- Pencil edit icon -->
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11.5 2.5l2 2-8 8.5-3.5 1 1-3.5z" />
+              <path d="M10 4l2 2" />
+            </svg>
+          </button>
         </div>
       </div>
     </header>
@@ -79,6 +103,7 @@
       :extensions="extensions"
       :editable="editable"
       :placeholder="locale === 'zh-CN' ? placeholderZh : placeholderEn"
+      :style="{ margin: '0 10px' }"
     />
     <details class="playground-debug">
       <summary>Document JSON</summary>
