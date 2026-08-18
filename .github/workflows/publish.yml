@@ -34,9 +34,13 @@ jobs:
 
       - run: pnpm build
 
-      - run: npm publish
+      - name: Configure npm auth
+        run: npm config set //registry.npmjs.org/:_authToken $env:NPM_TOKEN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npmjs.org
+        run: npm publish
 
   publish-github:
     name: Publish to GitHub Packages
@@ -64,6 +68,10 @@ jobs:
       # GitHub Packages requires scoped names — temporarily rename
       - run: npm pkg set name=@xiaodaozhi/xiaodao-editor
 
-      - run: npm publish
+      - name: Configure GitHub Packages auth
+        run: npm config set //npm.pkg.github.com/:_authToken $env:GITHUB_TOKEN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: npm publish
