@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   publish-npm:
     name: Publish to npmjs.org
@@ -16,11 +19,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.29.2
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry: https://registry.npmjs.org/
           cache: pnpm
 
@@ -46,11 +49,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.29.2
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry: https://npm.pkg.github.com/
           cache: pnpm
 
