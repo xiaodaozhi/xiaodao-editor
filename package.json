@@ -33,6 +33,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:demo": "vue-tsc --noEmit && vite build --mode demo",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue,.js --fix",
     "lint:check": "eslint . --ext .ts,.vue,.js",

@@ -5,6 +5,7 @@ node_modules
 # build output
 dist
 dist-new
+dist-demo
 .workbuddy
 *.tsbuildinfo
 

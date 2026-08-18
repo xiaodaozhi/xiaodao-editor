@@ -3,16 +3,19 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 
-// Two modes:
-//  - `vite` / `vite dev` -> serves the playground (index.html -> playground/main.ts)
-//  - `vite build`         -> library build of src/index.ts -> dist/
-export default defineConfig(({ command }) => {
+// Three modes:
+//  - `vite` / `vite dev`    -> serves the playground (index.html -> playground/main.ts)
+//  - `vite build`           -> library build of src/index.ts -> dist/
+//  - `vite build --mode demo` -> playground SPA build with App.vue -> dist-demo/
+export default defineConfig(({ command, mode }) => {
   const isBuild = command === 'build'
+  const isDemo = mode === 'demo'
+  const isLibBuild = isBuild && !isDemo
 
   return {
     plugins: [
       vue(),
-      isBuild &&
+      isLibBuild &&
         dts({
           include: ['src'],
           insertTypesEntry: true,
@@ -24,7 +27,7 @@ export default defineConfig(({ command }) => {
         '@': resolve(__dirname, 'src'),
       },
     },
-    build: isBuild
+    build: isLibBuild
       ? {
           lib: {
             entry: resolve(__dirname, 'src/index.ts'),
@@ -40,6 +43,11 @@ export default defineConfig(({ command }) => {
             },
           },
         }
-      : undefined,
+      : isDemo
+        ? {
+            outDir: 'dist-demo',
+            emptyOutDir: true,
+          }
+        : undefined,
   }
 })
