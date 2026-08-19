@@ -16,14 +16,20 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
 }
 
 #app {
   margin: 0 auto;
   padding: 0;
+  height: 100%;
 }
 
 /* --- Playground theme variables ----------------------------------------- *
@@ -47,6 +53,9 @@ body {
   --pg-border: #ebebea;
   --pg-hover: #f1f0ed;
   --pg-active: #e7e6e3;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .playground.pg-theme-dark {
@@ -77,8 +86,11 @@ body {
 
 .playground-body {
   position: relative;
-  padding: 0 10px;
+  padding: 0;
   background: var(--pg-bg);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .pg-title-text {

@@ -136,9 +136,14 @@ body.theme-light {
   outline: none;
   position: relative;
   color: var(--be-text);
-  /* Background is intentionally left to the consumer (host page) so the
+  /* Flex column layout: TopToolbar (fixed-height) + editor-content (scrollable).
+     Background is intentionally left to the consumer (host page) so the
      editor can blend into the surrounding UI.  Set --be-bg or a background
      on the .block-editor element from the host stylesheet if needed. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 200px;
 }
 
 /* During block dragging, disable ALL text selection across the editor tree
@@ -643,8 +648,10 @@ body.theme-light {
   margin-top: calc(
     var(--todo-padding-top) +
     (var(--todo-line-height) * var(--todo-font-size) - var(--todo-checkbox-size)) / 2
-    + 2px
   );
+  margin-right: 3px;
+  margin-bottom: 3px;
+  margin-left: 4px;
   width: var(--todo-checkbox-size);
   height: var(--todo-checkbox-size);
   accent-color: var(--be-accent);
@@ -1648,7 +1655,7 @@ body.theme-light {
   transition: background 0.1s ease;
 }
 
-.ht-btn:hover {
+.ht-btn:hover:not(.active):not(.open) {
   background: rgba(255 255 255 / 0.12);
 }
 
@@ -3250,7 +3257,7 @@ body.theme-dark .image-block-error-overlay {
   transition: background 0.1s ease, color 0.1s ease;
 }
 
-.table-floating-toolbar .ht-btn:hover {
+.table-floating-toolbar .ht-btn:hover:not(.active):not(.open) {
   background: var(--be-hover);
 }
 
@@ -3287,12 +3294,12 @@ body.theme-dark .table-cell-inner {
   color: var(--be-text);
 }
 
-/* --- Mobile toolbar (MobileToolbar.vue) --------------------------------- */
-/* Bottom-fixed action bar for touch devices. The .is-mobile class is set
-   on .block-editor when matchMedia('(pointer: coarse)') matches. */
+/* --- Top toolbar (TopToolbar.vue) -------------------------------------- */
+/* Top action bar — always visible, not limited to mobile mode.
+   Uses CSS variables so it adapts to light/dark theme automatically. */
 
 /* On mobile: hide the left handle gutter so content is flush-left, and
-   hide the block handle (plus/grip) — those actions move to MobileToolbar. */
+   hide the block handle (plus/grip) — those actions move to TopToolbar. */
 .block-editor.is-mobile .block-host {
   padding-left: 0;
 }
@@ -3301,33 +3308,35 @@ body.theme-dark .table-cell-inner {
   display: none !important;
 }
 
-/* The MobileToolbar component itself — a horizontal bar fixed at the
-   viewport bottom. */
-.mobile-toolbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+/* The TopToolbar component itself — a horizontal bar at the top of the
+   editor, part of the flex layout (not fixed to the viewport). */
+.top-toolbar {
+  position: relative;
   z-index: 60;
+  flex-shrink: 0;
   display: flex;
   align-items: stretch;
   gap: 0;
-  background: #1f1f1f;
-  color: #fff;
-  /* Safe area: the bottom padding accounts for the iPhone home indicator.
-     When the keyboard is open the inline `bottom` style lifts the whole
-     bar above the keyboard, and the OS collapses the safe-area inset to
-     ~0 so there's no double-padding. */
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-shadow: 0 -1px 0 rgba(255 255 255 / 0.06), 0 -4px 12px rgb(0 0 0 / 0.22);
+  padding: 2px 0;
+  background: var(--be-bg, #ffffff);
+  border-bottom: 1px solid var(--be-border, #e0e0e0);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.06);
   /* Prevent horizontal overflow — the inner scroll area handles button
      overflow instead of the page. */
   overflow: hidden;
-  max-width: 100vw;
+  max-width: 100%;
+}
+
+/* Dark theme overrides for the top toolbar. */
+.theme-dark .top-toolbar {
+  background: var(--be-bg, #1f1f1f);
+  color: #fff;
+  border-bottom-color: rgba(255 255 255 / 0.1);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
 }
 
 /* Left fixed section: plus + handle buttons. */
-.mobile-toolbar .mt-left {
+.top-toolbar .tt-left {
   display: flex;
   align-items: center;
   gap: 0;
@@ -3335,12 +3344,12 @@ body.theme-dark .table-cell-inner {
   padding: 0 2px;
 }
 
-.mobile-toolbar .mt-btn {
+.top-toolbar .tt-btn {
   background: transparent;
   border: 0;
   color: inherit;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 4px;
   cursor: pointer;
   display: inline-flex;
@@ -3350,30 +3359,56 @@ body.theme-dark .table-cell-inner {
   -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-toolbar .mt-btn:active {
+.top-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
+  background: var(--be-hover, rgba(0 0 0 / 0.06));
+}
+
+.top-toolbar .tt-btn:active:not(.active) {
+  background: var(--be-hover, rgba(0 0 0 / 0.08));
+}
+
+.top-toolbar .tt-btn.active {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.theme-dark .top-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.theme-dark .top-toolbar .tt-btn:active:not(.active) {
   background: rgba(255 255 255 / 0.16);
 }
 
-.mobile-toolbar .mt-btn.disabled,
-.mobile-toolbar .mt-btn:disabled {
+.theme-dark .top-toolbar .tt-btn.active {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.top-toolbar .tt-btn.disabled,
+.top-toolbar .tt-btn:disabled {
   opacity: 0.3;
   cursor: default;
   pointer-events: none;
 }
 
 /* Separator between fixed buttons and contextual buttons. */
-.mobile-toolbar .mt-sep {
+.top-toolbar .tt-sep {
   flex-shrink: 0;
   width: 1px;
   align-self: center;
   height: 24px;
-  background: rgba(255 255 255 / 0.15);
+  background: var(--be-border, rgba(0 0 0 / 0.1));
   margin: 0 4px;
 }
 
-/* --- HoverToolbar in mobile mode (embedded inside MobileToolbar) -------- */
+.theme-dark .top-toolbar .tt-sep {
+  background: rgba(255 255 255 / 0.15);
+}
+
+/* --- HoverToolbar in inline mode (embedded inside TopToolbar) ----------- */
 /* When the `mobile` prop is true, HoverToolbar is NOT teleported and NOT
-   absolutely positioned. It renders inline as a flex child of .mobile-toolbar,
+   absolutely positioned. It renders inline as a flex child of .top-toolbar,
    filling the remaining width and using the existing ht-content overflow /
    nav-button mechanism for horizontal scrolling. */
 
@@ -3399,10 +3434,8 @@ body.theme-dark .table-cell-inner {
   color: inherit;
   box-shadow: none;
   border-radius: 0;
-  /* Match the 40px height of the left-side plus/handle buttons so the
-     toolbar bar does NOT get taller when contextual buttons appear. */
   padding: 0;
-  height: 40px;
+  height: 36px;
   opacity: 1;
   transform: none;
   visibility: visible;
@@ -3410,7 +3443,7 @@ body.theme-dark .table-cell-inner {
   pointer-events: auto;
 }
 
-/* In mobile mode this is a static bottom bar, not a floating toolbar
+/* In inline mode this is a static top bar, not a floating toolbar
    anchored to a selection — hide the selection-pointer arrow entirely. */
 .hover-toolbar.mobile-mode.above::after,
 .hover-toolbar.mobile-mode.below::after {
@@ -3423,43 +3456,70 @@ body.theme-dark .table-cell-inner {
   display: none;
 }
 
-/* In mobile mode the toolbar buttons inherit the bar's styling. Override
-   the dark-toolbar-specific hover/active states to match a bottom bar.
-   Height matches .mt-btn (40px) so the two sides share one grid line. */
+/* In inline mode the toolbar buttons inherit the bar's styling. Override
+   the hover/active states to match a top bar.
+   Height matches .tt-btn (36px) so the two sides share one grid line. */
 .hover-toolbar.mobile-mode .ht-btn {
-  height: 40px;
-  min-width: 40px;
+  height: 36px;
+  min-width: 36px;
   padding: 0 8px;
   -webkit-tap-highlight-color: transparent;
 }
 
-.hover-toolbar.mobile-mode .ht-btn:active {
+.hover-toolbar.mobile-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
+  background: var(--be-hover, rgba(0 0 0 / 0.06));
+}
+
+.hover-toolbar.mobile-mode .ht-btn:active:not(.active):not(.open) {
+  background: var(--be-hover, rgba(0 0 0 / 0.08));
+}
+
+.hover-toolbar.mobile-mode .ht-btn.active,
+.hover-toolbar.mobile-mode .ht-btn.open {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+.theme-dark .hover-toolbar.mobile-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.theme-dark .hover-toolbar.mobile-mode .ht-btn:active:not(.active):not(.open) {
   background: rgba(255 255 255 / 0.16);
 }
 
-/* Mobile mode nav buttons also use the 40px touch target. */
+.theme-dark .hover-toolbar.mobile-mode .ht-btn.active,
+.theme-dark .hover-toolbar.mobile-mode .ht-btn.open {
+  background: var(--be-accent);
+  color: #fff;
+}
+
+/* Inline mode nav buttons also use the 36px touch target. */
 .hover-toolbar.mobile-mode .ht-nav-btn {
-  width: 32px;
-  height: 40px;
+  width: 28px;
+  height: 36px;
   border-radius: 4px;
 }
 
+.hover-toolbar.mobile-mode .ht-nav-btn:hover:not(.disabled) {
+  background: var(--be-hover, rgba(0 0 0 / 0.06));
+}
+
+.theme-dark .hover-toolbar.mobile-mode .ht-nav-btn:hover:not(.disabled) {
+  background: rgba(255 255 255 / 0.08);
+}
+
 /* Allow the toolbar's button strip to be swiped horizontally on touch
-   devices. Without this the browser treats any horizontal swipe inside the
-   scroll container as a scroll gesture and may suppress it, or the fixed
-   bottom bar's overflow handling interferes. pan-x keeps vertical page
-   scrolling untouched while permitting horizontal panning of the strip. */
+   devices. */
 .hover-toolbar.mobile-mode .ht-content {
   touch-action: pan-x;
 }
 
-/* Mobile dropdowns: teleported to <body> with position:fixed so they are NOT
-   clipped by .mobile-toolbar's overflow:hidden. bottom/left/right are set
+/* Inline dropdowns: teleported to <body> with position:fixed so they are NOT
+   clipped by .top-toolbar's overflow:hidden. top/left/right are set
    via inline style using viewport-relative coords. */
 .ht-dropdown-mobile {
   position: fixed;
-  /* Override the default absolute-position offsets (these will be replaced
-     by the inline fixed style, but setting them to auto prevents overlap). */
   top: auto;
   left: auto;
   z-index: 5000;
@@ -3472,10 +3532,14 @@ body.theme-dark .table-cell-inner {
   bottom: calc(100% + 6px);
 }
 
-/* Add bottom padding to the editor content so the fixed toolbar doesn't
-   overlap the last block. The padding accounts for the toolbar height
-   (~40px) plus safe-area inset. */
-.block-editor.is-mobile {
-  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+/* The scrollable content area — takes remaining height in the flex layout.
+   Always scrolls internally. */
+.editor-content {
+  flex: 1;
+  min-height: 0; /* Allow flex item to shrink below its content size */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  box-sizing: border-box;
 }
 

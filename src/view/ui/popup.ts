@@ -48,39 +48,21 @@ export function placeBelow(
   anchor: HTMLElement | DOMRect,
   popupSize: { readonly width: number; readonly height: number },
   margin = 6,
+  topBar = false,
+  bottomMargin = 0,
 ): PopupPlacement {
   void root;
   const anchorRect = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
 
-  // Use clientWidth/clientHeight — these represent the actual visible area
-  // of the viewport EXCLUDING scrollbars.  window.innerWidth includes the
-  // vertical scrollbar width (~15–17px), which causes horizontal clamp
-  // values to be too generous and popups to peek out behind the scrollbar.
   const viewportHeight = document.documentElement.clientHeight;
   const vw = viewportWidth();
-  // Available vertical space in the viewport, measured from the anchor.
-  // NOTE: we intentionally use viewport space, not space within the editor
-  // root. Because menus render with position:fixed (teleported to <body>),
-  // they are free to extend past the editor root's visual bounds as long as
-  // they stay inside the viewport. Using root-relative space here was the
-  // root cause of menus always opening downward even on the very last block
-  // — root-relative "spaceAbove" was tiny when the block sat near the top
-  // of the root, even though there was plenty of visible room above.
-  const spaceBelow = Math.max(0, viewportHeight - anchorRect.bottom - margin);
+  const spaceBelow = Math.max(0, viewportHeight - anchorRect.bottom - margin - bottomMargin);
   const spaceAbove = Math.max(0, anchorRect.top - margin);
 
-  // Decide direction.  The previous logic required spaceAbove to exceed
-  // `popupSize.height + margin + 40` which, for tall menus, made the
-  // "pop up" branch unreachable even when the anchor was near the bottom.
-  //
-  // New rule:
-  //   - If the popup fits below → pop down (default).
-  //   - If it does NOT fit below AND there is more room (or at least as
-  //     much room) above → pop up.
-  //   - Otherwise fall back to popping down (clamping will handle overflow).
   const fitsBelow = spaceBelow >= popupSize.height + margin;
   const fitsAbove = spaceAbove >= popupSize.height + margin;
-  const above = !fitsBelow && (fitsAbove || spaceAbove > spaceBelow);
+  // When the anchor is in a top toolbar, always pop down (below the anchor).
+  const above = topBar ? false : (!fitsBelow && (fitsAbove || spaceAbove > spaceBelow));
 
   let top: number;
   let bottom: number;
@@ -92,6 +74,7 @@ export function placeBelow(
     bottom = bottomBaseline;
     availableHeight = Math.max(120, spaceAbove);
   } else {
+    // Pop down (default, and forced when topBar=true).
     top = topBaseline;
     bottom = top + popupSize.height;
     availableHeight = Math.max(120, spaceBelow);

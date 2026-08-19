@@ -1051,10 +1051,11 @@ function recomputePlacement(): void {
     const el = menuEl.value;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const fromTopBar = !!anchor.closest('.top-toolbar');
     const placement = placeBelow(root, anchor, {
       width: Math.max(rect.width, MENU_WIDTH),
       height: rect.height,
-    }, 8);
+    }, 8, fromTopBar, fromTopBar ? 10 : 0);
     position.value = placement;
     positioned.value = true;
     nextTick(updateScrollState);

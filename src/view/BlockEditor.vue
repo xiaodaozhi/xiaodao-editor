@@ -32,6 +32,7 @@
     ref="rootEl"
     class="block-editor"
     :class="[themeClass, { 'block-editor-dragging': draggingBlockId !== null, 'is-mobile': isMobile }]"
+    :style="editorStyle"
     :contenteditable="false"
     @keydown="onKeyDown"
     @copy="onCopy"
@@ -40,28 +41,50 @@
     @dragleave="onFileDragLeave"
     @drop.prevent="onFileDrop"
   >
-    <BlockList
-      ref="blockListRef"
-      :items="renderItems"
-      :blocks-map="state.doc.blocks"
-      :first-block-placeholder="effectivePlaceholder"
-      :hovered-block-id="hoveredBlockId"
-      :focused-block-id="focusedBlockId"
-      :has-text-selection="hoverToolbar.visible"
-      :dragging-block-id="draggingBlockId"
-      :drop-target-block-id="dropTargetBlockId"
-      :drop-position="dropPosition"
-      :menu-open-block-id="settingsMenu.visible ? settingsMenu.blockId : null"
-      @open-settings-menu="onOpenSettingsMenu"
+    <!-- Top action bar (always visible — plus/handle + contextual buttons) -->
+    <TopToolbar
+      :root-el="rootEl"
+      :focus-block-id="focusedBlockId"
+      :hover-visible="hoverToolbar.visible"
+      :hover-selection-rect="hoverToolbar.selectionRect"
+      :hover-block-id="hoverToolbar.blockId"
+      :hover-block-type="hoverToolbar.blockType"
+      :hover-block-attrs="hoverToolbar.blockAttrs"
+      :plus-menu-visible="plusMenu.visible"
+      :settings-menu-visible="settingsMenu.visible"
+      @toolbar-interacting="markToolbarInteracting"
       @open-plus-menu="onOpenPlusMenu"
-      @slash-trigger="onSlashTrigger"
-      @input-changed="onInputChanged"
-      @hover-change="onHoverChange"
-      @grip-pointer-down="onGripPointerDown"
-      @grip-pointer-up="onGripPointerUp"
-      @link-click="onBlockLinkClick"
-      @focus-in="onBlockFocusIn"
+      @open-settings-menu="onOpenSettingsMenu"
+      @link-click="onHoverToolbarLinkClick"
+      @hover-close="hoverToolbar.visible = false"
     />
+    <!-- Scrollable content area — vertical scrolling lives here, not on the
+         editor root. When height is set this area scrolls internally; when
+         height is unset it grows with its content and the page scrolls. -->
+    <div class="editor-content">
+      <BlockList
+        ref="blockListRef"
+        :items="renderItems"
+        :blocks-map="state.doc.blocks"
+        :first-block-placeholder="effectivePlaceholder"
+        :hovered-block-id="hoveredBlockId"
+        :focused-block-id="focusedBlockId"
+        :has-text-selection="hoverToolbar.visible"
+        :dragging-block-id="draggingBlockId"
+        :drop-target-block-id="dropTargetBlockId"
+        :drop-position="dropPosition"
+        :menu-open-block-id="settingsMenu.visible ? settingsMenu.blockId : null"
+        @open-settings-menu="onOpenSettingsMenu"
+        @open-plus-menu="onOpenPlusMenu"
+        @slash-trigger="onSlashTrigger"
+        @input-changed="onInputChanged"
+        @hover-change="onHoverChange"
+        @grip-pointer-down="onGripPointerDown"
+        @grip-pointer-up="onGripPointerUp"
+        @link-click="onBlockLinkClick"
+        @focus-in="onBlockFocusIn"
+      />
+    </div>
     <!-- Cross-block text selection overlay.
          Teleported to <body> so ancestor transforms (scale/translate) don't
          break the alignment. getClientRects() reports viewport-relative
@@ -105,33 +128,6 @@
       :block-id="settingsMenu.blockId"
       :root-el="rootEl"
       @close="closeSettingsMenu"
-    />
-    <!-- Hover Toolbar (desktop only — replaced by MobileToolbar on touch devices) -->
-    <HoverToolbar
-      v-if="!isMobile"
-      :visible="hoverToolbar.visible"
-      :selection-rect="hoverToolbar.selectionRect"
-      :block-id="hoverToolbar.blockId"
-      :block-type="hoverToolbar.blockType"
-      :block-attrs="hoverToolbar.blockAttrs"
-      :root-el="rootEl"
-      @close="hoverToolbar.visible = false"
-      @link-click="onHoverToolbarLinkClick"
-    />
-    <!-- Mobile bottom toolbar (touch devices only) -->
-    <MobileToolbar
-      v-else
-      :root-el="rootEl"
-      :focus-block-id="focusedBlockId"
-      :hover-visible="hoverToolbar.visible"
-      :hover-selection-rect="hoverToolbar.selectionRect"
-      :hover-block-id="hoverToolbar.blockId"
-      :hover-block-type="hoverToolbar.blockType"
-      :hover-block-attrs="hoverToolbar.blockAttrs"
-      @open-plus-menu="onOpenPlusMenu"
-      @open-settings-menu="onOpenSettingsMenu"
-      @link-click="onHoverToolbarLinkClick"
-      @hover-close="hoverToolbar.visible = false"
     />
     <!-- Ordered-list marker click menu -->
     <OrderedListMenu
@@ -190,8 +186,8 @@ import { inlineText, inlineFromString, splitInline } from '../core/types';
 import { Editor } from '../core/Editor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
-import { editorKey, imageUploadKey, editableKey, mobileKey, mobileToolbarBridgeKey } from './context';
-import type { MobileToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
+import { editorKey, imageUploadKey, editableKey, mobileKey, topToolbarBridgeKey } from './context';
+import type { TopToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
 
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
@@ -199,8 +195,7 @@ import { caretSelection, isBlocks, textSelection } from '../core/selection/Selec
 import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
 import BlockSettingsMenu from './ui/BlockSettingsMenu.vue';
-import HoverToolbar from './ui/HoverToolbar.vue';
-import MobileToolbar from './ui/MobileToolbar.vue';
+import TopToolbar from './ui/TopToolbar.vue';
 import OrderedListMenu from './ui/OrderedListMenu.vue';
 import NumberPicker from './ui/NumberPicker.vue';
 import CodeLangPicker from './ui/CodeLangPicker.vue';
@@ -249,6 +244,11 @@ const props = withDefaults(defineProps<{
    * persisted documents.
    */
   uploadImage?: UploadImageHandler;
+  /** Optional: fixed width for the editor (e.g. '800px', '100%', 600). */
+  width?: string | number;
+  /** Optional: fixed height for the editor. When set, the editor scrolls
+   *  internally instead of growing unbounded. */
+  height?: string | number;
 }>(), {
   extensions: () => BuiltinExtensions,
   modelValue: () => ({ blocks: [] }),
@@ -259,6 +259,8 @@ const props = withDefaults(defineProps<{
 
   // optional: when omitted, the editor falls back to its built-in mock upload.
   uploadImage: undefined,
+  width: undefined,
+  height: undefined,
 });
 // Placeholder has a locale-aware default, so we only use the raw value when
 // the consumer explicitly passed a non-empty one.  This keeps the signature
@@ -302,6 +304,19 @@ const i18n = useI18n();
 
 const themeClass = computed<string>(() => `theme-${normalizedTheme.value}`);
 
+// Apply width/height props. Defaults to 100% so the editor always has a
+// constrained size and scrolls internally via .editor-content.
+const editorStyle = computed(() => {
+  const s: Record<string, string> = {};
+  s.width = props.width !== undefined
+    ? (typeof props.width === 'number' ? `${props.width}px` : props.width)
+    : '100%';
+  s.height = props.height !== undefined
+    ? (typeof props.height === 'number' ? `${props.height}px` : props.height)
+    : '100%';
+  return s;
+});
+
 // Sync the theme class to <body> so that Teleport-ed popovers (PlusMenu,
 // BlockSettingsMenu, HoverToolbar, …) render with the correct CSS variables
 // even though they live outside the `.block-editor` DOM subtree.
@@ -336,9 +351,8 @@ provide(editorKey, editor);
 
 // --- Mobile detection -----------------------------------------------------
 // `(pointer: coarse)` matches touch-first devices (iOS / iPadOS / Android).
-// This is provided to child components (TableBlock, MobileToolbar) so they
-// can adapt their rendering for mobile. The floating HoverToolbar is hidden
-// on mobile and replaced by the fixed-bottom MobileToolbar.
+// This is provided to child components (TableBlock) so they can adapt
+// their rendering for mobile. The TopToolbar is always visible (top bar).
 //
 // NOTE: matchMedia is synchronous — create the MQL and read `.matches`
 // IMMEDIATELY during setup so the FIRST render already uses the correct
@@ -355,9 +369,9 @@ function updateMobile(): void {
 }
 // Provide the bridge BEFORE TableBlock's setup reads it (provide is hoisted
 // in the component tree, so this is fine as long as it's in setup scope).
-const mobileToolbarBridge = ref<MobileToolbarDescriptor | null>(null);
+const topToolbarBridge = ref<TopToolbarDescriptor | null>(null);
 provide(mobileKey, isMobile);
-provide(mobileToolbarBridgeKey, mobileToolbarBridge);
+provide(topToolbarBridgeKey, topToolbarBridge);
 
 // Keep both the ref and the Editor instance in sync when the prop changes.
 watch(
@@ -747,6 +761,22 @@ const hoverToolbar = reactive<HoverToolbarState>({
   blockType: null,
   blockAttrs: {},
 });
+
+// Grace period: when the user interacts with the TopToolbar / HoverToolbar
+// buttons, the browser may fire selectionchange (collapsing the text selection)
+// before the click action completes. During this window we ignore
+// selectionchange-driven hiding so the buttons remain interactive.
+let toolbarInteracting = false;
+let toolbarInteractingTimer: ReturnType<typeof setTimeout> | null = null;
+
+function markToolbarInteracting(): void {
+  toolbarInteracting = true;
+  if (toolbarInteractingTimer) clearTimeout(toolbarInteractingTimer);
+  toolbarInteractingTimer = setTimeout(() => {
+    toolbarInteracting = false;
+    toolbarInteractingTimer = null;
+  }, 500);
+}
 
 const olMenu = reactive<OrderedListMenuState>({
   visible: false,
@@ -2577,6 +2607,12 @@ function onDocumentSelectionChange(): void {
   if (stateSel.kind === 'text' && isCrossBlockText(stateSel) && !pendingSel) {
     return;
   }
+  // Grace period: when the user is interacting with the TopToolbar buttons,
+  // the browser may have just collapsed the text selection. Keep the toolbar
+  // visible for a short window so the button action can complete.
+  if (toolbarInteracting) {
+    return;
+  }
   // A block selection (e.g. a selected image) is active but the caret has
   // moved into a text block — a plain click into contenteditable dispatches
   // no editor transaction, so the selection state would stay stuck on the
@@ -2829,7 +2865,7 @@ function onMouseUp(): void {
 //      independent contenteditable elements).
 //   2. After selection is initiated, drag finger across blocks extends
 //      selection exactly like on desktop.
-//   3. Lift finger to end selection. MobileToolbar shows for copy/edit.
+//   3. Lift finger to end selection. TopToolbar shows for copy/edit.
 
 interface MobileTouchGesture {
   longPressTimer: number;
@@ -2854,7 +2890,7 @@ function onTouchStart(e: TouchEvent): void {
   if (!contentEl) return;
 
   // Skip handles, buttons, links — let them handle their own events.
-  if (targetEl.closest('.block-handle, .mt-btn, .ht-btn, a[href]')) return;
+  if (targetEl.closest('.block-handle, .tt-btn, .ht-btn, a[href]')) return;
 
   const touch = e.touches[0];
   if (!touch) return;
@@ -3005,7 +3041,8 @@ function onTouchEnd(): void {
   // Drag completed: refresh overlay.
   updateCrossBlockOverlay();
 
-  // Show MobileToolbar if cross-block selection is active.
+  // Show the toolbar (floating HoverToolbar on desktop, TopToolbar on mobile)
+  // if cross-block selection is active.
   const sel = editor.getState().selection;
   if (sel.kind === 'text' && isCrossBlockText(sel)) {
     showHoverToolbarForCrossBlock(sel);

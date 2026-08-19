@@ -104,7 +104,6 @@
         :extensions="extensions"
         :editable="editable"
         :placeholder="locale === 'zh-CN' ? placeholderZh : placeholderEn"
-        :style="{ margin: '0 10px' }"
       />
     </div>
     <details class="playground-debug">

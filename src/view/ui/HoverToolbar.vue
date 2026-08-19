@@ -84,11 +84,11 @@
             <button
               ref="typeBtnEl"
               class="ht-btn ht-type-btn"
-              :class="{ open: openDropdown === 'type', disabled: noTextSelection }"
+              :class="{ open: openDropdown === 'type', disabled: typeDisabled }"
               :title="t('hoverToolbar.typeBtnTitle')"
-              :disabled="noTextSelection"
-              @mousedown.prevent.stop="!noTextSelection && toggleDropdown('type')"
-              @touchstart.stop="hireTap(() => { if (!noTextSelection) toggleDropdown('type'); }, $event)"
+              :disabled="typeDisabled"
+              @mousedown.prevent.stop="!typeDisabled && toggleDropdown('type')"
+              @touchstart.stop="hireTap(() => { if (!typeDisabled) toggleDropdown('type'); }, $event)"
               @click.prevent.stop
             >
               <span class="ht-type-label">{{ currentTypeLabel }}</span>
@@ -110,7 +110,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .mobile-toolbar overflow:hidden clip. -->
+                 .top-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -344,7 +344,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .mobile-toolbar overflow:hidden clip. -->
+                 .top-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -671,7 +671,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .mobile-toolbar overflow:hidden clip. -->
+                 .top-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -922,7 +922,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .mobile-toolbar overflow:hidden clip. -->
+                 .top-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -1254,9 +1254,9 @@ const props = defineProps<{
   tableActiveColor?: string;
   tableActiveBgColor?: string;
   tableActiveVerticalAlign?: string;
-  // Mobile mode: render as a static bottom bar instead of a floating toolbar.
+  // Inline mode: render as a static top bar instead of a floating toolbar.
   // Disables Teleport, absolute positioning, arrow, and fade animation.
-  // The parent (MobileToolbar) provides the fixed-bottom container.
+  // The parent (TopToolbar) provides the top bar container.
   mobile?: boolean;
 }>();
 
@@ -1308,19 +1308,20 @@ const HT_NAV_BTN_WIDTH = 24; // px each (left + right nav buttons when overflowi
 const dropdownStyle = computed(() => ({
   maxHeight: dropdownMaxHeight.value !== null ? `${dropdownMaxHeight.value}px` : undefined,
 }));
-// In mobile mode, dropdowns are teleported to <body> (to escape the
-// .mobile-toolbar overflow:hidden clip). We need position:fixed coords
-// (left/bottom relative to the viewport), computed from the trigger
+// In inline mode, dropdowns are teleported to <body> (to escape the
+// .top-toolbar overflow:hidden clip). We need position:fixed coords
+// (left/top or bottom relative to the viewport), computed from the trigger
 // button's getBoundingClientRect.
-const dropdownFixedRect = ref<{ left: number; bottom: number; right?: number } | null>(null);
+const dropdownFixedRect = ref<{ left: number; top?: number; bottom?: number; right?: number } | null>(null);
 const dropdownFixedStyle = computed(() => {
   if (!props.mobile || !dropdownFixedRect.value) return undefined;
   const r = dropdownFixedRect.value;
   const style: Record<string, string> = {
     position: 'fixed',
     left: `${r.left}px`,
-    bottom: `${r.bottom}px`,
   };
+  if (r.top !== undefined) style.top = `${r.top}px`;
+  if (r.bottom !== undefined) style.bottom = `${r.bottom}px`;
   if (r.right !== undefined) style.right = `${r.right}px`;
   return style;
 });
@@ -1523,8 +1524,10 @@ function updateActiveMarks(): void {
 // --- Mark button definitions -----------------------------------------------
 
 // In mobile mode without a text selection, the bottom toolbar is always shown
-// but its selection-dependent buttons (marks / align / color / copy) are
-// disabled. tableMode and cellEditMode are handled separately (their own
+// but its selection-dependent buttons (marks / color / copy) are disabled.
+// Block-level actions (type / align) remain enabled as long as a block is
+// focused, because they operate on the entire block not the text range.
+// tableMode and cellEditMode are handled separately (their own
 // selectionRect is supplied by the table renderer).
 const noTextSelection = computed(() =>
   props.mobile && !props.tableMode && !props.cellEditMode && !props.selectionRect,
@@ -1535,13 +1538,23 @@ const marksDisabled = computed(() =>
   noTextSelection.value || props.blockType === 'codeBlock',
 );
 
-/** 当前块是否支持对齐属性（代码块只允许左对齐）。 */
+// Block-level type selector — only disabled when there's no focused block at all.
+// Unlike marks, it works on the whole block even without a text selection.
+const typeDisabled = computed(() => {
+  if (props.tableMode || props.cellEditMode) return noTextSelection.value;
+  return !props.blockId;
+});
+
+/** 当前块是否支持对齐属性（代码块只允许左对齐）。
+ *  块级操作：光标在块内即可交互，无需文本选区。
+ *  代码块例外：对齐方式不允许被交互。 */
 const alignDisabled = computed(() => {
-  if (noTextSelection.value) return true;
   if (props.tableMode || props.cellEditMode) {
-    // In table/cell-edit mode, code block cells disallow alignment.
+    if (noTextSelection.value) return true;
     return props.blockType === 'codeBlock';
   }
+  if (!props.blockId) return true;
+  if (props.blockType === 'codeBlock') return true;
   const bt = props.blockType;
   if (!bt) return false;
   const schema = editor.registries.schema.get(bt as BlockType);
@@ -1670,7 +1683,7 @@ function measureHtOverflow(): void {
   void _unused;
   const naturalWidth = content.scrollWidth;
   // Available width for the toolbar content area.
-  // - Mobile mode: the toolbar lives inside MobileToolbar's content row
+  // - Inline mode: the toolbar lives inside TopToolbar's content row
   //   (which already subtracts the plus/handle buttons). Use the parent
   //   element's clientWidth so the overflow threshold matches the actual
   //   container, not the full viewport.
@@ -1922,26 +1935,26 @@ function positionActiveDropdown(): void {
   const spaceAbove = Math.floor(btnRect.top - margin);
   const natural = dropdown.scrollHeight;
 
-  // Mobile mode: the toolbar is pinned to the viewport bottom, so dropdowns
-  // must ALWAYS pop upward (above the trigger button). They are teleported
-  // to <body>, so we compute position:fixed coords using the viewport-
-  // relative button rect (escapes the .mobile-toolbar overflow:hidden clip).
+  // Mobile/inline mode: the toolbar is pinned to the viewport top, so
+  // dropdowns must ALWAYS pop downward (below the trigger button). They are
+  // teleported to <body>, so we compute position:fixed coords using the
+  // viewport-relative button rect (escapes the .top-toolbar overflow:hidden
+  // clip).
   if (props.mobile) {
-    dropdownAbove.value = true;
-    dropdownMaxHeight.value = Math.max(120, Math.min(spaceAbove, 360));
-    // Color dropdown is right-aligned (to the right edge of the button),
-    // so anchor on right instead of left.
+    dropdownAbove.value = false;
+    dropdownMaxHeight.value = Math.max(120, spaceBelow);
+    const topVal = btnRect.bottom + margin;
     if (kind === 'color') {
       const vw = document.documentElement.clientWidth;
       dropdownFixedRect.value = {
         left: 8,
-        bottom: Math.max(8, viewportH - btnRect.top + 6),
+        top: topVal,
         right: Math.max(8, vw - btnRect.right),
       };
     } else {
       dropdownFixedRect.value = {
         left: Math.max(8, btnRect.left),
-        bottom: Math.max(8, viewportH - btnRect.top + 6),
+        top: topVal,
       };
     }
     nextTick(updateScrollState);

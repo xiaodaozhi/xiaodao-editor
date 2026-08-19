@@ -308,10 +308,11 @@ watch(
     const el = menuEl.value;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const fromTopBar = !!props.anchorEl.closest('.top-toolbar');
     const placement = placeBelow(props.rootEl, props.anchorEl, {
       width: MENU_WIDTH,
       height: rect.height,
-    });
+    }, 6, fromTopBar, fromTopBar ? 10 : 0);
     position.value = placement;
     positioned.value = true;
     nextTick(updateScrollState);
