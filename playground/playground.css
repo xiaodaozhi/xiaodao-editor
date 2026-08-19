@@ -75,6 +75,12 @@ body {
   transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
+.playground-body {
+  position: relative;
+  padding: 0 10px;
+  background: var(--pg-bg);
+}
+
 .pg-title-text {
   font-size: 1.05rem;
   font-weight: 600;
