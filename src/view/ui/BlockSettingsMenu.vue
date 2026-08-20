@@ -521,9 +521,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, reactive, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, inject, shallowRef, reactive, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { placeBelow } from './popup';
-import { useEditor } from '../context';
+import { useEditor, fixedToolbarBottomKey } from '../context';
 import { useMenuScroll } from './useMenuScroll';
 import { useMenuDismiss } from './useMenuDismiss';
 import SafeHtml from './SafeHtml.vue';
@@ -580,6 +580,8 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const editor = useEditor();
+// True when FixedToolbar is pinned to the bottom → dropdowns must pop UPWARD.
+const isFixedToolbarBottom = inject(fixedToolbarBottomKey, ref(false));
 const menuEl = ref<HTMLElement | null>(null);
 const scrollEl = ref<HTMLElement | null>(null);
 const activeId = ref<string>('paragraph');
@@ -1051,11 +1053,15 @@ function recomputePlacement(): void {
     const el = menuEl.value;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const fromTopBar = !!anchor.closest('.top-toolbar');
+    const fromToolbar = !!anchor.closest('.fixed-toolbar');
+    const forceDirection: 'auto' | 'down' | 'up' = fromToolbar
+      ? (isFixedToolbarBottom.value ? 'up' : 'down')
+      : 'auto';
+    const viewportGap = fromToolbar ? 10 : 0;
     const placement = placeBelow(root, anchor, {
       width: Math.max(rect.width, MENU_WIDTH),
       height: rect.height,
-    }, 8, fromTopBar, fromTopBar ? 10 : 0);
+    }, 8, forceDirection, viewportGap, viewportGap);
     position.value = placement;
     positioned.value = true;
     nextTick(updateScrollState);

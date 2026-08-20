@@ -75,8 +75,8 @@ import OrderedListMenu from '../view/ui/OrderedListMenu.vue';
 import NumberPicker from '../view/ui/NumberPicker.vue';
 import { inlineToHtml, inlineFromDom } from '../view/inlineDom';
 import { autoLinkInlineSeq } from '../view/urlUtils';
-import { useEditor, useEditable, topToolbarBridgeKey } from '../view/context';
-import type { TopToolbarDescriptor } from '../view/context';
+import { useEditor, useEditable, fixedToolbarBridgeKey } from '../view/context';
+import type { FixedToolbarDescriptor } from '../view/context';
 import { useI18n } from '../i18n';
 import type { AnyCommandEntry, CommandEntry, Dispatch } from '../core/command/Command';
 import type { EditorState } from '../core/state/EditorState';
@@ -206,8 +206,8 @@ const TableBlock = defineComponent({
     const blockId = props.block.id;
     // Mobile detection + bridge — on touch devices the table does NOT render
     // its own HoverToolbar. Instead it publishes a descriptor (props + handlers)
-    // to the bridge so TopToolbar can render a single HoverToolbar in inline mode.
-    const topToolbarBridge = inject(topToolbarBridgeKey, null);
+    // to the bridge so FixedToolbar can render a single HoverToolbar in inline mode.
+    const fixedToolbarBridge = inject(fixedToolbarBridgeKey, null);
 
     // Live attrs — coerced once per render.
     const tattrs = computed<TableAttrs>(() => attrsToTable(props.block.attrs));
@@ -1960,8 +1960,8 @@ const TableBlock = defineComponent({
       if (colScrollRafId) cancelAnimationFrame(colScrollRafId);
       if (colScrollIdleTimer) clearTimeout(colScrollIdleTimer);
       // Release the mobile toolbar bridge if this table owns it.
-      if (topToolbarBridge && topToolbarBridge.value?.blockId === (blockId as BlockId)) {
-        topToolbarBridge.value = null;
+      if (fixedToolbarBridge && fixedToolbarBridge.value?.blockId === (blockId as BlockId)) {
+        fixedToolbarBridge.value = null;
       }
     });
 
@@ -2851,7 +2851,7 @@ const TableBlock = defineComponent({
 
       // Build the table-mode toolbar descriptor (props + handlers). Used for
       // both the desktop HoverToolbar render AND the mobile bridge payload.
-      const tableModeDescriptor: TopToolbarDescriptor = {
+      const tableModeDescriptor: FixedToolbarDescriptor = {
         visible: !!selRect,
         selectionRect: selRect,
         blockId: blockId as BlockId,
@@ -2888,19 +2888,19 @@ const TableBlock = defineComponent({
         onTableCopy: tableCopyHandler,
       };
 
-      // --- Always publish descriptor to the bridge so TopToolbar renders it
+      // --- Always publish descriptor to the bridge so FixedToolbar renders it
       // via <HoverToolbar mobile>.
-      if (topToolbarBridge) {
+      if (fixedToolbarBridge) {
         if (tableModeDescriptor.visible) {
-          topToolbarBridge.value = tableModeDescriptor;
+          fixedToolbarBridge.value = tableModeDescriptor;
         } else if (
-          topToolbarBridge.value?.blockId === (blockId as BlockId)
-          && !topToolbarBridge.value?.cellEditMode
+          fixedToolbarBridge.value?.blockId === (blockId as BlockId)
+          && !fixedToolbarBridge.value?.cellEditMode
         ) {
           // This table previously owned the bridge (table-mode) but the
-          // selection was cleared. Release it so TopToolbar falls back
+          // selection was cleared. Release it so FixedToolbar falls back
           // to the text-block descriptor. Don't touch cell-edit ownership.
-          topToolbarBridge.value = null;
+          fixedToolbarBridge.value = null;
         }
       }
 
@@ -2949,7 +2949,7 @@ const TableBlock = defineComponent({
       if (typeof focusedCellData?.verticalAlign === 'string') {
         cellBlockAttrs.verticalAlign = focusedCellData.verticalAlign;
       }
-      const cellEditDescriptor: TopToolbarDescriptor = {
+      const cellEditDescriptor: FixedToolbarDescriptor = {
         visible: cellTextToolbar.visible && !!cellTextToolbar.selectionRect,
         selectionRect: cellTextToolbar.selectionRect,
         blockId: blockId as BlockId,
@@ -2980,17 +2980,17 @@ const TableBlock = defineComponent({
           openCellLinkPopover();
         },
       };
-      if (topToolbarBridge) {
+      if (fixedToolbarBridge) {
         if (cellEditDescriptor.visible) {
           // Cell-edit takes priority over table-mode.
-          topToolbarBridge.value = cellEditDescriptor;
+          fixedToolbarBridge.value = cellEditDescriptor;
         } else if (
-          topToolbarBridge.value?.blockId === (blockId as BlockId)
-          && topToolbarBridge.value?.cellEditMode
+          fixedToolbarBridge.value?.blockId === (blockId as BlockId)
+          && fixedToolbarBridge.value?.cellEditMode
         ) {
           // This table's cell-edit previously owned the bridge but the
           // text selection was cleared. Release it.
-          topToolbarBridge.value = null;
+          fixedToolbarBridge.value = null;
         }
       }
 

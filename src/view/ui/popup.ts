@@ -48,8 +48,9 @@ export function placeBelow(
   anchor: HTMLElement | DOMRect,
   popupSize: { readonly width: number; readonly height: number },
   margin = 6,
-  topBar = false,
+  forceDirection: 'auto' | 'down' | 'up' = 'auto',
   bottomMargin = 0,
+  topMargin = 0,
 ): PopupPlacement {
   void root;
   const anchorRect = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
@@ -57,12 +58,19 @@ export function placeBelow(
   const viewportHeight = document.documentElement.clientHeight;
   const vw = viewportWidth();
   const spaceBelow = Math.max(0, viewportHeight - anchorRect.bottom - margin - bottomMargin);
-  const spaceAbove = Math.max(0, anchorRect.top - margin);
+  const spaceAbove = Math.max(0, anchorRect.top - margin - topMargin);
 
   const fitsBelow = spaceBelow >= popupSize.height + margin;
   const fitsAbove = spaceAbove >= popupSize.height + margin;
-  // When the anchor is in a top toolbar, always pop down (below the anchor).
-  const above = topBar ? false : (!fitsBelow && (fitsAbove || spaceAbove > spaceBelow));
+  // When forced down (top bar), always pop below the anchor.
+  // When forced up (bottom bar), always pop above the anchor.
+  // Otherwise auto-pick the side with more room.
+  const above
+    = forceDirection === 'down'
+      ? false
+      : forceDirection === 'up'
+        ? true
+        : (!fitsBelow && (fitsAbove || spaceAbove > spaceBelow));
 
   let top: number;
   let bottom: number;
@@ -70,11 +78,11 @@ export function placeBelow(
   const topBaseline = anchorRect.bottom + margin;
   const bottomBaseline = anchorRect.top - margin;
   if (above) {
-    top = Math.max(margin, bottomBaseline - popupSize.height);
+    top = Math.max(margin + topMargin, bottomBaseline - popupSize.height);
     bottom = bottomBaseline;
     availableHeight = Math.max(120, spaceAbove);
   } else {
-    // Pop down (default, and forced when topBar=true).
+    // Pop down (default, and forced when forceDirection='down').
     top = topBaseline;
     bottom = top + popupSize.height;
     availableHeight = Math.max(120, spaceBelow);

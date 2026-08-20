@@ -22,7 +22,7 @@ import type { Block, BlockId } from '../core/types';
 
 /**
  * Injection key for the reactive `isMobile` flag. Provided by BlockEditor so
- * child components (TableBlock, TopToolbar, …) can adapt their rendering
+ * child components (TableBlock, FixedToolbar, …) can adapt their rendering
  * for touch devices. Uses `(pointer: coarse)` matchMedia — matches iOS /
  * iPadOS / Android browsers.
  */
@@ -30,18 +30,18 @@ export const mobileKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-mobile
 
 /**
  * A bag of props + event handlers that fully describes what the
- * TopToolbar should render inside its embedded HoverToolbar. Produced by
+ * FixedToolbar should render inside its embedded HoverToolbar. Produced by
  * whichever context currently owns the selection (text-block selection in
  * BlockEditor, or table cell / cell-edit selection in TableBlock) and
- * consumed by TopToolbar which spreads it onto `<HoverToolbar mobile>`.
+ * consumed by FixedToolbar which spreads it onto `<HoverToolbar mobile>`.
  *
  * This is the reuse mechanism: instead of duplicating HoverToolbar's buttons
  * and logic, the source context builds the exact same prop/handler bag it
  * would normally pass to a floating HoverToolbar, and hands it to the
- * TopToolbar via the bridge so a SINGLE HoverToolbar instance (in inline
+ * FixedToolbar via the bridge so a SINGLE HoverToolbar instance (in inline
  * mode) renders the buttons.
  */
-export interface TopToolbarDescriptor {
+export interface FixedToolbarDescriptor {
   visible: boolean;
   selectionRect: DOMRect | null;
   blockId: BlockId | null;
@@ -78,14 +78,22 @@ export interface TopToolbarDescriptor {
 }
 
 /**
- * Injection key for the top-toolbar bridge — a reactive ref holding the
+ * Injection key for the fixed-toolbar bridge — a reactive ref holding the
  * **table-sourced** descriptor (or null). BlockEditor provides it; TableBlock
- * injects it and publishes its toolbar state when running on a device with a
- * top toolbar. The text-block descriptor is computed directly inside
- * TopToolbar from BlockEditor's hoverToolbar state (no bridge needed for
+ * injects it and publishes its toolbar state when running with a fixed
+ * toolbar. The text-block descriptor is computed directly inside
+ * FixedToolbar from BlockEditor's hoverToolbar state (no bridge needed for
  * that path).
  */
-export const topToolbarBridgeKey: InjectionKey<Ref<TopToolbarDescriptor | null>> = Symbol('block-editor-top-toolbar-bridge');
+export const fixedToolbarBridgeKey: InjectionKey<Ref<FixedToolbarDescriptor | null>> = Symbol('block-editor-fixed-toolbar-bridge');
+
+/**
+ * Injection key for a reactive flag indicating whether the FixedToolbar is
+ * currently placed at the bottom of the editor. Provided by FixedToolbar;
+ * consumed by PlusMenu / BlockSettingsMenu / HoverToolbar to decide which
+ * direction dropdowns should pop (upward when the bar is at the bottom).
+ */
+export const fixedToolbarBottomKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-fixed-toolbar-bottom');
 
 export const editorKey: InjectionKey<Editor> = Symbol('block-editor');
 

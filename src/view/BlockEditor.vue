@@ -41,8 +41,10 @@
     @dragleave="onFileDragLeave"
     @drop.prevent="onFileDrop"
   >
-    <!-- Top action bar (always visible — plus/handle + contextual buttons) -->
-    <TopToolbar
+    <!-- Fixed action bar (always visible — plus/handle + contextual buttons).
+         Position is auto-detected: top on desktop, bottom on mobile.
+         Can be overridden via the `toolbarPosition` prop. -->
+    <FixedToolbar
       :root-el="rootEl"
       :focus-block-id="focusedBlockId"
       :hover-visible="hoverToolbar.visible"
@@ -52,6 +54,7 @@
       :hover-block-attrs="hoverToolbar.blockAttrs"
       :plus-menu-visible="plusMenu.visible"
       :settings-menu-visible="settingsMenu.visible"
+      :position="toolbarPosition"
       @toolbar-interacting="markToolbarInteracting"
       @open-plus-menu="onOpenPlusMenu"
       @open-settings-menu="onOpenSettingsMenu"
@@ -186,8 +189,8 @@ import { inlineText, inlineFromString, splitInline } from '../core/types';
 import { Editor } from '../core/Editor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
-import { editorKey, imageUploadKey, editableKey, mobileKey, topToolbarBridgeKey } from './context';
-import type { TopToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
+import { editorKey, imageUploadKey, editableKey, mobileKey, fixedToolbarBridgeKey, fixedToolbarBottomKey } from './context';
+import type { FixedToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
 
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
@@ -195,7 +198,7 @@ import { caretSelection, isBlocks, textSelection } from '../core/selection/Selec
 import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
 import BlockSettingsMenu from './ui/BlockSettingsMenu.vue';
-import TopToolbar from './ui/TopToolbar.vue';
+import FixedToolbar from './ui/FixedToolbar.vue';
 import OrderedListMenu from './ui/OrderedListMenu.vue';
 import NumberPicker from './ui/NumberPicker.vue';
 import CodeLangPicker from './ui/CodeLangPicker.vue';
@@ -249,6 +252,10 @@ const props = withDefaults(defineProps<{
   /** Optional: fixed height for the editor. When set, the editor scrolls
    *  internally instead of growing unbounded. */
   height?: string | number;
+  /** Optional: placement of the persistent FixedToolbar.
+   *  - 'auto' (default): top on desktop, bottom on mobile.
+   *  - 'top' / 'bottom': force the toolbar to top or bottom. */
+  toolbarPosition?: 'auto' | 'top' | 'bottom';
 }>(), {
   extensions: () => BuiltinExtensions,
   modelValue: () => ({ blocks: [] }),
@@ -261,6 +268,7 @@ const props = withDefaults(defineProps<{
   uploadImage: undefined,
   width: undefined,
   height: undefined,
+  toolbarPosition: 'auto',
 });
 // Placeholder has a locale-aware default, so we only use the raw value when
 // the consumer explicitly passed a non-empty one.  This keeps the signature
@@ -352,7 +360,7 @@ provide(editorKey, editor);
 // --- Mobile detection -----------------------------------------------------
 // `(pointer: coarse)` matches touch-first devices (iOS / iPadOS / Android).
 // This is provided to child components (TableBlock) so they can adapt
-// their rendering for mobile. The TopToolbar is always visible (top bar).
+// their rendering for mobile. The FixedToolbar is always visible.
 //
 // NOTE: matchMedia is synchronous — create the MQL and read `.matches`
 // IMMEDIATELY during setup so the FIRST render already uses the correct
@@ -369,9 +377,22 @@ function updateMobile(): void {
 }
 // Provide the bridge BEFORE TableBlock's setup reads it (provide is hoisted
 // in the component tree, so this is fine as long as it's in setup scope).
-const topToolbarBridge = ref<TopToolbarDescriptor | null>(null);
+const fixedToolbarBridge = ref<FixedToolbarDescriptor | null>(null);
 provide(mobileKey, isMobile);
-provide(topToolbarBridgeKey, topToolbarBridge);
+provide(fixedToolbarBridgeKey, fixedToolbarBridge);
+
+// Resolve the FixedToolbar position: 'auto' → mobile=bottom, desktop=top.
+// 'top'/'bottom' props override the auto-detected default.
+const toolbarPosition = computed<'top' | 'bottom'>(() => {
+  if (props.toolbarPosition === 'top') return 'top';
+  if (props.toolbarPosition === 'bottom') return 'bottom';
+  return isMobile.value ? 'bottom' : 'top';
+});
+
+// Provide the bottom flag so PlusMenu / BlockSettingsMenu (rendered as
+// direct children of BlockEditor, NOT inside FixedToolbar) know which
+// direction to pop their dropdowns: bottom bar → UPWARD, top bar → downward.
+provide(fixedToolbarBottomKey, computed(() => toolbarPosition.value === 'bottom'));
 
 // Keep both the ref and the Editor instance in sync when the prop changes.
 watch(
@@ -762,7 +783,7 @@ const hoverToolbar = reactive<HoverToolbarState>({
   blockAttrs: {},
 });
 
-// Grace period: when the user interacts with the TopToolbar / HoverToolbar
+// Grace period: when the user interacts with the FixedToolbar / HoverToolbar
 // buttons, the browser may fire selectionchange (collapsing the text selection)
 // before the click action completes. During this window we ignore
 // selectionchange-driven hiding so the buttons remain interactive.
@@ -2607,7 +2628,7 @@ function onDocumentSelectionChange(): void {
   if (stateSel.kind === 'text' && isCrossBlockText(stateSel) && !pendingSel) {
     return;
   }
-  // Grace period: when the user is interacting with the TopToolbar buttons,
+  // Grace period: when the user is interacting with the FixedToolbar buttons,
   // the browser may have just collapsed the text selection. Keep the toolbar
   // visible for a short window so the button action can complete.
   if (toolbarInteracting) {
@@ -2865,7 +2886,7 @@ function onMouseUp(): void {
 //      independent contenteditable elements).
 //   2. After selection is initiated, drag finger across blocks extends
 //      selection exactly like on desktop.
-//   3. Lift finger to end selection. TopToolbar shows for copy/edit.
+//   3. Lift finger to end selection. FixedToolbar shows for copy/edit.
 
 interface MobileTouchGesture {
   longPressTimer: number;
@@ -3041,7 +3062,7 @@ function onTouchEnd(): void {
   // Drag completed: refresh overlay.
   updateCrossBlockOverlay();
 
-  // Show the toolbar (floating HoverToolbar on desktop, TopToolbar on mobile)
+  // Show the toolbar (floating HoverToolbar on desktop, FixedToolbar on mobile)
   // if cross-block selection is active.
   const sel = editor.getState().selection;
   if (sel.kind === 'text' && isCrossBlockText(sel)) {

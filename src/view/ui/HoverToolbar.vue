@@ -110,7 +110,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .top-toolbar overflow:hidden clip. -->
+                 .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -344,7 +344,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .top-toolbar overflow:hidden clip. -->
+                 .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -671,7 +671,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .top-toolbar overflow:hidden clip. -->
+                 .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -922,7 +922,7 @@
               </svg>
             </button>
             <!-- Teleport to body on mobile so the menu escapes the
-                 .top-toolbar overflow:hidden clip. -->
+                 .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
               :disabled="!mobile"
@@ -1178,9 +1178,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount, shallowRef } from 'vue';
+import { computed, ref, inject, watch, nextTick, onMounted, onBeforeUnmount, shallowRef } from 'vue';
 import { placeBelowSelection as placeSelection, placePreferAbove } from './popup';
-import { useEditor } from '../context';
+import { useEditor, fixedToolbarBottomKey } from '../context';
 import { useMenuScroll } from './useMenuScroll';
 import SafeHtml from './SafeHtml.vue';
 import { inlineText, splitInline } from '../../core/types';
@@ -1256,7 +1256,7 @@ const props = defineProps<{
   tableActiveVerticalAlign?: string;
   // Inline mode: render as a static top bar instead of a floating toolbar.
   // Disables Teleport, absolute positioning, arrow, and fade animation.
-  // The parent (TopToolbar) provides the top bar container.
+  // The parent (FixedToolbar) provides the fixed bar container.
   mobile?: boolean;
 }>();
 
@@ -1280,6 +1280,9 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const editor = useEditor();
+// When embedded in FixedToolbar, this flag tells dropdowns which way to pop:
+// true → toolbar is at the bottom, dropdowns pop UPWARD.
+const isFixedToolbarBottom = inject(fixedToolbarBottomKey, ref(false));
 const toolbarEl = ref<HTMLElement | null>(null);
 const typeDropdownEl = ref<HTMLElement | null>(null);
 const alignDropdownEl = ref<HTMLElement | null>(null);
@@ -1309,7 +1312,7 @@ const dropdownStyle = computed(() => ({
   maxHeight: dropdownMaxHeight.value !== null ? `${dropdownMaxHeight.value}px` : undefined,
 }));
 // In inline mode, dropdowns are teleported to <body> (to escape the
-// .top-toolbar overflow:hidden clip). We need position:fixed coords
+// .fixed-toolbar overflow:hidden clip). We need position:fixed coords
 // (left/top or bottom relative to the viewport), computed from the trigger
 // button's getBoundingClientRect.
 const dropdownFixedRect = ref<{ left: number; top?: number; bottom?: number; right?: number } | null>(null);
@@ -1683,7 +1686,7 @@ function measureHtOverflow(): void {
   void _unused;
   const naturalWidth = content.scrollWidth;
   // Available width for the toolbar content area.
-  // - Inline mode: the toolbar lives inside TopToolbar's content row
+  // - Inline mode: the toolbar lives inside FixedToolbar's content row
   //   (which already subtracts the plus/handle buttons). Use the parent
   //   element's clientWidth so the overflow threshold matches the actual
   //   container, not the full viewport.
@@ -1723,6 +1726,8 @@ function updateHtScrollState(): void {
 
 /** Scroll the toolbar content by one step in the given direction. */
 function htScrollBy(dir: 1 | -1): void {
+  // Close any open dropdown when navigating left/right.
+  openDropdown.value = null;
   const el = htContentEl.value;
   if (!el) return;
   el.scrollLeft += dir * HT_SCROLL_STEP;
@@ -1759,6 +1764,10 @@ function onHtTouchMove(e: TouchEvent): void {
   const dx = Math.abs(t.clientX - pressedStartX);
   const dy = Math.abs(t.clientY - pressedStartY);
   if (dx > HT_TAP_SLOP || dy > HT_TAP_SLOP) {
+    if (!swipeDetected) {
+      // A swipe just started — close any open dropdown.
+      openDropdown.value = null;
+    }
     swipeDetected = true;
   }
 }
@@ -1935,27 +1944,53 @@ function positionActiveDropdown(): void {
   const spaceAbove = Math.floor(btnRect.top - margin);
   const natural = dropdown.scrollHeight;
 
-  // Mobile/inline mode: the toolbar is pinned to the viewport top, so
-  // dropdowns must ALWAYS pop downward (below the trigger button). They are
-  // teleported to <body>, so we compute position:fixed coords using the
-  // viewport-relative button rect (escapes the .top-toolbar overflow:hidden
-  // clip).
+  // Mobile/inline mode: the toolbar is pinned to either the viewport top or
+  // bottom (FixedToolbar). Use the injected `fixedToolbarBottomKey` flag
+  // (provided by FixedToolbar based on its `position` prop) to decide which
+  // way dropdowns pop — bottom bar → UPWARD, top bar → downward.
+  // Dropdowns are teleported to <body>, so we compute position:fixed coords
+  // using the viewport-relative button rect (escapes the .fixed-toolbar
+  // overflow:hidden clip).
   if (props.mobile) {
-    dropdownAbove.value = false;
-    dropdownMaxHeight.value = Math.max(120, spaceBelow);
-    const topVal = btnRect.bottom + margin;
-    if (kind === 'color') {
-      const vw = document.documentElement.clientWidth;
-      dropdownFixedRect.value = {
-        left: 8,
-        top: topVal,
-        right: Math.max(8, vw - btnRect.right),
-      };
+    const vh = document.documentElement.clientHeight;
+    const VIEWPORT_GAP = 10; // keep 10px from the viewport edge the dropdown grows toward
+    const popUpward = isFixedToolbarBottom.value;
+    if (popUpward) {
+      // Fixed at bottom — pop upward. Reserve VIEWPORT_GAP at the viewport top.
+      dropdownAbove.value = true;
+      dropdownMaxHeight.value = Math.max(120, spaceAbove - VIEWPORT_GAP);
+      const bottomVal = vh - btnRect.top + margin;
+      if (kind === 'color') {
+        const vw = document.documentElement.clientWidth;
+        dropdownFixedRect.value = {
+          left: 8,
+          bottom: bottomVal,
+          right: Math.max(8, vw - btnRect.right),
+        };
+      } else {
+        dropdownFixedRect.value = {
+          left: Math.max(8, btnRect.left),
+          bottom: bottomVal,
+        };
+      }
     } else {
-      dropdownFixedRect.value = {
-        left: Math.max(8, btnRect.left),
-        top: topVal,
-      };
+      // Fixed at top — pop downward. Reserve VIEWPORT_GAP at the viewport bottom.
+      dropdownAbove.value = false;
+      dropdownMaxHeight.value = Math.max(120, spaceBelow - VIEWPORT_GAP);
+      const topVal = btnRect.bottom + margin;
+      if (kind === 'color') {
+        const vw = document.documentElement.clientWidth;
+        dropdownFixedRect.value = {
+          left: 8,
+          top: topVal,
+          right: Math.max(8, vw - btnRect.right),
+        };
+      } else {
+        dropdownFixedRect.value = {
+          left: Math.max(8, btnRect.left),
+          top: topVal,
+        };
+      }
     }
     nextTick(updateScrollState);
     return;

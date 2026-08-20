@@ -136,7 +136,7 @@ body.theme-light {
   outline: none;
   position: relative;
   color: var(--be-text);
-  /* Flex column layout: TopToolbar (fixed-height) + editor-content (scrollable).
+  /* Flex column layout: FixedToolbar (fixed-height) + editor-content (scrollable).
      Background is intentionally left to the consumer (host page) so the
      editor can blend into the surrounding UI.  Set --be-bg or a background
      on the .block-editor element from the host stylesheet if needed. */
@@ -3294,12 +3294,13 @@ body.theme-dark .table-cell-inner {
   color: var(--be-text);
 }
 
-/* --- Top toolbar (TopToolbar.vue) -------------------------------------- */
-/* Top action bar — always visible, not limited to mobile mode.
+/* --- Fixed toolbar (FixedToolbar.vue) ---------------------------------- */
+/* Persistent action bar — always visible, not limited to mobile mode.
+   Position can be top (default on desktop) or bottom (default on mobile).
    Uses CSS variables so it adapts to light/dark theme automatically. */
 
 /* On mobile: hide the left handle gutter so content is flush-left, and
-   hide the block handle (plus/grip) — those actions move to TopToolbar. */
+   hide the block handle (plus/grip) — those actions move to FixedToolbar. */
 .block-editor.is-mobile .block-host {
   padding-left: 0;
 }
@@ -3308,9 +3309,9 @@ body.theme-dark .table-cell-inner {
   display: none !important;
 }
 
-/* The TopToolbar component itself — a horizontal bar at the top of the
-   editor, part of the flex layout (not fixed to the viewport). */
-.top-toolbar {
+/* The FixedToolbar component itself — a horizontal bar pinned to the top or
+   bottom of the editor, part of the flex layout (not fixed to the viewport). */
+.fixed-toolbar {
   position: relative;
   z-index: 60;
   flex-shrink: 0;
@@ -3327,16 +3328,32 @@ body.theme-dark .table-cell-inner {
   max-width: 100%;
 }
 
-/* Dark theme overrides for the top toolbar. */
-.theme-dark .top-toolbar {
+/* When placed at the bottom, mirror the border/shadow direction and
+   reorder via flex `order` so the bar appears below the content area
+   (DOM order stays FixedToolbar → editor-content for event/provide
+   correctness, but CSS reorders the visual layout). */
+.fixed-toolbar.fixed-toolbar--bottom {
+  order: 10;
+  border-bottom: 0;
+  border-top: 1px solid var(--be-border, #e0e0e0);
+  box-shadow: 0 -1px 4px rgb(0 0 0 / 0.06);
+}
+
+/* Dark theme overrides for the fixed toolbar. */
+.theme-dark .fixed-toolbar {
   background: var(--be-bg, #1f1f1f);
   color: #fff;
   border-bottom-color: rgba(255 255 255 / 0.1);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
 }
 
+.theme-dark .fixed-toolbar.fixed-toolbar--bottom {
+  border-top-color: rgba(255 255 255 / 0.1);
+  box-shadow: 0 -1px 4px rgb(0 0 0 / 0.3);
+}
+
 /* Left fixed section: plus + handle buttons. */
-.top-toolbar .tt-left {
+.fixed-toolbar .tt-left {
   display: flex;
   align-items: center;
   gap: 0;
@@ -3344,7 +3361,7 @@ body.theme-dark .table-cell-inner {
   padding: 0 2px;
 }
 
-.top-toolbar .tt-btn {
+.fixed-toolbar .tt-btn {
   background: transparent;
   border: 0;
   color: inherit;
@@ -3359,41 +3376,41 @@ body.theme-dark .table-cell-inner {
   -webkit-tap-highlight-color: transparent;
 }
 
-.top-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
+.fixed-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
   background: var(--be-hover, rgba(0 0 0 / 0.06));
 }
 
-.top-toolbar .tt-btn:active:not(.active) {
+.fixed-toolbar .tt-btn:active:not(.active) {
   background: var(--be-hover, rgba(0 0 0 / 0.08));
 }
 
-.top-toolbar .tt-btn.active {
+.fixed-toolbar .tt-btn.active {
   background: var(--be-accent);
   color: #fff;
 }
 
-.theme-dark .top-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
+.theme-dark .fixed-toolbar .tt-btn:hover:not(.disabled):not(:disabled):not(.active) {
   background: rgba(255 255 255 / 0.08);
 }
 
-.theme-dark .top-toolbar .tt-btn:active:not(.active) {
+.theme-dark .fixed-toolbar .tt-btn:active:not(.active) {
   background: rgba(255 255 255 / 0.16);
 }
 
-.theme-dark .top-toolbar .tt-btn.active {
+.theme-dark .fixed-toolbar .tt-btn.active {
   background: var(--be-accent);
   color: #fff;
 }
 
-.top-toolbar .tt-btn.disabled,
-.top-toolbar .tt-btn:disabled {
+.fixed-toolbar .tt-btn.disabled,
+.fixed-toolbar .tt-btn:disabled {
   opacity: 0.3;
   cursor: default;
   pointer-events: none;
 }
 
 /* Separator between fixed buttons and contextual buttons. */
-.top-toolbar .tt-sep {
+.fixed-toolbar .tt-sep {
   flex-shrink: 0;
   width: 1px;
   align-self: center;
@@ -3402,13 +3419,13 @@ body.theme-dark .table-cell-inner {
   margin: 0 4px;
 }
 
-.theme-dark .top-toolbar .tt-sep {
+.theme-dark .fixed-toolbar .tt-sep {
   background: rgba(255 255 255 / 0.15);
 }
 
-/* --- HoverToolbar in inline mode (embedded inside TopToolbar) ----------- */
+/* --- HoverToolbar in inline mode (embedded inside FixedToolbar) --------- */
 /* When the `mobile` prop is true, HoverToolbar is NOT teleported and NOT
-   absolutely positioned. It renders inline as a flex child of .top-toolbar,
+   absolutely positioned. It renders inline as a flex child of .fixed-toolbar,
    filling the remaining width and using the existing ht-content overflow /
    nav-button mechanism for horizontal scrolling. */
 
@@ -3516,7 +3533,7 @@ body.theme-dark .table-cell-inner {
 }
 
 /* Inline dropdowns: teleported to <body> with position:fixed so they are NOT
-   clipped by .top-toolbar's overflow:hidden. top/left/right are set
+   clipped by .fixed-toolbar's overflow:hidden. top/left/right are set
    via inline style using viewport-relative coords. */
 .ht-dropdown-mobile {
   position: fixed;

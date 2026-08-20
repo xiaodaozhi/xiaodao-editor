@@ -1151,4 +1151,9 @@ const doc = ref<DocumentData>({
 watch(() => doc, (newDoc) => {
   console.log(newDoc)
 })
+
+// Update document title based on locale (i18n)
+watch(locale, (v) => {
+  document.title = v === 'zh-CN' ? '小刀编辑器' : 'Xiaodao Editor'
+}, { immediate: true })
 </script>
