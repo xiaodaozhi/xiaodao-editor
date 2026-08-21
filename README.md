@@ -1,5 +1,7 @@
 # xiaodao-editor
 
+[中文](./README.ZH.md) | **English**
+
 Notion-style **block editor** for Vue 3 + TypeScript. Ships as a single
 zero-runtime-dependency package: a framework-agnostic core plus a Vue view
 layer. Every block type (paragraph, heading, list, code, …) is contributed
@@ -32,7 +34,7 @@ by an **extension**, so the core never switches on a block type.
   background color, indentation (0–10); image additionally carries
   `src`, `alt`, `title`, `width`, `height`, `caption`, `fileId`
 - **Slash menu** — `/` opens a searchable command palette; input rules
-  (`# `, `> `, `[] `, ```` ``` ````) convert blocks on the fly; `/image`
+  (`# `, `> `, `[] `, ``` ``` ````) convert blocks on the fly; `/image`
   opens the file picker
 - **Block manipulation** — drag handle, hover toolbar, `+` insert button,
   grip menu with duplicate / copy / cut / move up / move down / delete;
@@ -42,10 +44,26 @@ by an **extension**, so the core never switches on a block type.
   duplicate clones the whole subtree; image additionally exposes replace /
   remove / drag-resize corner handle with locked aspect ratio and editable
   caption
+- **Fixed toolbar** — persistent action bar with a contextual
+  **HoverToolbar** embedded inline (so text selection is preserved when
+  clicking formatting buttons). Supports three placement modes via the
+  `toolbarPosition` prop: `'auto'` (default — top on desktop, bottom on
+  mobile), `'top'` (always top), or `'bottom'` (always bottom). Menus
+  (PlusMenu / BlockSettingsMenu) open downward when the toolbar is at
+  the top.
+- **Sizing & internal scrolling** — constrain the editor with `width`
+  and `height` props (numbers are treated as pixels). The content area
+  scrolls vertically inside the editor instead of growing unbounded,
+  so embedding layouts stay in control of overflow.
 - **Clipboard** — clean copy/cut/paste of HTML and plain text; multi-block
   selection overlay; **HTML `<img>` / image-file paste + drag-and-drop
   automatically create image blocks** and dispatch the upload; selecting text
   and pasting a URL wraps it as a link
+- **Mobile support** — long-press to start text selection, then drag your
+  finger to select **across multiple independent `contenteditable` blocks**
+  via a hit-tested overlay (the native Selection API cannot cross block
+  boundaries). The fixed toolbar auto-drops to the bottom above the virtual
+  keyboard.
 - **History** — undo/redo with typing grouping (`Mod-Z` / `Mod-Shift-Z`);
   undo restores blocks but never resurrects transient upload state
 - **i18n** — `zh-CN` (default) and `en-US` via the `locale` prop; zero-dep
@@ -57,6 +75,11 @@ by an **extension**, so the core never switches on a block type.
   hierarchical list of every heading in the document; stays in sync as
   headings are added, removed, or edited; click an entry to jump to the
   heading; insert via slash menu `/table of contents`
+- **Markdown import / export** — the `Editor` instance exposes
+  `toMarkdown()` and `setDocFromMarkdown(string)`. Round-trips are
+  implemented natively on top of the live `DocState` (no intermediate
+  `BlockData` or external converter), so heading/list nesting, inline
+  code marks, and blank-line separation stay stable.
 
 ## Quick start
 
@@ -85,15 +108,18 @@ The editor ships with all 13 built-in extensions by default — no need to pass
 
 ## Props
 
-| Prop           | Type                                   | Default            | Description                                                                   |
-| -------------- | -------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
-| `modelValue`   | `DocumentData`                         | `{ blocks: [] }`   | The document JSON (two-way via `v-model`).                                    |
-| `extensions`   | `readonly Extension[]`                 | `BuiltinExtensions`| Extensions to register. Override to add custom blocks or strip built-ins.     |
-| `editable`     | `boolean`                              | `true`             | Read-only mode when `false`.                                                  |
-| `placeholder`  | `string`                               | locale-aware       | Placeholder for the first empty block. Defaults to a localized string.        |
-| `theme`        | `'light' \| 'dark'`                    | `'light'`          | Color theme. The class is applied to `.block-editor` and synced to `<body>`.  |
-| `locale`       | `'zh-CN' \| 'en-US'`                   | `'zh-CN'`          | UI language. Any non-empty value other than `'zh-CN'` ⇒ `'en-US'`.            |
-| `uploadImage`  | `UploadImageHandler`                   | in-memory mock     | Hook for image uploads. Signature: `(name, file, controller, onProgress) => Promise<ImageUploadResult>`. Consumers **must** provide this if they intend to persist documents (the default mock stores `blob:` URLs which are not serialisable). |
+| Prop              | Type                                   | Default            | Description                                                                   |
+| ----------------- | -------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `modelValue`      | `DocumentData`                         | `{ blocks: [] }`   | The document JSON (two-way via `v-model`).                                    |
+| `extensions`      | `readonly Extension[]`                 | `BuiltinExtensions`| Extensions to register. Override to add custom blocks or strip built-ins.     |
+| `editable`        | `boolean`                              | `true`             | Read-only mode when `false`.                                                  |
+| `placeholder`     | `string`                               | locale-aware       | Placeholder for the first empty block. Defaults to a localized string.        |
+| `theme`           | `'light' \| 'dark'`                    | `'light'`          | Color theme. The class is applied to `.block-editor` and synced to `<body>`.  |
+| `locale`          | `'zh-CN' \| 'en-US'`                   | `'zh-CN'`          | UI language. Any non-empty value other than `'zh-CN'` ⇒ `'en-US'`.            |
+| `uploadImage`     | `UploadImageHandler`                   | in-memory mock     | Hook for image uploads. Signature: `(name, file, controller, onProgress) => Promise<ImageUploadResult>`. Consumers **must** provide this if they intend to persist documents (the default mock stores `blob:` URLs which are not serialisable). |
+| `width`           | `string \| number`                     | `undefined`        | Optional fixed width. A number is interpreted as CSS pixels; a string is used as-is (e.g. `'800px'`, `'100%'`). When unset, the editor fills its container (`width: 100%`). |
+| `height`          | `string \| number`                     | `undefined`        | Optional fixed height. When set, the editor scrolls its content area **internally** rather than growing unbounded; when unset the editor grows with content and the host page scrolls. |
+| `toolbarPosition` | `'auto' \| 'top' \| 'bottom'`          | `'auto'`           | Placement of the persistent `FixedToolbar`. `'auto'` = top on desktop, bottom on mobile (above the virtual keyboard). |
 
 ### Emits
 
@@ -104,9 +130,9 @@ The editor ships with all 13 built-in extensions by default — no need to pass
 
 ### Expose
 
-| Member   | Type     | Description                              |
-| -------- | -------- | ---------------------------------------- |
-| `editor` | `Editor` | The framework-agnostic `Editor` instance.|
+| Member   | Type     | Description                                                                                                                                          |
+| -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `editor` | `Editor` | The framework-agnostic `Editor` instance. Useful methods: <br>`toData(): DocumentData` — export JSON. <br>`setDocument(json: DocumentData)` — replace JSON. <br>`toMarkdown(): string` — export native Markdown. <br>`setDocFromMarkdown(md: string)` — import native Markdown (resets history). |
 
 ## Theming
 
@@ -274,11 +300,14 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
 
 - **`src/core/`** — framework-agnostic engine (zero Vue imports, enforced by
   ESLint). Owns the document model, transactions, history, commands, schema,
-  and extension registries.
+  extension registries, and **native Markdown import/export**
+  (`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()` — operates straight
+  on `DocState`, no intermediate `BlockData`).
 - **`src/view/`** — Vue bridge: `BlockEditor.vue` (root), `BlockList`,
   `BlockHost`, `BlockContent` (per-block `contenteditable`), and the UI
   components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
-  `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`).
+  `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, `LinkPopover`,
+  `FixedToolbar`).
 - **`src/extensions/`** — the 13 built-in extensions plus `_commonAttrs.ts`
   (shared align/color/bgColor/indent specs and color presets, plus
   `ImageExtension`'s upload-side-channel renderer logic). **Table** lives in
@@ -297,7 +326,8 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
 pnpm install
 pnpm dev          # playground at http://localhost:5173
 pnpm typecheck    # vue-tsc --noEmit
-pnpm build        # vue-tsc --noEmit && vite build
+pnpm build        # vue-tsc --noEmit && vite build  → library dist/
+pnpm build:demo   # vue-tsc --noEmit && vite build --mode demo  → demo dist-demo/ (playground/App.vue)
 pnpm lint         # eslint --fix
 ```
 
