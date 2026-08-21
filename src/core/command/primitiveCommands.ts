@@ -1301,6 +1301,12 @@ function toggleMarkCommand(ctx: Ctx): CommandEntry<ToggleMarkArgs> {
       const builder = createTransaction();
       builder.setText(args.id, newContent);
       builder.setMeta({ addToHistory: true });
+      // Preserve selection explicitly: toggleMark does not move the caret or
+      // change the selection range — it only toggles inline marks. Writing
+      // this down means applyTransaction() doesn't rely on the implicit
+      // `state.selection` fallback, killing any subtle bugs where plugins
+      // or focus changes cause a transient "fallback to first block".
+      builder.setSelection(state.selection);
       // Intentionally NOT calling skipDomWrite — the DOM must re-render to
       // show the new mark tags.
       dispatch?.(builder.build());
@@ -1408,6 +1414,10 @@ function setInlineMarkCommand(ctx: Ctx): CommandEntry<SetInlineMarkArgs> {
       const builder = createTransaction();
       builder.setText(args.id, newContent);
       builder.setMeta({ addToHistory: true });
+      // Same rationale as toggleMark: preserve the editor selection so any
+      // transient focus / DOM selection quirk during the toolbar action
+      // window can't accidentally fall back to a different block id.
+      builder.setSelection(state.selection);
       dispatch?.(builder.build());
       return true;
     },

@@ -796,6 +796,11 @@ function markToolbarInteracting(): void {
   toolbarInteractingTimer = setTimeout(() => {
     toolbarInteracting = false;
     toolbarInteractingTimer = null;
+    // Protection window is closed. Re-run selection sync once to ensure any
+    // selection-restore that happened DURING the protected window (and was
+    // therefore skipped for the "clear" paths) is now re-evaluated so
+    // hoverToolbar lands on the correct final visible=true / rect state.
+    onDocumentSelectionChange();
   }, 500);
 }
 
@@ -1343,7 +1348,17 @@ const unsubscribe = editor.subscribe((update) => {
       }
     }
   }
-  setFocusedBlock(finalFocused);
+  // During toolbar interaction (bold / color / type buttons, …) the DOM is
+  // often in a transitive state where innerHTML has been rewritten but the
+  // native selection hasn't been restored yet, and plugins or selection
+  // fallbacks can briefly produce nonsensical focus signals. Ignore any
+  // attempt to move focusedBlockId during the 500ms grace period — the
+  // block the user had focused before clicking the toolbar is the correct
+  // one and we don't want to flash "Heading 1" / first-block UI because of
+  // it.
+  if (!toolbarInteracting) {
+    setFocusedBlock(finalFocused);
+  }
   if (!suppressSelectionSync && sel !== prevSelection) {
     if (skipNextSelectionApply) {
       skipNextSelectionApply = false;
@@ -2605,7 +2620,14 @@ function onDocumentSelectionChange(): void {
         nextFocused = null;
       }
     }
-    if (nextFocused !== null) {
+    // [Guard 3] Refuse ANY focus change during the toolbar interaction
+    // grace period — even legit-looking ones. Clicking a bold/italic/type
+    // button inside FixedToolbar sometimes fires a transient focusin /
+    // selectionchange combo that briefly points at a DIFFERENT block (e.g.
+    // the document's first block) before the action's own selection restores
+    // things. Skipping setFocusedBlock here keeps the previously-focused
+    // block stable so the type dropdown doesn't flash "一级标题".
+    if (nextFocused !== null && !toolbarInteracting) {
       setFocusedBlock(nextFocused);
     }
   }
@@ -2629,11 +2651,15 @@ function onDocumentSelectionChange(): void {
     return;
   }
   // Grace period: when the user is interacting with the FixedToolbar buttons,
-  // the browser may have just collapsed the text selection. Keep the toolbar
-  // visible for a short window so the button action can complete.
-  if (toolbarInteracting) {
-    return;
-  }
+  // the browser fires selectionchange (collapsing / emptying the text
+  // selection) before the click action completes. We only want to GUARD
+  // against the "hide toolbar / null out rect" destructive assignments
+  // below — we still allow the POSITIVE "set visible=true + fill rect"
+  // branch at the bottom to run freely, so that selection-restore after
+  // BlockContent's innerHTML rewrite always materialises into state.
+  // Accordingly, there is no blanket `return;` here; each destructive
+  // site checks the flag on its own.
+  //
   // A block selection (e.g. a selected image) is active but the caret has
   // moved into a text block — a plain click into contenteditable dispatches
   // no editor transaction, so the selection state would stay stuck on the
@@ -2651,24 +2677,30 @@ function onDocumentSelectionChange(): void {
   }
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
-    hoverToolbar.blockType = null;
-    hoverToolbar.blockAttrs = {};
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+      hoverToolbar.blockType = null;
+      hoverToolbar.blockAttrs = {};
+    }
     return;
   }
   const range = sel.getRangeAt(0);
   if (range.collapsed) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+    }
     return;
   }
   if (!root.contains(range.commonAncestorContainer)) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+    }
     return;
   }
   // Change 5: don't show toolbar while mouse button is held down (dragging).
@@ -2681,27 +2713,33 @@ function onDocumentSelectionChange(): void {
     ? (anchorNode as HTMLElement).closest<HTMLElement>('.table-cell-inner')
     : (anchorNode?.parentElement?.closest<HTMLElement>('.table-cell-inner')));
   if (cellInner) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
-    hoverToolbar.blockType = null;
-    hoverToolbar.blockAttrs = {};
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+      hoverToolbar.blockType = null;
+      hoverToolbar.blockAttrs = {};
+    }
     return;
   }
   const contentEl = (anchorNode?.nodeType === 1
     ? (anchorNode as HTMLElement).closest<HTMLElement>('.block-content')
     : (anchorNode?.parentElement?.closest<HTMLElement>('.block-content')));
   if (!contentEl) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+    }
     return;
   }
   const blockId = contentEl.getAttribute('data-block-id') as BlockId | null;
   if (!blockId) {
-    hoverToolbar.visible = false;
-    hoverToolbar.selectionRect = null;
-    hoverToolbar.blockId = null;
+    if (!toolbarInteracting) {
+      hoverToolbar.visible = false;
+      hoverToolbar.selectionRect = null;
+      hoverToolbar.blockId = null;
+    }
     return;
   }
   const doc = editor.getState().doc;

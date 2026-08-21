@@ -408,7 +408,7 @@
                 class="bsm-swatch"
                 :class="{ 'active': currentColor === c.key, 'bsm-disabled': colorsDisabled }"
                 :title="t(c.key === 'default' ? 'color.default' : 'color.' + c.key)"
-                :style="{ backgroundColor: c.cssValue }"
+                :style="{ backgroundColor: c.displayCssValue ?? c.cssValue }"
                 :disabled="colorsDisabled"
                 @mousedown.prevent="!colorsDisabled && onPick({ id: `tc-${c.key}`, run: () => setTextColor(c.key) })"
               />
@@ -454,9 +454,12 @@
                 v-for="c in bgColors"
                 :key="'bc-' + c.key"
                 class="bsm-swatch"
-                :class="{ 'active': currentBgColor === c.key, 'bsm-disabled': colorsDisabled }"
+                :class="[
+                  { 'active': currentBgColor === c.key, 'bsm-disabled': colorsDisabled },
+                  c.key === 'default' ? 'bsm-swatch--none' : '',
+                ]"
                 :title="t(c.key === 'default' ? 'color.none' : 'color.' + c.key)"
-                :style="{ backgroundColor: c.cssValue }"
+                :style="{ backgroundColor: c.displayCssValue ?? c.cssValue }"
                 :disabled="colorsDisabled"
                 @mousedown.prevent="!colorsDisabled && onPick({ id: `bc-${c.key}`, run: () => setBgColor(c.key) })"
               />

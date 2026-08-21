@@ -2,6 +2,11 @@
 
 [中文](./README.ZH.md) | **English**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Vue 3.4+](https://img.shields.io/badge/Vue-3.4+-42b883.svg)](https://vuejs.org/)
+[![TypeScript 5.4+](https://img.shields.io/badge/TypeScript-5.4+-3178C6.svg)](https://www.typescriptlang.org/)
+[![Vite 5.0+](https://img.shields.io/badge/Vite-5.0+-646CFF.svg)](https://vitejs.dev/)
+
 Notion-style **block editor** for Vue 3 + TypeScript. Ships as a single
 zero-runtime-dependency package: a framework-agnostic core plus a Vue view
 layer. Every block type (paragraph, heading, list, code, …) is contributed

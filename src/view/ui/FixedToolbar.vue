@@ -122,10 +122,14 @@
       class="tt-sep"
     />
     <!-- HoverToolbar (inline mode) — renders ALL contextual buttons.
-         v-bind spreads the descriptor (props + onXxx handlers). -->
+         v-bind spreads the descriptor (props + onXxx handlers).
+         @interacting arms BlockEditor's 500ms selection grace period even
+         for Teleported dropdown content (whose clicks don't bubble through
+         FixedToolbar's @mousedown.capture root listener). -->
     <HoverToolbar
       mobile
       v-bind="descriptor"
+      @interacting="emit('toolbarInteracting')"
     />
   </div>
 </template>
@@ -196,12 +200,32 @@ const lastTextDescriptor = ref<FixedToolbarDescriptor | null>(null);
 // Update the text-descriptor cache synchronously when a text selection is
 // active (and no table descriptor takes priority). flush:'sync' ensures the
 // cache is up to date before the `descriptor` computed re-evaluates.
+//
+// Defensive guards:
+//  1. Never overwrite a VALID cached descriptor with a broken one where
+//     hoverVisible=true but selectionRect is null. That transient state
+//     sometimes appears during command apply → DOM rewrite cycles and
+//     would cause Priority-3 fallback to also run with a null rect =
+//     marksDisabled=true (the "整体禁用" bug).
+//  2. When hoverVisible drops to false, don't clear the cache immediately
+//     because the 500ms toolbarInteracting grace period usually protects
+//     the selection state. Instead, start a short lazy-clear timer so the
+//     cache survives typical command-apply windows (~20–200ms) but is still
+//     cleaned up within a couple seconds of the user actually moving away.
+let lazyClearTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  [tableBridge, () => props.hoverVisible],
+  [tableBridge, () => props.hoverVisible, () => props.hoverSelectionRect],
   () => {
     const td = tableBridge.value;
     if (td && td.visible) return; // table takes priority, don't cache text
     if (props.hoverVisible) {
+      // Cancel any pending lazy clear — selection came back.
+      if (lazyClearTimer) {
+        clearTimeout(lazyClearTimer);
+        lazyClearTimer = null;
+      }
+      // Guard #1: if selectionRect is null, keep previous valid cache.
+      if (props.hoverSelectionRect === null) return;
       lastTextDescriptor.value = {
         visible: true,
         selectionRect: props.hoverSelectionRect,
@@ -212,6 +236,15 @@ watch(
         onClose: () => emit('hoverClose'),
         onLinkClick: (blockId: BlockId, from: number, to: number) => emit('linkClick', blockId, from, to),
       };
+    } else {
+      // Guard #2: lazy-clear after 1.5s so command-apply teardown never
+      // empties the cache synchronously.
+      if (lastTextDescriptor.value && !lazyClearTimer) {
+        lazyClearTimer = setTimeout(() => {
+          lastTextDescriptor.value = null;
+          lazyClearTimer = null;
+        }, 1500);
+      }
     }
   },
   { immediate: true, flush: 'sync' },
@@ -312,10 +345,12 @@ function onHandleClick(): void {
 // Invalidate the cached text descriptor when the focus block changes.
 // This prevents stale cached data from showing buttons for a block the
 // user has navigated away from.
+// NOTE: When newId is null (focus temporarily lost, e.g. clicking toolbar),
+// we KEEP the cache so selection-based toolbar buttons don't flash disabled.
 watch(() => props.focusBlockId, (newId, oldId) => {
   if (newId !== oldId && lastTextDescriptor.value) {
     const cached = lastTextDescriptor.value;
-    if (cached.blockId !== newId) {
+    if (newId !== null && cached.blockId !== newId) {
       lastTextDescriptor.value = null;
     }
   }

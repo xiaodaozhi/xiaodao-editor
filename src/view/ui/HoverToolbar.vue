@@ -973,7 +973,7 @@
                         class="ht-swatch"
                         :class="{ active: activeColor === c.key }"
                         :title="t(c.key === 'default' ? 'color.default' : 'color.' + c.key)"
-                        :style="{ backgroundColor: c.cssValue }"
+                        :style="{ backgroundColor: c.displayCssValue ?? c.cssValue }"
                         @mousedown.prevent.stop="onTextColorPick(c.key)"
                       />
                     </div>
@@ -987,9 +987,12 @@
                         v-for="c in bgColors"
                         :key="'bc-' + c.key"
                         class="ht-swatch"
-                        :class="{ active: activeBgColor === c.key }"
+                        :class="[
+                          { active: activeBgColor === c.key },
+                          c.key === 'default' ? 'ht-swatch--none' : '',
+                        ]"
                         :title="t(c.key === 'default' ? 'color.none' : 'color.' + c.key)"
-                        :style="{ backgroundColor: c.cssValue }"
+                        :style="{ backgroundColor: c.displayCssValue ?? c.cssValue }"
                         @mousedown.prevent.stop="onBgColorPick(c.key)"
                       />
                     </div>
@@ -1262,6 +1265,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  interacting: [];
   linkClick: [blockId: BlockId, from: number, to: number];
   delete: [];
   merge: [];
@@ -2060,6 +2064,7 @@ useMenuScroll(scrollEl, updateScrollState);
 // --- Actions --------------------------------------------------------------
 
 function onTypePick(opt: TypeOption): void {
+  emit('interacting');
   if (props.tableMode || props.cellEditMode) {
     // Map heading + level to table cell type (heading1, heading2, etc.)
     // so the TableBlock renderer can store the correct cellType.
@@ -2096,6 +2101,7 @@ function onTypePick(opt: TypeOption): void {
 }
 
 function onAlignPick(align: AlignValue): void {
+  emit('interacting');
   if (props.tableMode || props.cellEditMode) {
     emit('tableAlign', align);
     openDropdown.value = null;
@@ -2124,6 +2130,7 @@ function onVerticalAlignPick(verticalAlign: VerticalAlignValue): void {
 }
 
 function onTextColorPick(key: string): void {
+  emit('interacting');
   if (props.tableMode) {
     emit('tableTextColor', key === 'default' ? null : key);
     openDropdown.value = null;
@@ -2213,6 +2220,7 @@ function onTextColorPick(key: string): void {
 }
 
 function onBgColorPick(key: string): void {
+  emit('interacting');
   if (props.tableMode) {
     emit('tableBgColor', key === 'default' ? null : key);
     openDropdown.value = null;
@@ -2476,6 +2484,7 @@ function serializeCrossBlock(): { text: string; html: string } | null {
 }
 
 function onToggleMark(markType: string): void {
+  emit('interacting');
   if (props.tableMode) {
     emit('tableMark', markType);
     return;
@@ -2559,6 +2568,10 @@ function onToggleMark(markType: string): void {
 }
 
 function onLinkClick(): void {
+  emit('interacting');
+  // Close any already-open dropdown menus (color / type / align) before
+  // opening LinkPopover — otherwise they stack visually on top of each other.
+  openDropdown.value = null;
   // Cell edit mode: emit linkClick with dummy offsets. The TableBlock
   // renderer reads the selection directly from window.getSelection() to
   // open the LinkPopover, so offsets are not needed.

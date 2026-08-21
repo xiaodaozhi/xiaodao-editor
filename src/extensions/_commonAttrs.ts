@@ -102,6 +102,10 @@ export interface ColorPreset {
   readonly cssValue: string;
   /** Background opacity (0-1). Only meaningful for bg color presets. */
   readonly opacity: number;
+  /** Optional override for color picker swatch display. The applied text
+   *  highlight keeps using cssValue. Used for bg colors where the 15% tint
+   *  is invisible in the picker UI. Falls back to cssValue when omitted. */
+  readonly displayCssValue?: string;
 }
 
 export const TEXT_COLOR_PRESETS: readonly ColorPreset[] = [
@@ -119,13 +123,13 @@ export const TEXT_COLOR_PRESETS: readonly ColorPreset[] = [
 
 export const BG_COLOR_PRESETS: readonly ColorPreset[] = [
   { key: 'default', label: 'None', cssValue: 'transparent', opacity: 0 },
-  { key: 'gray', label: 'Gray', cssValue: 'var(--be-swatch-bg-gray)', opacity: 0.15 },
-  { key: 'brown', label: 'Brown', cssValue: 'var(--be-swatch-bg-brown)', opacity: 0.18 },
-  { key: 'orange', label: 'Orange', cssValue: 'var(--be-swatch-bg-orange)', opacity: 0.18 },
-  { key: 'yellow', label: 'Yellow', cssValue: 'var(--be-swatch-bg-yellow)', opacity: 0.18 },
-  { key: 'green', label: 'Green', cssValue: 'var(--be-swatch-bg-green)', opacity: 0.18 },
-  { key: 'blue', label: 'Blue', cssValue: 'var(--be-swatch-bg-blue)', opacity: 0.18 },
-  { key: 'purple', label: 'Purple', cssValue: 'var(--be-swatch-bg-purple)', opacity: 0.18 },
-  { key: 'pink', label: 'Pink', cssValue: 'var(--be-swatch-bg-pink)', opacity: 0.18 },
-  { key: 'red', label: 'Red', cssValue: 'var(--be-swatch-bg-red)', opacity: 0.18 },
+  { key: 'gray', label: 'Gray', cssValue: 'var(--be-swatch-bg-gray)', opacity: 0.15, displayCssValue: 'var(--be-swatch-display-bg-gray)' },
+  { key: 'brown', label: 'Brown', cssValue: 'var(--be-swatch-bg-brown)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-brown)' },
+  { key: 'orange', label: 'Orange', cssValue: 'var(--be-swatch-bg-orange)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-orange)' },
+  { key: 'yellow', label: 'Yellow', cssValue: 'var(--be-swatch-bg-yellow)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-yellow)' },
+  { key: 'green', label: 'Green', cssValue: 'var(--be-swatch-bg-green)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-green)' },
+  { key: 'blue', label: 'Blue', cssValue: 'var(--be-swatch-bg-blue)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-blue)' },
+  { key: 'purple', label: 'Purple', cssValue: 'var(--be-swatch-bg-purple)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-purple)' },
+  { key: 'pink', label: 'Pink', cssValue: 'var(--be-swatch-bg-pink)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-pink)' },
+  { key: 'red', label: 'Red', cssValue: 'var(--be-swatch-bg-red)', opacity: 0.18, displayCssValue: 'var(--be-swatch-display-bg-red)' },
 ];
