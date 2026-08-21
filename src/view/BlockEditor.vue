@@ -800,7 +800,14 @@ function markToolbarInteracting(): void {
     // selection-restore that happened DURING the protected window (and was
     // therefore skipped for the "clear" paths) is now re-evaluated so
     // hoverToolbar lands on the correct final visible=true / rect state.
-    onDocumentSelectionChange();
+    //
+    // `force:true` bypasses the `isMouseDown` early return: the 500ms timer
+    // fires when the user might still be holding down a toolbar button
+    // (outside the contenteditable area) — we want to materialise any
+    // legitimate still-existing DOM selection into hoverToolbar state so
+    // the toolbar buttons don't stay disabled until the next mouseup click
+    // cycle re-runs selectionchange.
+    onDocumentSelectionChange({ force: true });
   }, 500);
 }
 
@@ -2598,7 +2605,19 @@ function stripSlashPrefix(text: string): string {
 
 // --- Hover toolbar: show on mouseup, not during drag -------------------
 
-function onDocumentSelectionChange(): void {
+function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): void {
+  // The same function is used for both:
+  //   1. document.addEventListener('selectionchange', onDocumentSelectionChange)
+  //      → first arg is an Event object (we never use it; we re-read from
+  //        window.getSelection() directly inside).
+  //   2. Internal programmatic calls from markToolbarInteracting timeout etc.
+  //      → first arg is `{ force: true }` (or `{}`) to request bypassing
+  //        the `isMouseDown` drag-suppression guard.
+  // Detect which case we're in by checking if the arg looks like our opts.
+  let force = false;
+  if (_eventOrOpts && typeof _eventOrOpts === 'object' && !('type' in _eventOrOpts)) {
+    force = Boolean((_eventOrOpts as { force?: boolean }).force);
+  }
   const editorRoot = rootEl.value;
   if (editorRoot) {
     const domSel = window.getSelection();
@@ -2676,8 +2695,31 @@ function onDocumentSelectionChange(): void {
     }
   }
   const sel = window.getSelection();
+  // Destructive "clear hoverToolbar state" exits below — each is guarded by
+  // BOTH !toolbarInteracting AND !isMouseDown. Why two flags?
+  //   * `toolbarInteracting` covers the 500ms window AFTER a FixedToolbar /
+  //     HoverToolbar button mousedown: click inside a teleported dropdown or
+  //     button fires selectionchange synchronously while the command is still
+  //     applying; clearing state here would cause the "toolbar flashes
+  //     disabled" bug because the POSITIVE branch at the bottom hasn't fired
+  //     yet for the post-command restored selection.
+  //   * `isMouseDown` covers everything BEFORE a mouseup — i.e. the user is
+  //     actively DRAGGING inside contenteditable to extend/shrink the text
+  //     selection, or is still HOLDING a toolbar button down (no mouseup yet
+  //     → no click handler fired → no command run → no POSITIVE refill). In
+  //     either case, native selectionchange fires continuously with transient
+  //     collapsed / no-range / wrong-ancestor snapshots; wiping state on each
+  //     would kill the POSITIVE state the user saw on the previous mouseup,
+  //     and when combined with FixedToolbar's lazy-clear timer (1.5s) a long
+  //     enough button hold would clear the cache *despite* the 500ms
+  //     protection, locking the toolbar on the Priority-4 focused-block
+  //     fallback with all buttons disabled.
+  // NOTE: the POSITIVE branch at the bottom (visible=true + fill rect + block
+  // info) never checks either flag — selection-restore during command apply
+  // must always be allowed to populate state so subsequent lazy-clear runs
+  // find a valid descriptor to latch on to.
   if (!sel || sel.rangeCount === 0) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;
@@ -2688,7 +2730,7 @@ function onDocumentSelectionChange(): void {
   }
   const range = sel.getRangeAt(0);
   if (range.collapsed) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;
@@ -2696,15 +2738,16 @@ function onDocumentSelectionChange(): void {
     return;
   }
   if (!root.contains(range.commonAncestorContainer)) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;
     }
     return;
   }
-  // Change 5: don't show toolbar while mouse button is held down (dragging).
-  if (isMouseDown) return;
+  // Drag-in-progress suppression inside editor content (NOT the force:true
+  // post-timeout resync case — see inlined comment).
+  if (isMouseDown && !force) return;
   const anchorNode = sel.anchorNode;
   // If the selection is inside a table cell's contenteditable, the TableBlock
   // renderer manages its own HoverToolbar (cellEditMode). Skip the editor-level
@@ -2713,7 +2756,7 @@ function onDocumentSelectionChange(): void {
     ? (anchorNode as HTMLElement).closest<HTMLElement>('.table-cell-inner')
     : (anchorNode?.parentElement?.closest<HTMLElement>('.table-cell-inner')));
   if (cellInner) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;
@@ -2726,7 +2769,7 @@ function onDocumentSelectionChange(): void {
     ? (anchorNode as HTMLElement).closest<HTMLElement>('.block-content')
     : (anchorNode?.parentElement?.closest<HTMLElement>('.block-content')));
   if (!contentEl) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;
@@ -2735,7 +2778,7 @@ function onDocumentSelectionChange(): void {
   }
   const blockId = contentEl.getAttribute('data-block-id') as BlockId | null;
   if (!blockId) {
-    if (!toolbarInteracting) {
+    if (!toolbarInteracting && !isMouseDown) {
       hoverToolbar.visible = false;
       hoverToolbar.selectionRect = null;
       hoverToolbar.blockId = null;

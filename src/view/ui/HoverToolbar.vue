@@ -28,6 +28,7 @@
       :class="{ visible, 'mobile-shell': mobile, 'mobile-visible': mobile && visible }"
       :style="mobile ? undefined : shellStyle"
       :aria-hidden="!visible"
+      @mousedown.prevent.capture="onShellMouseDownCapture"
     >
       <div
         ref="toolbarEl"
@@ -1280,6 +1281,10 @@ const emit = defineEmits<{
   tableBgColor: [color: string | null];
   tableCopy: [];
 }>();
+
+function onShellMouseDownCapture() {
+  emit('interacting');
+}
 
 const { t } = useI18n();
 

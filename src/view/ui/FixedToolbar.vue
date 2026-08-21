@@ -33,7 +33,7 @@
     :class="{ 'fixed-toolbar--bottom': isBottom }"
     role="toolbar"
     :aria-label="t('hoverToolbar.label')"
-    @mousedown.capture="$emit('toolbarInteracting')"
+    @mousedown.prevent.capture="onRootMouseDownCapture"
   >
     <!-- Left: plus + handle (fixed, always visible when a focus block exists) -->
     <div class="tt-left">
@@ -167,6 +167,10 @@ const emit = defineEmits<{
   toolbarInteracting: [];
 }>();
 
+function onRootMouseDownCapture(_: MouseEvent) {
+  emit('toolbarInteracting');
+}
+
 const { t } = useI18n();
 const editable = useEditable();
 const editor = useEditor();
@@ -201,6 +205,60 @@ const lastTextDescriptor = ref<FixedToolbarDescriptor | null>(null);
 // active (and no table descriptor takes priority). flush:'sync' ensures the
 // cache is up to date before the `descriptor` computed re-evaluates.
 //
+// Climb from a DOM node to the nearest .block-content contained by the
+// editor root. Extracted out of the lazy-clear callback so it's only
+// created once per component instead of fresh on every watch fire.
+const findBlockContentEl = (node: Node | null | undefined): HTMLElement | null => {
+  if (!node) return null;
+  const el: HTMLElement | null = (node.nodeType === 1
+    ? node as HTMLElement
+    : node.parentElement) as HTMLElement | null;
+  if (!el) return null;
+  const ce = el.closest<HTMLElement>('.block-content');
+  if (ce && (props.rootEl?.contains(ce) ?? false)) return ce;
+  return null;
+};
+
+// Lazy-clear callback for lastTextDescriptor. Re-schedules itself every
+// 1500ms as long as a valid non-collapsed DOM text selection still exists
+// inside the editor root — this way a user holding a toolbar button down
+// (no selectionchange events, no POSITIVE-FILL refresh) won't have the
+// cache wiped from under them mid-hold.
+let lazyClearTimer: ReturnType<typeof setTimeout> | null = null;
+const maybeClearCache = () => {
+  if (!lastTextDescriptor.value) {
+    lazyClearTimer = null;
+    return;
+  }
+  try {
+    const s = window.getSelection();
+    if (s && s.rangeCount > 0) {
+      const r = s.getRangeAt(0);
+      if (!r.collapsed) {
+        // Check all four "selection endpoints" — some browsers shift
+        // anchor/focus around button interactions even though the logical
+        // range is still inside content, and forward vs reverse selections
+        // can put different nodes in anchor vs focus. startContainer +
+        // endContainer cover the range boundaries themselves (independent
+        // of direction).
+        const alive = [s.anchorNode, s.focusNode, r.startContainer, r.endContainer]
+          .some((n) => findBlockContentEl(n) !== null);
+        if (alive) {
+          lazyClearTimer = setTimeout(maybeClearCache, 1500);
+          return;
+        }
+      }
+    }
+  } catch {
+    // Selection API occasionally throws in edge cases (cross-origin iframes,
+    // detached DOM, etc.). Treat as "no valid selection" and proceed to
+    // clear the cache — worst case the toolbar briefly disables until the
+    // next POSITIVE-FILL from a real selectionchange.
+  }
+  lastTextDescriptor.value = null;
+  lazyClearTimer = null;
+};
+
 // Defensive guards:
 //  1. Never overwrite a VALID cached descriptor with a broken one where
 //     hoverVisible=true but selectionRect is null. That transient state
@@ -212,9 +270,23 @@ const lastTextDescriptor = ref<FixedToolbarDescriptor | null>(null);
 //     the selection state. Instead, start a short lazy-clear timer so the
 //     cache survives typical command-apply windows (~20–200ms) but is still
 //     cleaned up within a couple seconds of the user actually moving away.
-let lazyClearTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  [tableBridge, () => props.hoverVisible, () => props.hoverSelectionRect],
+  [
+    tableBridge,
+    () => props.hoverVisible,
+    () => props.hoverSelectionRect,
+    // CRITICAL FIX: hoverBlockId / hoverBlockType / hoverBlockAttrs are set
+    // SEPARATELY from hoverVisible inside BlockEditor's POSITIVE-FILL path.
+    // Without listing them here, Vue fires the watch when visible=true but
+    // the other three are still stale (null / heading from a previous block),
+    // so the cache ends up with blockId=null + blockType=heading even though
+    // POSITIVE-FILL is about to set them to the real values. This caused the
+    // type dropdown to flash "一级标题" and, when combined with LAZY-CLEAR,
+    // locked the toolbar into the Priority-4 disabled fallback.
+    () => props.hoverBlockId,
+    () => props.hoverBlockType,
+    () => props.hoverBlockAttrs,
+  ],
   () => {
     const td = tableBridge.value;
     if (td && td.visible) return; // table takes priority, don't cache text
@@ -226,6 +298,16 @@ watch(
       }
       // Guard #1: if selectionRect is null, keep previous valid cache.
       if (props.hoverSelectionRect === null) return;
+      // Guard #1.5: all four "identity" props must be non-null / non-empty
+      // before we overwrite the cache. POSITIVE-FILL assigns them one by one
+      // (visible → rect → blockId → blockType → attrs) and each assignment
+      // triggers this watch independently (because of flush:'sync'). By
+      // refusing to write until blockId and blockType have arrived from the
+      // POSITIVE-FILL, we guarantee the cache never contains a mixture of
+      // new visible + stale identity props.
+      if (props.hoverBlockId === null || props.hoverBlockType === null) {
+        return;
+      }
       lastTextDescriptor.value = {
         visible: true,
         selectionRect: props.hoverSelectionRect,
@@ -240,10 +322,7 @@ watch(
       // Guard #2: lazy-clear after 1.5s so command-apply teardown never
       // empties the cache synchronously.
       if (lastTextDescriptor.value && !lazyClearTimer) {
-        lazyClearTimer = setTimeout(() => {
-          lastTextDescriptor.value = null;
-          lazyClearTimer = null;
-        }, 1500);
+        lazyClearTimer = setTimeout(maybeClearCache, 1500);
       }
     }
   },
