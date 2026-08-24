@@ -209,6 +209,67 @@ const TableBlock = defineComponent({
     // to the bridge so FixedToolbar can render a single HoverToolbar in inline mode.
     const fixedToolbarBridge = inject(fixedToolbarBridgeKey, null);
 
+    // ---------------------------------------------------------------------
+    // Bridge publish helper (render-side side-effect guard).
+    //
+    // NEVER write `fixedToolbarBridge.value` synchronously inside the render
+    // function: assigning a fresh descriptor object on every render makes
+    // FixedToolbar re-render (its `descriptor` computed depends on the
+    // bridge), which can re-trigger this table's render via ResizeObserver /
+    // measureOffsets — an infinite render loop. In dev builds Vue's
+    // RECURSION_LIMIT=100 guard stops it (only a warning); in production
+    // builds that guard is compiled out, so the page freezes.
+    //
+    // Correct pattern: compute the descriptor in render, then PUBLISH it
+    // after the render flush (nextTick) with content-signature dedupe so a
+    // re-render with identical content does not re-assign a new object.
+    // ---------------------------------------------------------------------
+    let lastBridgeSignature = '__none__';
+
+    function bridgeSignature(d: FixedToolbarDescriptor | null): string {
+      if (!d) return 'null';
+      const r = d.selectionRect;
+      const marks = d.tableActiveMarks ? [...d.tableActiveMarks].sort().join(',') : '';
+      return [
+        d.visible ? 'v' : '-',
+        d.cellEditMode ? 'c' : d.tableMode ? 't' : '-',
+        String(d.blockId ?? ''),
+        String(d.blockType ?? ''),
+        d.showDelete ? 'D' : '-',
+        d.showMerge ? 'M' : '-',
+        d.showSplit ? 'S' : '-',
+        d.showHeaderRow ? 'H' : '-',
+        d.headerRowActive ? 'h' : '-',
+        d.tableActiveColor ?? '',
+        d.tableActiveBgColor ?? '',
+        d.tableActiveVerticalAlign ?? '',
+        marks,
+        r ? `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)}` : '',
+        d.blockAttrs ? JSON.stringify(d.blockAttrs) : '',
+      ].join('|');
+    }
+
+    /** Publish to the bridge only when the descriptor content actually changed. */
+    function publishBridge(d: FixedToolbarDescriptor | null): void {
+      if (!fixedToolbarBridge) return;
+      const sig = bridgeSignature(d);
+      if (sig === lastBridgeSignature) return;
+      lastBridgeSignature = sig;
+      fixedToolbarBridge.value = d;
+    }
+
+    /**
+     * Defer a bridge publish until after the current render flush. Safe to
+     * call from inside the render function — it never writes a reactive ref
+     * synchronously, so it cannot feed a render loop.
+     */
+    function scheduleBridgePublish(d: FixedToolbarDescriptor | null): void {
+      if (!fixedToolbarBridge) return;
+      void nextTick(() => {
+        publishBridge(d);
+      });
+    }
+
     // Live attrs — coerced once per render.
     const tattrs = computed<TableAttrs>(() => attrsToTable(props.block.attrs));
 
@@ -2889,10 +2950,11 @@ const TableBlock = defineComponent({
       };
 
       // --- Always publish descriptor to the bridge so FixedToolbar renders it
-      // via <HoverToolbar mobile>.
+      // via <HoverToolbar mobile>. Published AFTER the render flush with
+      // content-signature dedupe — see publishBridge()/scheduleBridgePublish().
       if (fixedToolbarBridge) {
         if (tableModeDescriptor.visible) {
-          fixedToolbarBridge.value = tableModeDescriptor;
+          scheduleBridgePublish(tableModeDescriptor);
         } else if (
           fixedToolbarBridge.value?.blockId === (blockId as BlockId)
           && !fixedToolbarBridge.value?.cellEditMode
@@ -2900,7 +2962,7 @@ const TableBlock = defineComponent({
           // This table previously owned the bridge (table-mode) but the
           // selection was cleared. Release it so FixedToolbar falls back
           // to the text-block descriptor. Don't touch cell-edit ownership.
-          fixedToolbarBridge.value = null;
+          scheduleBridgePublish(null);
         }
       }
 
@@ -2980,17 +3042,19 @@ const TableBlock = defineComponent({
           openCellLinkPopover();
         },
       };
+      // Published AFTER the render flush with content-signature dedupe — see
+      // publishBridge()/scheduleBridgePublish().
       if (fixedToolbarBridge) {
         if (cellEditDescriptor.visible) {
           // Cell-edit takes priority over table-mode.
-          fixedToolbarBridge.value = cellEditDescriptor;
+          scheduleBridgePublish(cellEditDescriptor);
         } else if (
           fixedToolbarBridge.value?.blockId === (blockId as BlockId)
           && fixedToolbarBridge.value?.cellEditMode
         ) {
           // This table's cell-edit previously owned the bridge but the
           // text selection was cleared. Release it.
-          fixedToolbarBridge.value = null;
+          scheduleBridgePublish(null);
         }
       }
 
