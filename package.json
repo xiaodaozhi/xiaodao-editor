@@ -4,6 +4,7 @@
   "description": "Notion-style block editor for Vue 3",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://xiaodaozhi.com/xiaodao-editor.html",
   "keywords": [
     "vue",
     "vue3",
