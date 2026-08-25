@@ -4,7 +4,7 @@
  * stops propagation. Key names follow ProseMirror conventions
  * (e.g. "Mod-Enter", "Shift-ArrowUp", "Backspace").
  *
- * See docs/editor-architecture.md §11.1.
+ * See docs/architecture.md §11.1.
  */
 
 export interface KeymapBinding {

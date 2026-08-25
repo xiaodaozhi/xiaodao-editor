@@ -15,7 +15,7 @@
  *     automatically rebuilt into a real parent/children tree at load time,
  *     using the same stack-by-indent algorithm Markdown parsing uses.
  *
- * See docs/editor-architecture.md §4.4 (forest + normalized store) and §10.
+ * See docs/architecture.md §4.4 (forest + normalized store) and §10.
  */
 
 import type {

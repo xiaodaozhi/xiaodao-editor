@@ -4,7 +4,7 @@
  * correct undo/redo without snapshotting the whole document — only the blocks
  * a transaction touched are referenced by the inverse.
  *
- * See docs/editor-architecture.md §9 (History) and §16 (undo/redo correctness).
+ * See docs/architecture.md §9 (History) and §16 (undo/redo correctness).
  */
 
 import type { BlockId, DocState, InlineSeq } from '../types';

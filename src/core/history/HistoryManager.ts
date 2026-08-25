@@ -7,7 +7,7 @@
  * not recorded. Consecutive transactions sharing a `historyGroup` key
  * collapse into a single undo entry (used for typing runs).
  *
- * See docs/editor-architecture.md §9 (History) and §16 (undo/redo correctness).
+ * See docs/architecture.md §9 (History) and §16 (undo/redo correctness).
  */
 
 import type { DocState, Selection } from '../types';

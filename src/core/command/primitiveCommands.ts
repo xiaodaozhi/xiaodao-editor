@@ -5,7 +5,7 @@
  * switches). Block-type-specific commands live in their extensions and
  * compose these primitives.
  *
- * See docs/editor-architecture.md §7.3, §11.2, §11.3.
+ * See docs/architecture.md §7.3, §11.2, §11.3.
  */
 
 import type { Attrs, BlockId, BlockType, InlineNode, InlineSeq, Mark, Selection } from '../types';

@@ -13,7 +13,7 @@
  *  - `viewHints.skipDomWrite`: block ids the view bridge must NOT write back to
  *    the DOM (e.g. the focused contenteditable that already has the text).
  *
- * See docs/editor-architecture.md §6.3, §7.2, §10.3.
+ * See docs/architecture.md §6.3, §7.2, §10.3.
  */
 
 import type { Attrs, BlockId, BlockType, InlineSeq, Selection } from '../types';

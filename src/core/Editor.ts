@@ -8,7 +8,7 @@
  *  - State changes ONLY through `dispatch(transaction)`.
  *  - Plugins receive events via typed hooks; the view never calls plugins directly.
  *
- * See docs/editor-architecture.md §10 (state management), §13 (Editor facade).
+ * See docs/architecture.md §10 (state management), §13 (Editor facade).
  */
 
 import type { Attrs, Block, BlockId, DocState, DocumentData, InlineSeq, JSONValue, Mark, Selection, TextRun } from './types';

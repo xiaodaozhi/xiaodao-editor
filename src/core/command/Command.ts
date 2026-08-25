@@ -4,7 +4,7 @@
  * and, if applicable, build a transaction and call `dispatch`. Returning
  * `true` means "handled" (so keymaps can fall through).
  *
- * See docs/editor-architecture.md §7.1.
+ * See docs/architecture.md §7.1.
  */
 
 import type { EditorState } from '../state/EditorState';

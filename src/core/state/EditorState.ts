@@ -4,7 +4,7 @@
  * through `applyTransaction`, which produces a *new* `EditorState` with
  * structural sharing (unchanged `Block` objects keep referential identity).
  *
- * See docs/editor-architecture.md §10.1.
+ * See docs/architecture.md §10.1.
  */
 
 import type { DocState, Selection } from '../types';

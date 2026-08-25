@@ -13,7 +13,7 @@
  *    the selection. We do NOT listen to `selectionchange` — that event fires
  *    too often and creates feedback loops.
  *
- * See docs/editor-architecture.md §8.2 (selection sync).
+ * See docs/architecture.md §8.2 (selection sync).
  */
 
 import type { BlockId, Selection, DocState  } from '../core/types';

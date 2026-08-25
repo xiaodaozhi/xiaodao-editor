@@ -7,7 +7,7 @@
  * versioned state — this is what makes undo/redo correct across plugin
  * effects.
  *
- * See docs/editor-architecture.md §9.
+ * See docs/architecture.md §9.
  */
 
 import type { EditorState } from '../state/EditorState';

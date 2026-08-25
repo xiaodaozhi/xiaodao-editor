@@ -1862,7 +1862,8 @@ body.theme-light {
 /* Hover toolbar: color swatch dropdown */
 
 .ht-color-dropdown {
-  min-width: 200px;
+  /* 5 swatches per row: 5 × 20px + 4 × 3px gap + 2 × 10px padding */
+  min-width: 132px;
   padding: 8px 10px;
   left: auto;
   right: 0;
@@ -1885,8 +1886,10 @@ body.theme-light {
 
 .ht-swatches {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
+  /* Fixed column width: 5 swatches per row stay compact regardless of how
+     wide the (mobile) dropdown container is stretched to. */
+  grid-template-columns: repeat(5, 20px);
+  gap: 3px;
 }
 
 .ht-swatch {
@@ -1896,6 +1899,7 @@ body.theme-light {
   border: 1.5px solid var(--be-border);
   cursor: pointer;
   padding: 0;
+  box-sizing: border-box;
   transition: transform 0.1s ease, border-color 0.1s ease;
 }
 

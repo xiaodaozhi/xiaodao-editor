@@ -3,7 +3,7 @@
  * reason about it *without* knowing the type. The core never switches on
  * `block.type`; it asks the schema registry instead.
  *
- * See docs/editor-architecture.md §5.3.
+ * See docs/architecture.md §5.3.
  */
 
 import type { Attrs, Block, BlockType, JSONValue } from '../types';

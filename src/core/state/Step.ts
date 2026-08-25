@@ -8,7 +8,7 @@
  * diff (changed / removed) that the view bridge consumes to update only the
  * affected blocks.
  *
- * See docs/editor-architecture.md §7.2 (transactions are the only mutation
+ * See docs/architecture.md §7.2 (transactions are the only mutation
  * path) and §10.3 (update flow).
  */
 

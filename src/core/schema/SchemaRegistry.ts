@@ -3,7 +3,7 @@
  * extensions and frozen. Provides structural predicates the core uses instead
  * of switching on type names.
  *
- * See docs/editor-architecture.md §5.2.
+ * See docs/architecture.md §5.2.
  */
 
 import type { Block, BlockType } from '../types';

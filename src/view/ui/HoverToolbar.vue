@@ -1324,7 +1324,7 @@ const dropdownStyle = computed(() => ({
 // .fixed-toolbar overflow:hidden clip). We need position:fixed coords
 // (left/top or bottom relative to the viewport), computed from the trigger
 // button's getBoundingClientRect.
-const dropdownFixedRect = ref<{ left: number; top?: number; bottom?: number; right?: number } | null>(null);
+const dropdownFixedRect = ref<{ left?: number; top?: number; bottom?: number; right?: number } | null>(null);
 const dropdownFixedStyle = computed(() => {
   if (!props.mobile || !dropdownFixedRect.value) return undefined;
   const r = dropdownFixedRect.value;
@@ -1972,7 +1972,6 @@ function positionActiveDropdown(): void {
       if (kind === 'color') {
         const vw = document.documentElement.clientWidth;
         dropdownFixedRect.value = {
-          left: 8,
           bottom: bottomVal,
           right: Math.max(8, vw - btnRect.right),
         };
@@ -1990,7 +1989,6 @@ function positionActiveDropdown(): void {
       if (kind === 'color') {
         const vw = document.documentElement.clientWidth;
         dropdownFixedRect.value = {
-          left: 8,
           top: topVal,
           right: Math.max(8, vw - btnRect.right),
         };

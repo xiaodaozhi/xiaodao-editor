@@ -9,7 +9,7 @@
  * `serialize`/`deserialize`; a behavior extension (e.g. `History`) provides
  * only `plugins`.
  *
- * See docs/editor-architecture.md §5.
+ * See docs/architecture.md §5.
  */
 
 import type { BlockSchemaSpec } from '../schema/BlockSchema';

@@ -5,7 +5,7 @@
  * intentionally framework-agnostic (no Vue) and contains only type definitions
  * plus a few pure type guards. All runtime behavior lives in dedicated modules.
  *
- * See docs/editor-architecture.md §4 (Document model) and §8 (Selection).
+ * See docs/architecture.md §4 (Document model) and §8 (Selection).
  */
 
 // ---------------------------------------------------------------------------

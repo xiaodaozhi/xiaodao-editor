@@ -3,7 +3,7 @@
  * never produced by extensions or persistence. Uses the Web Crypto API so the
  * core has zero runtime dependencies.
  *
- * See docs/editor-architecture.md §4.1 ("id is generated and owned by the
+ * See docs/architecture.md §4.1 ("id is generated and owned by the
  * core").
  */
 

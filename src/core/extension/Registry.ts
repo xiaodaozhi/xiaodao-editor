@@ -3,7 +3,7 @@
  * name with later entries overriding earlier ones) and assembles the frozen,
  * typed registries the editor consults at runtime.
  *
- * See docs/editor-architecture.md §5.2, §5.4.
+ * See docs/architecture.md §5.2, §5.4.
  */
 
 import type { BlockSchemaSpec } from '../schema/BlockSchema';
