@@ -1,14 +1,5 @@
 # Xiaodao Editor Architecture
 
-> Status: **Phases 1–9 — Implemented** (all built-in block types, inline marks,
-> link marks, image block with upload pipeline, table block, divider, table of
-> contents, block-level attrs, slash menu, input rules, hover toolbar, drag
-> handle, clipboard, i18n, theming, **native Markdown ↔ DocState import/export,
-> size-controllable editor canvas (`width`/`height` props + internal scroll),
-> persistent FixedToolbar with `toolbarPosition: auto|top|bottom` and downward-
-> opening menus, long-press cross-block text-selection overlay on mobile,
-> `build:demo` demo-dist command**).
-
 This document defines the architecture for a production-grade, Notion-style
 block editor that ships as a **reusable Vue 3 + TypeScript package**. It is the
 single source of truth for the editor's design. Implementation must conform to
