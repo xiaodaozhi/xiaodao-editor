@@ -2677,6 +2677,12 @@ function onWindowMouseDown(e: MouseEvent): void {
   // selection is preserved even if a control forgets to preventDefault.
   if (toolbar && toolbar.contains(e.target as Node)) {
     e.preventDefault();
+    // A dropdown may be open. If the click landed on a toolbar button
+    // other than the open dropdown (or its trigger), close the dropdown
+    // so the new action isn't visually masked by the stale menu. Tapping
+    // the same trigger again is handled by toggleDropdown and left alone
+    // here (closeDropdownIfOutside exempts the active trigger/button).
+    if (openDropdown.value) closeDropdownIfOutside(e.target);
     return;
   }
 
@@ -2706,9 +2712,13 @@ function onWindowTouchStart(e: TouchEvent): void {
     // (nav buttons / separators) that sit outside the scroll container.
     const content = htContentEl.value;
     if (content && content.contains(target as Node)) {
+      // Inside the scrollable strip: a tap on a non-trigger button should
+      // still close any open dropdown (mirrors mousedown behaviour above).
+      if (openDropdown.value) closeDropdownIfOutside(target);
       return;
     }
     e.preventDefault();
+    if (openDropdown.value) closeDropdownIfOutside(target);
     return;
   }
   closeDropdownIfOutside(target);
