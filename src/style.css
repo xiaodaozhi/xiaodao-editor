@@ -1731,6 +1731,17 @@ body.theme-light {
   width: 30px;
 }
 
+/* SafeHtml renders injected SVG icons as a <span v-html/>. As an inline
+   element inside the flex .ht-btn it forms a baseline line-box whose
+   descender space falls below the SVG; on iOS Safari this pushes the
+   visible glyph upward relative to buttons that render <svg> directly.
+   Turn the wrapper into a flex container so it hugs the SVG and the
+   button's align-items:center can truly center the icon on every UA. */
+.ht-icon-only > span {
+  display: inline-flex;
+  align-items: center;
+}
+
 .ht-type-btn {
   font-size: 0.82rem;
   font-weight: 500;
