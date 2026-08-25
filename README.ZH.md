@@ -1,13 +1,14 @@
-# xiaodao-editor
+# 小刀编辑器 (Xiaodao Editor)
 
 **中文** | [English](./README.md)
 
+[![Downloads](https://img.shields.io/npm/d18m/xiaodao-editor)](https://www.npmjs.com/package/xiaodao-editor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Vue 3.4+](https://img.shields.io/badge/Vue-3.4+-42b883.svg)](https://vuejs.org/)
 [![TypeScript 5.4+](https://img.shields.io/badge/TypeScript-5.4+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Vite 5.0+](https://img.shields.io/badge/Vite-5.0+-646CFF.svg)](https://vitejs.dev/)
 
-基于 Vue 3 + TypeScript 的 Notion 风格**块编辑器**。以零运行时依赖的单一包形式提供：一个与框架无关的核心层 + 一个 Vue 视图层。每一种块类型（段落、标题、列表、代码块……）都由**扩展（extension）**提供，因此核心层永远不需要根据块类型做分支判断。
+基于 Vue 3 + TypeScript 的 Notion 风格 **块编辑器**。以零运行时依赖的单一包形式提供：一个与框架无关的核心层 + 一个 Vue 视图层。每一种块类型（段落、标题、列表、代码块……）都由 **扩展（extension）** 提供，因此核心层永远不需要根据块类型做分支判断。
 
 ![预览](./img/preview-1.png)
 
