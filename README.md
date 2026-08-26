@@ -1,6 +1,6 @@
 # Xiaodao Editor
 
-[中文](./README.ZH.md) | **English**
+[中文](./README.ZH.md) | **English** | [Demo](https://editor.xdz.me)
 
 [![Downloads](https://img.shields.io/npm/d18m/xiaodao-editor)](https://www.npmjs.com/package/xiaodao-editor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

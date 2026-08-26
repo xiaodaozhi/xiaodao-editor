@@ -1,6 +1,6 @@
 # 小刀编辑器 (Xiaodao Editor)
 
-**中文** | [English](./README.md)
+**中文** | [English](./README.md) | [演示](https://editor.xdz.me)
 
 [![Downloads](https://img.shields.io/npm/d18m/xiaodao-editor)](https://www.npmjs.com/package/xiaodao-editor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
