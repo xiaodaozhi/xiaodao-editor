@@ -1,6 +1,6 @@
 {
   "name": "xiaodao-editor",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Notion-style block editor for Vue 3",
   "type": "module",
   "license": "MIT",
