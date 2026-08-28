@@ -8,11 +8,22 @@
   "keywords": [
     "vue",
     "vue3",
-    "editor",
+    "vue-component",
     "block-editor",
     "notion",
+    "editor",
     "rich-text",
-    "wysiwyg"
+    "text-editor",
+    "wysiwyg",
+    "markdown",
+    "content-editor",
+    "block",
+    "note",
+    "块编辑器",
+    "富文本编辑器",
+    "笔记编辑器",
+    "内容编辑",
+    "模块化编辑器"
   ],
   "files": [
     "dist"
