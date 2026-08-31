@@ -79,3 +79,9 @@ export const ICON_REPLACE = `<svg viewBox="0 0 16 16" width="14" height="14" fil
 
 /** Upload (cloud + arrow) icon, pure paths. */
 export const ICON_UPLOAD = `<svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true"><path d="M768.35456 416a256 256 0 1 0-512 0 192 192 0 1 0 0 384v64a256 256 0 0 1-58.88-505.216 320.128 320.128 0 0 1 629.76 0A256.128 256.128 0 0 1 768.35456 864v-64a192 192 0 0 0 0-384z m-512 384h128v64H256.35456v-64z m384 0h128v64h-128v-64z" fill="currentColor"/><path d="M539.04256 589.184v333.056a32.448 32.448 0 0 1-32 32.192 32.448 32.448 0 0 1-32-32.192V589.184l-36.096 36.096a32.192 32.192 0 0 1-45.056-0.192 31.616 31.616 0 0 1-0.192-45.056l90.88-90.88a31.36 31.36 0 0 1 22.528-9.152 30.08 30.08 0 0 1 22.4 9.088l90.88 90.944a32.192 32.192 0 0 1-0.192 45.056 31.616 31.616 0 0 1-45.056 0.192l-36.096-36.096z" fill="currentColor"/></svg>`;
+
+/** Equation / math — Sigma (Σ) glyph, pure paths. */
+export const ICON_EQUATION = `<svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true"><path d="M611.82976 512L300.4928 200.92928l545.2288-0.29696-0.04096-84.44928-667.36128 0.3584-0.04096 82.05312L492.34944 512 179.47648 824.60672l-1.19808 1.20832 0.04096 81.64352 667.36128 0.3584 0.04096-84.44928-545.2288-0.29696L611.82976 512z" fill="currentColor"/></svg>`;
+
+/** Equation — pencil (edit) glyph. */
+export const ICON_EDIT = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5L13.5 5.5L6 13L3 13L3 10z"/><path d="M9 4L12 7"/></svg>`;

@@ -532,7 +532,7 @@ import { useMenuDismiss } from './useMenuDismiss';
 import SafeHtml from './SafeHtml.vue';
 import type { BlockId, Block } from '../../core/types';
 import type { EditorState } from '../../core/state/EditorState';
-import { inlineText } from '../../core/types';
+import { inlineText, inlineFromString } from '../../core/types';
 import {
   TEXT_COLOR_PRESETS,
   BG_COLOR_PRESETS,
@@ -553,6 +553,7 @@ import {
   ICON_TODO,
   ICON_QUOTE,
   ICON_CODE,
+  ICON_EQUATION,
 } from './icons';
 import { useI18n } from '../../i18n';
 
@@ -669,11 +670,12 @@ const isDividerBlock = computed<boolean>(() =>
   openedBlockType.value === 'divider' || openedBlockType.value === 'tableOfContents',
 );
 
-/** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格、目录 */
+/** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格、目录、公式（公式无 align 属性） */
 const hideAlignSection = computed<boolean>(() =>
   openedBlockType.value === 'divider'
   || openedBlockType.value === 'table'
-  || openedBlockType.value === 'tableOfContents',
+  || openedBlockType.value === 'tableOfContents'
+  || openedBlockType.value === 'equation',
 );
 
 /** 当前块是否支持颜色属性（代码块不支持 color / bgColor）。 */
@@ -745,54 +747,86 @@ const currentBgColor = computed<string>(() => {
 
 // --- Menu contents --------------------------------------------------------
 
+/**
+ * Turn the current block into `type`. Handles the Equation ⇄ text round-trip:
+ *  - text block → equation: the block's plain text becomes the LaTeX source.
+ *  - equation → text type: the LaTeX source is restored as the block's text
+ *    (so the formula is never silently lost; this is the only place that
+ *    relocates the equation's content, since the schema has no `expression`
+ *    attr for text blocks).
+ */
+function applyTurnInto(type: string, attrs?: Record<string, unknown>): void {
+  const blockId = props.blockId;
+  if (!blockId) return;
+  const b = editor.getState().doc.blocks.get(blockId);
+  if (!b) return;
+  if (type === 'equation') {
+    const text = inlineText(b.content);
+    editor.commands.convertBlock?.({ id: blockId, type: 'equation', attrs: { expression: text } });
+    return;
+  }
+  const expr = b.type === 'equation' ? String((b.attrs as { expression?: unknown }).expression ?? '') : '';
+  editor.commands.convertBlock?.({ id: blockId, type, attrs });
+  if (expr) {
+    const schema = editor.registries.schema.get(type);
+    if (schema && schema.content === 'text') {
+      editor.commands.setText?.({ id: blockId, content: inlineFromString(expr) });
+    }
+  }
+}
+
 const turnIntoActions = computed<readonly SettingsItem[]>(() => [
   {
     id: 'paragraph', iconHtml: ICON_PARAGRAPH, title: t('turnInto.paragraph'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'paragraph' }),
+    run: () => void applyTurnInto('paragraph'),
   },
   {
     id: 'h1', iconHtml: ICON_H1, title: t('turnInto.h1'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 1 } }),
+    run: () => void applyTurnInto('heading', { level: 1 }),
   },
   {
     id: 'h2', iconHtml: ICON_H2, title: t('turnInto.h2'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 2 } }),
+    run: () => void applyTurnInto('heading', { level: 2 }),
   },
   {
     id: 'h3', iconHtml: ICON_H3, title: t('turnInto.h3'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 3 } }),
+    run: () => void applyTurnInto('heading', { level: 3 }),
   },
   {
     id: 'h4', iconHtml: ICON_H4, title: t('turnInto.h4'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 4 } }),
+    run: () => void applyTurnInto('heading', { level: 4 }),
   },
   {
     id: 'h5', iconHtml: ICON_H5, title: t('turnInto.h5'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 5 } }),
+    run: () => void applyTurnInto('heading', { level: 5 }),
   },
   {
     id: 'h6', iconHtml: ICON_H6, title: t('turnInto.h6'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'heading', attrs: { level: 6 } }),
+    run: () => void applyTurnInto('heading', { level: 6 }),
   },
   {
     id: 'bullet', iconHtml: ICON_BULLET_LIST, title: t('turnInto.bullet'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'bulletList' }),
+    run: () => void applyTurnInto('bulletList'),
   },
   {
     id: 'ordered', iconHtml: ICON_ORDERED_LIST, title: t('turnInto.ordered'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'orderedList' }),
+    run: () => void applyTurnInto('orderedList'),
   },
   {
     id: 'todo', iconHtml: ICON_TODO, title: t('turnInto.todo'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'todoList', attrs: { checked: false } }),
+    run: () => void applyTurnInto('todoList', { checked: false }),
   },
   {
     id: 'quote', iconHtml: ICON_QUOTE, title: t('turnInto.quote'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'quote' }),
+    run: () => void applyTurnInto('quote'),
   },
   {
     id: 'code', iconHtml: ICON_CODE, title: t('turnInto.code'), kind: 'turnInto',
-    run: () => void editor.commands.convertBlock?.({ id: props.blockId, type: 'codeBlock', attrs: { language: 'plain' } }),
+    run: () => void applyTurnInto('codeBlock', { language: 'plain' }),
+  },
+  {
+    id: 'equation', iconHtml: ICON_EQUATION, title: t('turnInto.equation'), kind: 'turnInto',
+    run: () => void applyTurnInto('equation'),
   },
 ]);
 
@@ -814,6 +848,7 @@ function isTurnIntoActive(id: TurnIntoId): boolean {
     case 'todo': return b.type === 'todoList';
     case 'quote': return b.type === 'quote';
     case 'code': return b.type === 'codeBlock';
+    case 'equation': return b.type === 'equation';
     default: return false;
   }
 }
@@ -894,7 +929,10 @@ function setBgColor(key: string): void {
 async function copyBlock(): Promise<void> {
   const b = currentBlock.value;
   if (!b) return;
-  const text = inlineText(b.content);
+  // Equation blocks carry their content in `attrs.expression`, not inline text.
+  const text = b.type === 'equation'
+    ? String((b.attrs as { expression?: unknown }).expression ?? '')
+    : inlineText(b.content);
   const payload = JSON.stringify({ id: b.id, type: b.type, attrs: b.attrs, text });
   const htmlPayload = `<meta charset="utf-8"><!-- blockeditor:${payload.replace(/--/g, '\\-\\-')} -->${
     escapeHtml(text)

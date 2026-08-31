@@ -17,10 +17,18 @@ by an **extension**, so the core never switches on a block type.
 
 ## Features
 
-- **11 built-in block types** — paragraph, h1–h6 (heading), bullet list,
-  ordered list, to-do, quote, code block, **image**, **divider**,
-  **table**, **table of contents** (13 extensions total including Keymap
-  and History behavior extensions)
+- **12 built-in block types** — paragraph, h1–h6 (heading), bullet list,
+  ordered list, to-do, quote, code block, **image**, **equation** (LaTeX math),
+  **divider**, **table**, **table of contents** (14 extensions total including
+  Keymap and History behavior extensions)
+- **Equation (LaTeX math) block** — renders LaTeX via KaTeX as a centered
+  display formula. The document stores **only the raw `expression` string** —
+  KaTeX output is recomputed on the fly and never persisted, so serialization
+  stays lean. Insert via the `/equation` slash command or the `+` menu; an empty
+  block opens directly in edit mode. Click the block to select it; the floating
+  ✎ button (or clicking an empty block) opens the source editor with a live
+  preview. Supports block selection and **nesting as a child block** (indents
+  to match its depth). Markdown export uses `$$$ … $$$` fenced blocks.
 - **Table block** — `attrs`-based N×M grid; default 120 px column widths,
   new tables default to header row; row/column selection strips,
   corner-handle to select the whole table; insert dots between rows/cols;
@@ -109,7 +117,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 </template>
 ```
 
-The editor ships with all 13 built-in extensions by default — no need to pass
+The editor ships with all 14 built-in extensions by default — no need to pass
 `extensions` unless you want a custom set.
 
 ## Props
@@ -166,7 +174,7 @@ Set it explicitly if needed:
 
 ## Built-in extensions
 
-`BuiltinExtensions` bundles these **13 extensions** (11 block types + 2 behavior extensions):
+`BuiltinExtensions` bundles these **14 extensions** (12 block types + 2 behavior extensions):
 
 | Extension             | Block type      | Notes                                                            |
 | --------------------- | --------------- | ---------------------------------------------------------------- |
@@ -178,6 +186,7 @@ Set it explicitly if needed:
 | `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
 | `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating — Enter inserts a newline.           |
 | `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `uploadImage` prop + `cleanup:image-file`. |
+| `EquationExtension`   | `equation`      | `content: 'none'`; isolated block — stores only `attrs.expression` (raw LaTeX). KaTeX renders a centered display formula on the fly (output never persisted). Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
 | `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |
 | `DividerExtension`    | `divider`       | Isolating horizontal rule.                                       |
 | `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`; empty attrs — the heading list is a **dynamic view** computed from the editor state on every render. Non-editable block (`editable: false`); collects all `heading` blocks in document order (table-cell headings excluded automatically); click an entry to scroll the heading into view. Serialize emits empty string (the real headings are exported by their own blocks). |
@@ -250,6 +259,7 @@ const doc: DocumentData = {
            { content: [{ type: 'text', text: '3' }], rowspan: 1, colspan: 1, covered: false }],
         ],
       }, content: [] },
+    { type: 'equation', attrs: { expression: 'E = mc^2' }, content: [] },
   ],
 }
 ```
@@ -314,7 +324,7 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
   components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
   `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, `LinkPopover`,
   `FixedToolbar`).
-- **`src/extensions/`** — the 13 built-in extensions plus `_commonAttrs.ts`
+- **`src/extensions/`** — the 14 built-in extensions plus `_commonAttrs.ts`
   (shared align/color/bgColor/indent specs and color presets, plus
   `ImageExtension`'s upload-side-channel renderer logic). **Table** lives in
   `Table.ts` (Vue renderer + command registrations) and `tableModel.ts` (pure
@@ -322,7 +332,9 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
   selection expansion, header row toggle, column width helpers, HTML/Markdown
   serialization, attrs validation/coercion). **Divider** lives in `Divider.ts`.
   **Table of contents** lives in `TableOfContents.ts` (non-editable block that
-  renders a live heading list).
+  renders a live heading list). **Equation** lives in `Equation.ts` (LaTeX/KaTeX
+  block; stores only `attrs.expression`, renders a centered display formula; its
+  `attrs.indent` mirrors nesting depth so it indents as a child block).
 - **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
   provide/inject so popovers rendered through `<Teleport>` stay reactive.
 

@@ -318,14 +318,6 @@ const ImageBlock = defineComponent({
       return (props.block.attrs.src as string) ?? '';
     }
 
-    function onBlockClick(e: MouseEvent): void {
-      // Clicking the image shell selects the block (Notion-style).
-      e.stopPropagation();
-      // Read-only: selecting the block would surface editing affordances.
-      if (!editable.value) return;
-      editor.commands.selectBlock?.({ id: blockId });
-    }
-
     return () => {
       const attrs = props.block.attrs;
       const src = effectiveSrc();
@@ -352,15 +344,19 @@ const ImageBlock = defineComponent({
       // Toolbar overlay (shown always on hover; forced-visible when the
       // block has a pending/error upload state). Hidden entirely in
       // read-only mode — replace/remove are editing actions.
+      // Selection is shown by the SAME generic block-focus mechanism as every
+      // other non-text block (image / table / divider / equation): the host's
+      // `.block-host.block-focused` class, set by `setFocusedBlock`, drives the
+      // toolbar via CSS. We no longer read `editor.getState().selection` here.
+      // `forceToolbarVisible` (pending/errored upload) is a side-channel state
+      // that must still force the toolbar open regardless of focus.
       const forceToolbarVisible = !!us && us.status !== 'success';
-      const sel = editor.getState().selection;
-      const isSelectedAsBlock = sel.kind === 'blocks' && sel.blockIds.includes(blockId);
       if (editable.value) {
         children.push(
           h('div', {
             class: [
               'image-block-toolbar',
-              { 'image-block-toolbar-visible': forceToolbarVisible || isSelectedAsBlock },
+              { 'image-block-toolbar-forced': forceToolbarVisible },
             ],
           }, [
             h('button', {
@@ -530,7 +526,6 @@ const ImageBlock = defineComponent({
             {
               class: wrapperClasses,
               style: wrapperStyle,
-              onClick: onBlockClick,
             },
             children,
           ),

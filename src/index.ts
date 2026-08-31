@@ -27,6 +27,8 @@ export { KeymapExtension } from './extensions/Keymap';
 export { HistoryExtension } from './extensions/History';
 export { ImageExtension } from './extensions/Image';
 export type { ImageAttrs } from './extensions/Image';
+export { EquationExtension } from './extensions/Equation';
+export type { EquationAttrs } from './extensions/Equation';
 export { TableExtension } from './extensions/Table';
 export type { TableAttrs, TableCellData } from './extensions/tableModel';
 export { DividerExtension } from './extensions/Divider';

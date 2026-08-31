@@ -704,7 +704,7 @@ function useEditor（）: Editor  // 在 <BlockEditor> 树之外调用时抛出
 
 ```ts
 props: {
-  extensions？: readonly Extension[]        // 默认 BuiltinExtensions（13 个扩展，含 Image/Table/Divider/TableOfContents）
+  extensions？: readonly Extension[]        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
   modelValue？: DocumentData                // 默认 { blocks: [] }
   editable？: boolean                       // 默认 true
   placeholder？: string                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
@@ -1146,7 +1146,7 @@ export const ImageExtension: Extension
 
 Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位的遮罩(上传中/错误时可见)叠在 `<img>` 上方，进度条 100–0%，错误时红色重试按钮。`fileId` attr 是可选的**外部存储标识**(S3 key、OSS object id 等)——`BlockEditor.vue` 维护每个 `fileId` 的引用计数，当一个 block 从文档中被删除/替换(事务 diff)且该 `fileId` 的引用从 ≥1 降到 0 时，emit `cleanup:image-file`，以便宿主应用删除存储对象。
 
-**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/context`(`useEditor`)、`view/BlockContent.vue`(用于可选 caption)、`view/imageUpload`(订阅瞬时状态 `imageUploadStore`)、`view/ui/icons`(`ICON_IMAGE`)和 `extensions/_commonAttrs`(`IMAGE_ATTRS`)。捆绑于 `builtin.ts`；默认 `BuiltinExtensions` 为 13 个扩展。粘贴路径：剪贴板文件 → `clipboard.ts` 返回 `_pendingFile` → `BlockEditor.vue` 分发 `insertBlock`(Image) → `imageUploadStore.beginUpload`(创建 `tempSrc` → 进度 tick → resolve/reject → `setAttrs({ src, fileId, alt, ... })` 或 `retry` 重新 begin)。
+**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/context`(`useEditor`)、`view/BlockContent.vue`(用于可选 caption)、`view/imageUpload`(订阅瞬时状态 `imageUploadStore`)、`view/ui/icons`(`ICON_IMAGE`)和 `extensions/_commonAttrs`(`IMAGE_ATTRS`)。捆绑于 `builtin.ts`；默认 `BuiltinExtensions` 为 14 个扩展。粘贴路径：剪贴板文件 → `clipboard.ts` 返回 `_pendingFile` → `BlockEditor.vue` 分发 `insertBlock`(Image) → `imageUploadStore.beginUpload`(创建 `tempSrc` → 进度 tick → resolve/reject → `setAttrs({ src, fileId, alt, ... })` 或 `retry` 重新 begin)。
 
 ### `src/extensions/Table.ts`
 
@@ -1191,6 +1191,12 @@ export function createTableCommands(editor: Editor): {
 - Tab / Shift+Tab 导航；最后一个单元格 Tab → 自动追加新行；非代码块单元格 Enter → 退出聚焦（同步内容）+ 保持单格选中态。
 
 **交互。** 导入 `vue`（`h / ref / computed / watch / nextTick / onBeforeUnmount`）、`core/types`（`BlockAttrs` / `EditorRef` / `BlockId` / `Mark` / `MarkType`）、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/context`（`useEditor`）、`extensions/tableModel`（全部纯函数 + `TABLE_ATTRS_SCHEMA` / `expandSelectionToFullRect`）、`view/ui/HoverToolbar.vue`（浮动操作栏）、`i18n`（`t()`）、`core/inlineDom`（`inlineToHtml` / `inlineFromHtml` / `inlineToMarkdown` / `markdownToInline` / 在 `syncCellContent` 内部间接使用）。`BuiltinExtensions` 默认包含。与 Image 一样，Table 是 `content: 'none'` 块，通过 `attrs` 存储所有数据，零核心改动。与其他扩展无相互依赖；**不导入 core 外的扩展**（仅 `tableModel.ts` 同目录）。
+
+### `src/extensions/Equation.ts`
+
+**职责。** 公式（LaTeX 数学公式）块类型扩展——一个 `content: 'none'`、**isolated** 块，只保存 `attrs.expression`（原始 LaTeX 源码）。渲染器是独立的 Vue 组件（`EquationBlock`）：查看态调用 `katex.renderToString` 即时渲染居中展示公式（渲染出的 DOM 永不持久化，只序列化 `attrs.expression`）；编辑态显示绑定 `attrs.expression` 的 textarea 并带 KaTeX 实时预览，外加一个浮动 ✎ 按钮用于（重新）打开编辑器。空块在插入时自动进入编辑态。选中与嵌套遵循编辑器的通用非文本块约定：根元素携带 `block-focus-root`，因此块手柄/选中环完全由 `focusedBlockId` 驱动（组件内不做 `isSelected` 订阅）；`classesFromAttrs(attrs)` 注入 `be-indent-N` 类，使块作为子块嵌套时按深度正确缩进（`attrs.indent` 即为深度镜像）。Markdown 导出序列化为 `$$$ … $$$` 围栏块；HTML 导出输出 `<div class="equation-block-rendered">`。非法 LaTeX 会渲染为 `katex-error-block` 兜底而非抛错。
+
+**交互。** 导入 `vue`、`core/types`、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/ui/SafeHtml.vue`、`view/ui/icons`（`ICON_EQUATION`、`ICON_EDIT`）、`extensions/_commonAttrs`（`COMMON_ATTRS`、`classesFromAttrs`）、`view/context`（`useEditor` / `useEditable`）、`i18n`（`useI18n`）以及 `katex`（外加 `katex/dist/katex.min.css`）。`BuiltinExtensions` 默认包含。与 Image/Table 一样，Equation 是 `content: 'none'` 的 attrs 存储块——零核心改动。空公式块按 Enter 退出到默认块类型；编辑按钮在进入编辑态前调用 `editor.commands.selectBlock({ id })`，确保编辑时块始终处于选中态。
 
 ### `src/extensions/tableModel.ts`
 
@@ -1534,6 +1540,6 @@ export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n'
 export type { Theme, Locale, I18nBundle } from './i18n'
 ```
 
-**交互。** 导入 `core/index`、四个 `.vue` 组件、`view/context`、`i18n.ts`、`view/urlUtils`、`view/imageUpload` 以及内置扩展捆绑（13 个扩展，含 `TableOfContents`）。这是包的 `main`/`module` 字段指向的文件；`playground/App.vue` 和外部消费者从这里导入。
+**交互。** 导入 `core/index`、四个 `.vue` 组件、`view/context`、`i18n.ts`、`view/urlUtils`、`view/imageUpload` 以及内置扩展捆绑（14 个扩展，含 `Equation`/`TableOfContents`）。这是包的 `main`/`module` 字段指向的文件；`playground/App.vue` 和外部消费者从这里导入。
 
 **扩展点。** 新的公共能力（核心或视图）通过在这里添加它的再导出暴露。`core/index.ts`（框架无关表面）与此文件（添加 Vue + 扩展）的分离强化了层边界：只想要引擎的消费者可以在包暴露该子路径时导入 `xiaodao-editor/core`，或摇树掉 Vue 组件。

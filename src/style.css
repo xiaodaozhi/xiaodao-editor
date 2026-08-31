@@ -992,7 +992,13 @@ body.theme-light {
 
 .slash-menu {
   position: fixed;
-  z-index: 50;
+  /* Sits above the FixedToolbar (z-index 60) so when the menu is anchored
+     to a button inside the bar (or otherwise overlaps it), it never
+     passes UNDER the bar's buttons. Previously 50 — too low, the
+     toolbar visually covered the menu whenever they overlapped (e.g.
+     upward-pop scenarios triggered from near the viewport top). Matches
+     .number-picker / .code-lang-picker (70). */
+  z-index: 70;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
   border-radius: 4px;
@@ -1155,7 +1161,11 @@ body.theme-light {
 
 .block-settings-menu {
   position: fixed;
-  z-index: 60;
+  /* Same reasoning as .slash-menu: this menu is also triggered from the
+     FixedToolbar's grip handle, and must stay above the bar (z-index 60)
+     so it never visually passes UNDER the toolbar's buttons when they
+     overlap. */
+  z-index: 70;
   background: var(--be-bg);
   border: 1px solid var(--be-border);
   border-radius: 4px;
@@ -2416,7 +2426,8 @@ body.theme-light {
 }
 
 .block-image-wrapper:hover .image-block-toolbar,
-.image-block-toolbar-visible {
+.block-host.block-focused .image-block-toolbar,
+.image-block-toolbar-forced {
   opacity: 1 !important;
   transform: translateY(0) !important;
 }
@@ -3648,3 +3659,224 @@ body.theme-dark .table-cell-inner {
   box-sizing: border-box;
 }
 
+
+/* ===========================================================================
+   Equation block (LaTeX / KaTeX)
+   - Display mode: centered, no borders, horizontal scroll for long formulas,
+     never causes page-level horizontal overflow, mobile-safe.
+   - Edit mode: plain textarea (no border / no focus outline) above a live
+     KaTeX preview. Placeholder only shows while editing an empty formula.
+   =========================================================================== */
+.equation-block {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.45em;
+  padding: 4px 4px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  cursor: default;
+  font-size: 1.05em;
+  line-height: 1.5;
+  color: var(--be-fg);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* The equation ring is driven by the SAME generic block-selection mechanism
+   as every other non-text block (image / table / divider / …): when the host
+   carries `.block-host.block-focused`, the block is selected. Previously this
+   was a per-component `.equation-selected` class toggled by a bespoke
+   `isSelected` computed that read `editor.getState().selection` directly —
+   that desynced from the real selection and from `block-focused`. */
+.block-host.block-focused .equation-block {
+  /* Match the table / image block selected outline: a light blue 2px ring at
+     a 4px radius (rgba(51, 112, 255, 0.35) == --be-focus with alpha). */
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.35);
+  border-radius: 4px;
+}
+
+.equation-block::-webkit-scrollbar {
+  height: 6px;
+}
+.equation-block::-webkit-scrollbar-thumb {
+  background: var(--be-border);
+  border-radius: 3px;
+}
+
+/* KaTeX display output: keep it inside the block, allow horizontal scroll.
+   IMPORTANT: the scroll container here is .equation-block (full container width).
+   We do NOT add overflow-x:auto on .katex-display itself — when the math is
+   wider than the block, .equation-block produces a scrollbar that spans the
+   full block width (not just the formula's own width). */
+.equation-block .katex-display {
+  margin: 0;
+  padding: 2px 0;
+  text-align: center;
+}
+.equation-block .katex-display > .katex {
+  white-space: nowrap;
+}
+
+/* Fill the block (block-level, 100% width) so the inner .katex-display gets
+   the FULL container width. Previously this was inline-block with shrink-to-fit
+   width = formula width, which made the scrollbar match the formula content
+   instead of the block. */
+.equation-render {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.equation-placeholder {
+  color: #9aa0a6;
+  font-style: italic;
+  user-select: none;
+  font-size: 0.95em;
+}
+
+.equation-error-inline {
+  color: var(--be-color-red, #d93025);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* --- Floating edit button (mirrors image-block toolbar) ----------------- */
+.equation-toolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--be-border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 5;
+}
+
+.equation-block:hover .equation-toolbar,
+.block-host.block-focused .equation-toolbar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.theme-dark .equation-toolbar,
+body.theme-dark .equation-toolbar {
+  background: rgba(34, 36, 40, 0.94);
+}
+
+.equation-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--be-text);
+  border-radius: 2px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.equation-edit-btn:hover {
+  background: var(--be-hover);
+  color: var(--be-accent);
+}
+
+.equation-edit-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* --- Edit mode ---------------------------------------------------------- */
+.equation-block.equation-editing {
+  display: block;
+  cursor: default;
+  text-align: left;
+}
+
+.equation-edit {
+  width: 100%;
+}
+
+.equation-edit-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  min-height: 2em;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--be-fg);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95em;
+  line-height: 1.5;
+  border-radius: 6px;
+}
+.equation-edit-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: 0 0 0 1px var(--be-border);
+}
+.equation-edit-input::placeholder {
+  color: #9aa0a6;
+  font-style: italic;
+}
+
+.equation-edit-preview {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-top: 1px dashed var(--be-border);
+  min-height: 1.6em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  background: var(--be-bg);
+  border-radius: 0 0 6px 6px;
+}
+.equation-edit-preview .katex-display {
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+.equation-error-badge {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75em;
+  color: var(--be-color-red, #d93025);
+  background: rgba(217, 48, 37, 0.1);
+}
+
+/* Mobile: slightly larger hit area, prevent zoom on focus. */
+@media (max-width: 600px) {
+  .equation-block {
+    font-size: 1.1em;
+  }
+  .equation-edit-input {
+    font-size: 16px;
+  }
+}
+
+/* Dark theme tweaks for the error badge. */
+.theme-dark .equation-error-badge,
+body.theme-dark .equation-error-badge {
+  background: rgba(255, 138, 128, 0.16);
+}

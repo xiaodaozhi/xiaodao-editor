@@ -541,7 +541,7 @@ src/
     Keymap.ts                   # 默认键位映射：Enter/Backspace/ArrowUp/ArrowDown
     History.ts                  # 撤销/重做键位映射：Mod-z / Mod-Shift-z / Mod-y
     _commonAttrs.ts             # 共享 align/color/bgColor/indent 规范 + 颜色预设
-    builtin.ts                  # BuiltinExtensions 捆绑（13 个扩展）+ 再导出
+    builtin.ts                  # BuiltinExtensions 捆绑（14 个扩展）+ 再导出
   i18n.ts                       # locale （zh-CN/en-US） + 主题 （light/dark） 模块
   style.css                     # 编辑器样式表（CSS 变量、浅色/深色 token；链接 <a> 样式；图片块遮罩 + 上传 UI；链接浮层样式）
   index.ts                      # 公开的包入口点

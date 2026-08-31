@@ -35,5 +35,12 @@
     "playground/**/*.ts",
     "playground/**/*.vue",
     "vite.config.ts"
+  ],
+  "exclude": [
+    "test/**/*.test.ts",
+    "test/**/*.spec.ts",
+    "test/**/__tests__/**",
+    "playground/**/*.test.ts",
+    "playground/**/*.spec.ts"
   ]
 }

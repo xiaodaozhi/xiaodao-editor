@@ -1,6 +1,6 @@
 # Xiaodao Editor Module Reference
 
-This document is the per-module API reference for the `xiaodao-editor` package, a Notion-style, block-first editor built as a reusable Vue 3 + TypeScript library. The **core** (`src/core/**`) is framework-agnostic — it has zero Vue imports and is portable to any framework — while the **view layer** (`src/view/**`) is the sole bridge to Vue reactivity and the DOM. Every block type and editing behavior is contributed by an **extension**, so the core never switches on a block type. The package ships 13 built-in extensions (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, Table, Divider, **TableOfContents**, Keymap, History) covering all block types, inline marks (bold/italic/underline/strike/code/**link with href attribute + URL sanitization**), block-level attrs, slash menu, input rules, hover toolbar (+ link button), drag handle, clipboard, i18n, theming, **image upload pipeline with transient side-channel and fileId cleanup events**, **link popover (view/edit/copy/remove), Mod+K, paste/type URL auto-link**, **table block with merge/split/header-row**, **table-of-contents block (live heading list view)**, JSON persistence, and Markdown/HTML serialize/deserialize. This reference is organized by subsystem; for design rationale and the update flow, see `docs/architecture.md` (notably §4 document model, §6 rendering, §7 commands, §10 state, §11 keyboard/IME, §14 Phase 6 Image + Link Mark, Phase 7 Table + Divider, Phase 8 Table of Contents).
+This document is the per-module API reference for the `xiaodao-editor` package, a Notion-style, block-first editor built as a reusable Vue 3 + TypeScript library. The **core** (`src/core/**`) is framework-agnostic — it has zero Vue imports and is portable to any framework — while the **view layer** (`src/view/**`) is the sole bridge to Vue reactivity and the DOM. Every block type and editing behavior is contributed by an **extension**, so the core never switches on a block type. The package ships 14 built-in extensions (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, Table, Divider, **Equation**, **TableOfContents**, Keymap, History) covering all block types, inline marks (bold/italic/underline/strike/code/**link with href attribute + URL sanitization**), block-level attrs, slash menu, input rules, hover toolbar (+ link button), drag handle, clipboard, i18n, theming, **image upload pipeline with transient side-channel and fileId cleanup events**, **link popover (view/edit/copy/remove), Mod+K, paste/type URL auto-link**, **table block with merge/split/header-row**, **equation block (LaTeX/KaTeX with live preview and nesting)**, **table-of-contents block (live heading list view)**, JSON persistence, and Markdown/HTML serialize/deserialize. This reference is organized by subsystem; for design rationale and the update flow, see `docs/architecture.md` (notably §4 document model, §6 rendering, §7 commands, §10 state, §11 keyboard/IME, §14 Phase 6 Image + Link Mark, Phase 7 Table + Divider, Phase 8 Table of Contents).
 
 ## Document Model & Types
 
@@ -700,7 +700,7 @@ function useEditor(): Editor  // throws if called outside a <BlockEditor> tree
 
 ```ts
 props: {
-  extensions?: readonly Extension[]        // default BuiltinExtensions (13 extensions, including Image/Table/Divider/TableOfContents)
+  extensions?: readonly Extension[]        // default BuiltinExtensions (14 extensions, including Image/Table/Divider/Equation/TableOfContents)
   modelValue?: DocumentData                // default { blocks: [] }
   editable?: boolean                       // default true
   placeholder?: string                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
@@ -1168,7 +1168,7 @@ The `ImageBlock` renderer renders `.block-image-wrapper` → `<img class="block-
 - Four drag-resize handles are positioned at the image corners; dragging calls `setAttrs` with new `width`/`height`, enforcing a minimum width of 64 px and preserving aspect ratio when Shift is held.
 - A `contenteditable="true"` `.block-image-caption` sits below the image; its text writes to `attrs.caption` via `setAttrs` on blur/input.
 
-**Interactions.** Imports `vue`, `core/extension/Extension`, `core/types`, `view/context` (`useEditor`), `view/imageUpload` (subscribes per-block state), `view/ui/icons` (`ICON_IMAGE`, `ICON_REPLACE`, `ICON_DELETE`, `ICON_RETRY`), and `i18n` (`useI18n`). Bundled in `builtin.ts`; default `BuiltinExtensions` counts 13 extensions. Drag/resize uses standard pointer events (no extra library). Caption contenteditable uses the same IME-guardless (single caret, no marks) pattern as blocks can contain inline text but caption deliberately does not support inline marks.
+**Interactions.** Imports `vue`, `core/extension/Extension`, `core/types`, `view/context` (`useEditor`), `view/imageUpload` (subscribes per-block state), `view/ui/icons` (`ICON_IMAGE`, `ICON_REPLACE`, `ICON_DELETE`, `ICON_RETRY`), and `i18n` (`useI18n`). Bundled in `builtin.ts`; default `BuiltinExtensions` counts 14 extensions. Drag/resize uses standard pointer events (no extra library). Caption contenteditable uses the same IME-guardless (single caret, no marks) pattern as blocks can contain inline text but caption deliberately does not support inline marks.
 
 ### `src/extensions/Table.ts`
 
@@ -1213,6 +1213,12 @@ export function createTableCommands(editor: Editor): {
 - Tab / Shift+Tab for cell navigation; Tab in last cell → auto appends new row; non-code-block Enter → exits focus (syncs content) + stays in single-cell selected mode.
 
 **Interactions.** Imports `vue` (`h / ref / computed / watch / nextTick / onBeforeUnmount`), `core/types` (`BlockAttrs` / `EditorRef` / `BlockId` / `Mark` / `MarkType`), `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/context` (`useEditor`), `extensions/tableModel` (all pure functions + `TABLE_ATTRS_SCHEMA` / `expandSelectionToFullRect`), `view/ui/HoverToolbar.vue` (floating toolbar), `i18n` (`t()`), and indirectly uses `core/inlineDom` (via `syncCellContent` and `inlineToHtml` / `inlineFromHtml` / `inlineToMarkdown` / `markdownToInline` calls). Included by default in `BuiltinExtensions`. Like Image, Table is a `content: 'none'` attrs-storage block — zero core changes. No cross-extension imports beyond its sibling `tableModel.ts`.
+
+### `src/extensions/Equation.ts`
+
+**Responsibility.** Equation (LaTeX math) block type extension — a `content: 'none'`, **isolated** block that stores only `attrs.expression` (the raw LaTeX source). The renderer is a self-contained Vue component (`EquationBlock`): in view mode it calls `katex.renderToString` to produce a centered display formula on the fly (the rendered DOM is never persisted — only `attrs.expression` is serialized); in edit mode it shows a textarea bound to `attrs.expression` with a live KaTeX preview, plus a floating ✎ button to (re)open the editor. An empty block auto-enters edit mode on insert. Selection and nesting follow the editor-wide generic non-text block convention: the root element carries `block-focus-root` so the block-handle/selection ring is driven entirely by `focusedBlockId` (no per-component `isSelected` subscription), and `classesFromAttrs(attrs)` injects the `be-indent-N` class so the block indents correctly when nested as a child (`attrs.indent` mirrors depth). Markdown export serializes as `$$$ … $$$` fenced blocks; HTML export emits `<div class="equation-block-rendered">`. Invalid LaTeX is rendered as a `katex-error-block` fallback rather than throwing.
+
+**Interactions.** Imports `vue`, `core/types`, `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/ui/SafeHtml.vue`, `view/ui/icons` (`ICON_EQUATION`, `ICON_EDIT`), `extensions/_commonAttrs` (`COMMON_ATTRS`, `classesFromAttrs`), `view/context` (`useEditor` / `useEditable`), `i18n` (`useI18n`), and `katex` (plus `katex/dist/katex.min.css`). Included by default in `BuiltinExtensions`. Like Image/Table, Equation is a `content: 'none'` attrs-storage block — zero core changes. Enter on an empty equation exits to the default block type; the edit button calls `editor.commands.selectBlock({ id })` before entering edit mode so the block is always selected while editing.
 
 ### `src/extensions/tableModel.ts`
 
@@ -1388,7 +1394,7 @@ export { KeymapExtension } from './Keymap'
 export { HistoryExtension } from './History'
 ```
 
-**Interactions.** Imports the 13 built-in extension modules and `core/extension/Extension`. Re-exported by `src/index.ts`. Consumers compose `[...BuiltinExtensions, ...userExtensions]`, or omit `extensions` entirely (the `BlockEditor` prop defaults to `BuiltinExtensions`).
+**Interactions.** Imports the 14 built-in extension modules and `core/extension/Extension`. Re-exported by `src/index.ts`. Consumers compose `[...BuiltinExtensions, ...userExtensions]`, or omit `extensions` entirely (the `BlockEditor` prop defaults to `BuiltinExtensions`).
 
 **Extension points.** Adding a new built-in block type or behavior means adding its extension to this array (and re-exporting it). Because override is name-based, a user can replace any single built-in without forking the bundle.
 
@@ -1490,6 +1496,6 @@ export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n'
 export type { Theme, Locale, I18nBundle } from './i18n'
 ```
 
-**Interactions.** Imports `core/index`, the four `.vue` components, `view/context`, `i18n.ts`, `view/urlUtils`, `view/imageUpload`, and the built-in extensions bundle (13 extensions, including `TableOfContents`). This is the file the package `main`/`module` fields point at; the `playground/App.vue` and external consumers import from here.
+**Interactions.** Imports `core/index`, the four `.vue` components, `view/context`, `i18n.ts`, `view/urlUtils`, `view/imageUpload`, and the built-in extensions bundle (14 extensions, including `Equation`/`TableOfContents`). This is the file the package `main`/`module` fields point at; the `playground/App.vue` and external consumers import from here.
 
 **Extension points.** A new public capability (core or view) is exposed by adding its re-export here. The split between `core/index.ts` (framework-agnostic surface) and this file (adds Vue + extensions) enforces the layer boundary: a consumer who wants only the engine can import `xiaodao-editor/core` if the package exposes that subpath, or tree-shake the Vue components.

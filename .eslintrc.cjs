@@ -70,6 +70,21 @@ module.exports = {
         '@typescript-eslint/no-restricted-imports': 'off',
       },
     },
+    // Test files use `any` for editor/command mocks and non-null assertions for
+    // fixtures; relax those rules here without affecting production code.
+    {
+      files: [
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/*.spec.ts',
+        '**/__tests__/**/*.ts',
+        '**/__tests__/**/*.vue',
+      ],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-non-null-assertion': 'off',
+      },
+    },
   ],
   ignorePatterns: ['dist', 'node_modules', '*.cjs', '*.css'],
 }

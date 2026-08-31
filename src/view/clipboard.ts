@@ -210,9 +210,10 @@ function parsePlainText(text: string): ParsedBlock[] {
  */
 function compactEmptyBlocks(blocks: ParsedBlock[]): void {
   // Step 1: collapse multiple consecutive empties into one.
-  // Image / Table / Divider / Code blocks are NEVER considered "empty" — they
-  // carry structural meaning in their attrs even without inline text.
-  const STRUCTURAL_TYPES = new Set(['image', 'table', 'divider', 'codeBlock']);
+  // Image / Table / Divider / Code / Equation blocks are NEVER considered
+  // "empty" — they carry structural meaning in their attrs even without
+  // inline text (an equation's LaTeX source lives in attrs.expression).
+  const STRUCTURAL_TYPES = new Set(['image', 'table', 'divider', 'codeBlock', 'equation']);
   const collapsed: ParsedBlock[] = [];
   let prevEmpty = false;
   for (const b of blocks) {

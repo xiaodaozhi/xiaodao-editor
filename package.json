@@ -1,6 +1,6 @@
 {
   "name": "xiaodao-editor",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Notion-style block editor for Vue 3",
   "type": "module",
   "license": "MIT",
@@ -49,6 +49,8 @@
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .ts,.vue,.js --fix",
     "lint:check": "eslint . --ext .ts,.vue,.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"playground/**/*.{ts,vue}\"",
     "prepublishOnly": "pnpm build"
   },
@@ -56,20 +58,24 @@
     "vue": "^3.4.0"
   },
   "dependencies": {
-    "highlight.js": "^11.11.0"
+    "highlight.js": "^11.11.0",
+    "katex": "^0.18.4"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-vue": "^5.1.2",
+    "@vue/test-utils": "^2.4.6",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^9.27.0",
+    "happy-dom": "^15.0.0",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vite": "^5.4.0",
     "vite-plugin-dts": "^4.0.3",
+    "vitest": "^2.1.0",
     "vue": "^3.4.38",
     "vue-tsc": "^2.0.29"
   },

@@ -1215,7 +1215,7 @@ function onSelectionMouseUp(): void {
  * text block must never overwrite focus on these blocks.
  */
 const NON_TEXT_BLOCK_TYPES = new Set([
-  'image', 'divider', 'table', 'toc', 'tableOfContents', 'codeBlock',
+  'image', 'divider', 'table', 'toc', 'tableOfContents', 'codeBlock', 'equation',
 ]);
 
 // fileId → reference-count (number of image blocks referencing the file).
@@ -1540,6 +1540,12 @@ function onKeyDown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   if (target && target.classList.contains('image-block-caption')) {
     return; // let the browser handle native contenteditable editing
+  }
+  // Equation editor textarea: let the textarea handle all keys natively so the
+  // user can type LaTeX, press Enter to submit / Escape to cancel, etc.,
+  // without the editor keymap intercepting them.
+  if (target && target.closest('[data-equation-edit]')) {
+    return;
   }
   // Table cells manage their own keyboard handling (Enter exits edit mode,
   // Tab navigates cells). Skip the editor-level keymap to avoid creating
@@ -2684,6 +2690,14 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
   // no editor transaction, so the selection state would stay stuck on the
   // selected block. Adopt the native caret position to drop the selection.
   if (isBlocks(stateSel) && stateSel.blockIds.length > 0) {
+    // If a collapsed caret has appeared (e.g. the user clicked into a text
+    // block while a block selection was active), downgrade the block selection
+    // to that caret. This is what deselects a non-text block (image/equation/
+    // table/...) when you click elsewhere — without it the block would stay
+    // "selected" forever. Selecting a non-text block itself never reaches this
+    // branch (its mousedown arms mouseDownOnNonTextBlock, so onMouseUp skips
+    // onDocumentSelectionChange entirely), so this downgrade never interferes
+    // with the non-text block's own selection.
     const domSel = window.getSelection();
     if (domSel && domSel.rangeCount > 0 && domSel.getRangeAt(0).collapsed) {
       const read = readDomSelection(root, editor.getState().doc);
@@ -2902,7 +2916,12 @@ function onMouseDown(e: MouseEvent): void {
     const targetEl = e.target as HTMLElement | null;
     if (targetEl && (
       targetEl.closest('.table-cell-inner, .block-table-container, .block-table-of-contents')
-      || (targetEl.closest('.block-focus-root') && !targetEl.closest('[contenteditable="true"]'))
+      || (targetEl.closest('.block-focus-root') && !targetEl.closest('[contenteditable="true"]') && !targetEl.closest('[data-equation-edit]'))
+      // An equation rendered in VIEW mode (not editing) owns no text caret,
+      // so it must be treated like the other non-text blocks: skip drag
+      // selection tracking and, crucially, let the click's selectBlock win
+      // instead of being overwritten by a stale caret on mouseup.
+      || (targetEl.closest('.equation-block') && !targetEl.closest('[data-equation-edit]'))
     )) {
       mouseDownOnNonTextBlock = true;
       try {
@@ -3434,8 +3453,11 @@ function onBlockRootClick(e: MouseEvent): void {
   // Clicks inside a contenteditable text region (e.g. the code block's
   // .block-code) must NOT clear the native selection: the contenteditable
   // owns its own caret. Clearing it here is what makes the caret vanish
-  // the instant the mouse is released.
+  // the instant the mouse is released. The same applies to the Equation
+  // block's LaTeX <textarea> — it is a real text-editing surface (tagged
+  // with [data-equation-edit]) and must keep its caret/selection.
   if (target.closest('[contenteditable="true"]')) return;
+  if (target.closest('[data-equation-edit]')) return;
   const focusRoot = target.closest('.block-focus-root');
   if (!focusRoot) return;
   const host = (focusRoot as HTMLElement).closest('.block-host');

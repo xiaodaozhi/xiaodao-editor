@@ -246,6 +246,14 @@ const zhCN: Dict = {
   'toc.empty': '暂无标题',
   'slash.tableOfContents.title': '目录',
   'slash.tableOfContents.description': '插入文档目录。',
+
+  // Equation block
+  'slash.equation.title': '公式',
+  'slash.equation.description': '插入数学公式（LaTeX）',
+  'turnInto.equation': '公式',
+  'equation.placeholder': '输入数学公式...',
+  'equation.invalid': '公式无法解析',
+  'equation.edit': '编辑公式',
 };
 
 const enUS: Dict = {
@@ -454,6 +462,14 @@ const enUS: Dict = {
   'toc.empty': 'No headings',
   'slash.tableOfContents.title': 'Table of Contents',
   'slash.tableOfContents.description': 'Insert a table of contents.',
+
+  // Equation block
+  'slash.equation.title': 'Equation',
+  'slash.equation.description': 'Insert a math formula (LaTeX)',
+  'turnInto.equation': 'Equation',
+  'equation.placeholder': 'Type a formula...',
+  'equation.invalid': 'Invalid equation',
+  'equation.edit': 'Edit formula',
 };
 
 const DICTS: Readonly<Record<Locale, Dict>> = {

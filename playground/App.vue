@@ -1069,6 +1069,55 @@ const doc = ref<DocumentData>({
     },
 
     // =====================================================================
+    // 公式块
+    // =====================================================================
+    {
+      type: 'heading',
+      attrs: { level: 3 },
+      content: [{ type: 'text', text: '9.4 公式块' }],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: '公式块使用 ' },
+        { type: 'text', text: 'KaTeX', marks: [{ type: 'bold' }] },
+        { type: 'text', text: ' 渲染，仅存储原始 LaTeX（' },
+        { type: 'text', text: 'expression', marks: [{ type: 'code' }] },
+        { type: 'text', text: ' 字符串），不存储 HTML/SVG。点击右上角铅笔按钮进入编辑，Enter 提交，Esc 取消（空公式则删除）。' },
+      ],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: 'E = mc^2' },
+      content: [],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}' },
+      content: [],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: 'e^{i\\pi} + 1 = 0' },
+      content: [],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: '\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}' },
+      content: [],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: '\\int_{-\\infty}^{\\infty} e^{-x^2}\\,dx = \\sqrt{\\pi}' },
+      content: [],
+    },
+    {
+      type: 'equation',
+      attrs: { expression: 'f(x) = \\int_{a}^{b} \\left( \\alpha x^3 + \\beta x^2 + \\gamma x + \\delta \\right) e^{-\\lambda x}\\,dx' },
+      content: [],
+    },
+
+    // =====================================================================
     // 分隔线
     // =====================================================================
     {

@@ -14,7 +14,8 @@
 
 ## 功能特性
 
-- **11 种内置块类型** — 段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**分割线**、**表格**、**目录**（共 **13 个扩展**，另含 Keymap 与 History 两个行为扩展）
+- **12 种内置块类型** — 段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**公式**（LaTeX 数学公式）、**分割线**、**表格**、**目录**（共 **14 个扩展**，另含 Keymap 与 History 两个行为扩展）
+- **公式（LaTeX 数学）块** — 通过 KaTeX 渲染居中的展示型公式。文档中**只保存原始 `expression` 字符串**——KaTeX 输出在渲染时即时计算、永不持久化，因此序列化保持精简。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
 - **表格块** — 基于 `attrs` 的 N×M 网格；新建表格默认列宽 120 px、默认启用标题行；行/列选择条 + 左上角角部全选手柄；行/列之间插入点；浮动操作栏提供合并/拆分单元格、**切换标题行**（设置 `attrs.headerRow`）、删除行/列/整个表；单元格使用独立的 `contenteditable`，支持段落/标题/代码块类型、富行内标记、单元格背景色与对齐；Tab 在单元格间导航，Enter 退出编辑（代码块单元格按 Enter 插入换行），Escape 失焦；仿 Arco Design 的内部水平滚动条；矩形选区遇到合并单元格时会自动扩展以保证永远不会只选中合并单元格的一半。
 - **行内样式标记** — 粗体、斜体、下划线、删除线、行内代码、**链接**（`Mod-K` 快捷键、粘贴 URL、自动识别、浮层查看/编辑/复制/删除、href 净化阻断 `javascript:` / XSS），以及按选区设置的文字颜色与背景色
 - **块级属性** — 对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
@@ -53,7 +54,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 </template>
 ```
 
-编辑器默认内置全部 13 种扩展 — 除非你需要自定义集合，否则无需传入 `extensions`。
+编辑器默认内置全部 14 种扩展 — 除非你需要自定义集合，否则无需传入 `extensions`。
 
 ## Props 属性
 
@@ -105,7 +106,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 
 ## 内置扩展
 
-`BuiltinExtensions` 打包了以下 **13 种扩展**（11 种块类型 + 2 个行为扩展）：
+`BuiltinExtensions` 打包了以下 **14 种扩展**（12 种块类型 + 2 个行为扩展）：
 
 | 扩展名称               | 块类型         | 说明                                                                 |
 | ---------------------- | -------------- | -------------------------------------------------------------------- |
@@ -117,6 +118,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
 | `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式 — Enter 插入换行。                 |
 | `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `uploadImage` prop 与 `cleanup:image-file` 事件走上传侧信道。 |
+| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。KaTeX 在渲染时即时计算居中展示公式（输出永不持久化）。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |
 | `DividerExtension`     | `divider`      | 隔离型水平分割线。                                                     |
 | `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`；空 attrs — 标题列表是每次渲染时从编辑器状态计算的**动态视图**。不可编辑块（`editable: false`）；按文档顺序收集所有 `heading` 块（表格单元格内的标题自动排除）；点击条目滚动到对应标题。序列化输出空字符串（真正的标题由各自的块导出）。 |
@@ -188,6 +190,7 @@ const doc: DocumentData = {
            { content: [{ type: 'text', text: '3' }], rowspan: 1, colspan: 1, covered: false }],
         ],
       }, content: [] },
+    { type: 'equation', attrs: { expression: 'E = mc^2' }, content: [] },
   ],
 }
 ```

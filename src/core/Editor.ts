@@ -659,6 +659,15 @@ function blockToChunks(doc: DocState, id: BlockId, _level: number): MdChunk[] {
       lines = [];
       break;
     }
+    case 'equation': {
+      const e = block.attrs?.expression;
+      const expr = typeof e === 'string' ? e : '';
+      if (expr.trim().length > 0) {
+        const body = expr.split('\n');
+        lines = [`${pad}$$$`, ...body.map((l) => `${pad}${l}`), `${pad}$$$`];
+      }
+      break;
+    }
     default: {
       const text = inline(block);
       if (text.length > 0) lines = [`${pad}${text}`];
@@ -769,6 +778,7 @@ function parseLine(line: string): ParsedBlock | null {
 type LogicalBlock
   = | { kind: 'fence'; lang: string; body: string[] }
     | { kind: 'table'; lines: string[] }
+    | { kind: 'math'; body: string[] }
     | { kind: 'lines'; lines: string[] };
 
 /** Split raw markdown into top-level logical blocks (code fences, tables). */
@@ -799,6 +809,24 @@ function splitBlocks(md: string): LogicalBlock[] {
         i += 1;
       }
       blocks.push({ kind: 'fence', lang, body });
+      i += 1;
+      continue;
+    }
+    // Math fence: a line that is exactly "$$" (whitespace allowed) opens a
+    // block-level LaTeX equation; a following "$$" line closes it. The body is
+    // the raw LaTeX source.
+    const mathFence = /^\s*\$\$\s*$/.exec(line);
+    if (mathFence) {
+      flush();
+      const body: string[] = [];
+      i += 1;
+      while (i < rawLines.length) {
+        const l = rawLines[i]!;
+        if (/^\s*\$\$\s*$/.test(l)) break;
+        body.push(l);
+        i += 1;
+      }
+      blocks.push({ kind: 'math', body });
       i += 1;
       continue;
     }
@@ -868,6 +896,17 @@ function markdownToDoc(md: string): DocState {
     }
     if (group.kind === 'table') {
       items.push({ indent: 0, block: parseTable(group.lines) });
+      continue;
+    }
+    if (group.kind === 'math') {
+      items.push({
+        indent: 0,
+        block: {
+          type: 'equation',
+          attrs: { expression: group.body.join('\n') },
+          content: [],
+        },
+      });
       continue;
     }
     // Parse lines, tracking whether a blank line preceded each one so we

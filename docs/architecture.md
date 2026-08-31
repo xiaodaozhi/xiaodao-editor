@@ -734,7 +734,7 @@ src/
     Keymap.ts                   # default keymap: Enter/Backspace/ArrowUp/ArrowDown
     History.ts                  # undo/redo keymap: Mod-z / Mod-Shift-z / Mod-y
     _commonAttrs.ts             # shared align/color/bgColor/indent specs + color presets
-    builtin.ts                  # BuiltinExtensions bundle (13 extensions) + re-exports
+    builtin.ts                  # BuiltinExtensions bundle (14 extensions) + re-exports
   i18n.ts                       # locale (zh-CN/en-US) + theme (light/dark) module
   style.css                     # editor stylesheet (CSS variables, light/dark tokens; link anchor styles; image block overlays + upload UI; link popover styles)
   index.ts                      # public package entry point
@@ -1008,7 +1008,7 @@ guarantee of the brief.
 - [x] No deep reactivity; rendering subscribes per block via shallow refs.
 - [x] Modules are small and single-responsibility; no `utils.ts`. (Domain helpers live in their own modules — e.g. `urlUtils.ts`, `imageUpload.ts`.)
 - [x] Future features (Callout, Database, Columns, AI, …) require no core changes.
-- [x] **Phases 1–8 implemented**: 11 built-in block types (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, **Table**, **Divider**, **TableOfContents**) = 13 built-in extensions (incl. Keymap + History); inline marks including `link` with href sanitization; image block with transient upload side-channel, drag resize, caption, slash entry, fileId reference counting and `cleanup:image-file` emit; block-level attrs, slash menu, input rules, hover toolbar (incl. link button + table header-row toggle when table corner-selected), drag handle, clipboard (incl. URL paste → link, image paste → upload), i18n, theming; table of contents block (live heading list view, non-editable, slash entry, serialize → empty).
+- [x] **Phases 1–8 implemented**: 12 built-in block types (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, **Table**, **Divider**, **Equation**, **TableOfContents**) = 14 built-in extensions (incl. Keymap + History); inline marks including `link` with href sanitization; image block with transient upload side-channel, drag resize, caption, slash entry, fileId reference counting and `cleanup:image-file` emit; block-level attrs, slash menu, input rules, hover toolbar (incl. link button + table header-row toggle when table corner-selected), drag handle, clipboard (incl. URL paste → link, image paste → upload), i18n, theming; table of contents block (live heading list view, non-editable, slash entry, serialize → empty).
 - [x] **Table block invariants**: table content lives entirely in `Block.attrs` (`content: 'none'`) so core transactions/undo are untouched; all cell operations route through `editor.commands.setAttrs` → pure `tableModel.ts` (immutable in, new attrs out); code-block-cell Enter inserts a newline character rather than splitting the block.
 - [x] **Security — link href sanitization**: every path that writes or reconstructs a link `href` (`inlineToHtml`, `inlineFromDom`, `LinkPopover` save, `BlockContent` URL paste/auto-link) funnels through the single `sanitizeUrl` whitelist; unsafe schemes (`javascript:`, `vbscript:`, `data:`, `file:`) never reach the DOM.
 - [x] **Image upload invariants**: `Block.attrs` never stores transient upload state (pending/progress/error/blob URLs) — transient state lives in `view/imageUpload.ts`; undo/redo and reload-from-persistence therefore never resurrect invalid `blob:` or `pending` state.

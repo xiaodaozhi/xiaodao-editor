@@ -19,6 +19,7 @@ import { TodoListExtension } from './TodoList';
 import { QuoteExtension } from './Quote';
 import { CodeBlockExtension } from './CodeBlock';
 import { ImageExtension } from './Image';
+import { EquationExtension } from './Equation';
 import { TableExtension } from './Table';
 import { DividerExtension } from './Divider';
 import { TableOfContentsExtension } from './TableOfContents';
@@ -32,6 +33,7 @@ export const BuiltinExtensions: readonly Extension[] = [
   QuoteExtension,
   CodeBlockExtension,
   ImageExtension,
+  EquationExtension,
   TableExtension,
   DividerExtension,
   TableOfContentsExtension,
@@ -49,6 +51,8 @@ export { TodoListExtension } from './TodoList';
 export { QuoteExtension } from './Quote';
 export { CodeBlockExtension } from './CodeBlock';
 export { ImageExtension } from './Image';
+export { EquationExtension } from './Equation';
+export type { EquationAttrs } from './Equation';
 export { TableExtension, createTableCommands } from './Table';
 export { DividerExtension } from './Divider';
 export { TableOfContentsExtension } from './TableOfContents';
