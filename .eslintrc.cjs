@@ -54,7 +54,10 @@ module.exports = {
     'vue/no-v-html': 'off',
   },
   overrides: [
-    // The view layer, extensions, and playground may use Vue freely.
+    // The view layer, extensions, playground, and the test suite may use Vue
+    // freely. Test files import `vue`, `@vue/test-utils`, and `@/*` modules to
+    // mount components and mock editor commands, so they must be exempt from the
+    // framework-agnostic `src/core` restriction too.
     {
       files: [
         'src/view/**/*.ts',
@@ -64,6 +67,8 @@ module.exports = {
         'src/i18n.ts',
         'src/env.d.ts',
         'playground/**/*',
+        'test/**/*.ts',
+        'test/**/*.vue',
       ],
       rules: {
         'no-restricted-imports': 'off',
