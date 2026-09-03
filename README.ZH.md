@@ -69,7 +69,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 | `uploadImage`     | `UploadImageHandler`                   | 内存内 mock            | 图片上传钩子；签名：`(name, file, controller, onProgress) => Promise<ImageUploadResult>`。要持久化文档**必须**提供此 prop（默认 mock 使用不可序列化的 `blob:` URL）。 |
 | `width`           | `string \| number`                     | `undefined`            | 可选：编辑器宽度。数字按 CSS px 解析；字符串直接使用（如 `'800px'`、`'100%'`）。未设置时默认撑满容器（`width: 100%`）。 |
 | `height`          | `string \| number`                     | `undefined`            | 可选：编辑器高度。设置后内容区域会在编辑器**内部**滚动，不再无限向下生长；未设置时编辑器随内容扩展，由宿主页面接管滚动。 |
-| `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`               | 工具栏 / 操作栏的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。`'float'`（仅桌面端）隐藏 `FixedToolbar`，改用跟随文本选区的浮动工具栏（HoverToolbar）；移动端自动回退为 `FixedToolbar`。 |
+| `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`               | 工具栏 / 操作栏的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。`'float'`（仅桌面端）隐藏 `FixedToolbar`，改用跟随文本/表格选区的浮动工具栏（HoverToolbar）；移动端自动回退为 `FixedToolbar`。 |
 
 ### Emits 事件
 

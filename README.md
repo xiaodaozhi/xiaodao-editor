@@ -64,7 +64,7 @@ by an **extension**, so the core never switches on a block type.
   `toolbarPosition` prop: `'auto'` (default — top on desktop, bottom on
   mobile), `'top'` (always top), `'bottom'` (always bottom), or `'float'`
   (desktop only — hides the FixedToolbar and shows a floating selection
-  toolbar that follows the text selection; falls back to the FixedToolbar
+  toolbar that follows the text/table selection; falls back to the FixedToolbar
   on mobile). Menus (PlusMenu / BlockSettingsMenu) open downward when the
   toolbar is at the top.
 - **Sizing & internal scrolling** — constrain the editor with `width`

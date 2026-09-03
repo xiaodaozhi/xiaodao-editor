@@ -967,7 +967,7 @@ In `view` mode it renders: a clickable `<a :href="sanitizeUrl(currentHref)">` wi
 - `'auto'` (default): top on desktop, bottom on mobile (stays above the virtual keyboard via the `visualViewport` API; uses `env(safe-area-inset-bottom)` for iPhone home-indicator spacing).
 - `'top'`: force top. Menus (PlusMenu, BlockSettingsMenu) open **downward**.
 - `'bottom'`: force bottom. Menus open **upward**.
-- `'float'`: **desktop only** — the FixedToolbar is hidden and `BlockEditor.vue` renders a standalone floating `HoverToolbar` (teleported to `<body>`, follows the text selection) instead. On mobile (`(pointer: coarse)`), `'float'` falls back to `'auto'`.
+- `'float'`: **desktop only** — the FixedToolbar is hidden and `BlockEditor.vue` renders a standalone floating `HoverToolbar` (teleported to `<body>`, follows the text/table selection) instead. On mobile (`(pointer: coarse)`), `'float'` falls back to `'auto'`.
 
 Embeds a single `<HoverToolbar>` instance **inline** (instead of rendering it as a floating overlay) so text-selection state is preserved when the user clicks formatting buttons. Left side: plus button (opens `PlusMenu`) and grip button (opens `BlockSettingsMenu`). Right side: the full `HoverToolbar` button set (type / align / marks / color / copy / table ops / link ops). Provides two injection keys that downstream menus consume to decide popup direction:
 - `fixedToolbarBottomKey: Ref<boolean>` — `true` when the toolbar is pinned to the bottom.

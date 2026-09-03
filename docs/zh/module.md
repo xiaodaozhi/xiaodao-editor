@@ -968,7 +968,7 @@ emits: {
 - `'auto'`（默认）：桌面端顶栏、移动端底栏（通过 `visualViewport` API 始终显示在虚拟键盘之上；使用 `env(safe-area-inset-bottom)` 适配 iPhone 主屏指示条）。
 - `'top'`：强制顶栏。PlusMenu / BlockSettingsMenu 等菜单改为**向下**弹出。
 - `'bottom'`：强制底栏。菜单改为**向上**弹出。
-- `'float'`：**仅桌面端**——隐藏 FixedToolbar，改由 `BlockEditor.vue` 渲染一个独立的浮动 `HoverToolbar`（Teleport 到 `<body>`，跟随文本选区）。在移动端（`(pointer: coarse)`）下 `'float'` 会回退为 `'auto'`。
+- `'float'`：**仅桌面端**——隐藏 FixedToolbar，改由 `BlockEditor.vue` 渲染一个独立的浮动 `HoverToolbar`（Teleport 到 `<body>`，跟随文本/表格选区）。在移动端（`(pointer: coarse)`）下 `'float'` 会回退为 `'auto'`。
 
 内嵌一个 **inline 的** `<HoverToolbar>` 实例（而不是作为浮动叠加层渲染），这样用户点击格式化按钮时可以**保留文本选区状态**。左侧：plus 按钮（打开 `PlusMenu`）和 grip 按钮（打开 `BlockSettingsMenu`）。右侧：完整的 `HoverToolbar` 按钮集（类型 / 对齐 / 标记 / 颜色 / 复制 / 表格操作 / 链接操作）。它对外提供两个注入键，供下游菜单决定弹出方向：
 - `fixedToolbarBottomKey: Ref<boolean>` — 当工具栏被钉在底部时为 `true`。

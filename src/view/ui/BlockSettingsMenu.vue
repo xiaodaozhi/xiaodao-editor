@@ -48,8 +48,9 @@
         class="bsm-scroll"
         @scroll="updateScrollState"
       >
-        <!-- 1. Turn into (no label) — hidden for non-text blocks like image/table/divider -->
-        <template v-if="!isImageBlock && !isDividerBlock">
+        <!-- 1. Turn into (no label) — hidden for non-text blocks like image/table/divider,
+             and for the equation block (equations can't be converted to other blocks). -->
+        <template v-if="!isImageBlock && !isDividerBlock && !isEquationBlock">
           <div class="bsm-group">
             <div class="bsm-icon-grid">
               <button
@@ -532,7 +533,7 @@ import { useMenuDismiss } from './useMenuDismiss';
 import SafeHtml from './SafeHtml.vue';
 import type { BlockId, Block } from '../../core/types';
 import type { EditorState } from '../../core/state/EditorState';
-import { inlineText, inlineFromString } from '../../core/types';
+import { inlineText } from '../../core/types';
 import {
   TEXT_COLOR_PRESETS,
   BG_COLOR_PRESETS,
@@ -553,7 +554,6 @@ import {
   ICON_TODO,
   ICON_QUOTE,
   ICON_CODE,
-  ICON_EQUATION,
 } from './icons';
 import { useI18n } from '../../i18n';
 
@@ -670,6 +670,11 @@ const isDividerBlock = computed<boolean>(() =>
   openedBlockType.value === 'divider' || openedBlockType.value === 'tableOfContents',
 );
 
+/** 公式块：不显示"转为"区域（公式不能转成其他块，其他块也不能转成公式）。 */
+const isEquationBlock = computed<boolean>(() =>
+  openedBlockType.value === 'equation',
+);
+
 /** 需要隐藏"对齐与缩进"区域的块类型：分割线、表格、目录、公式（公式无 align 属性） */
 const hideAlignSection = computed<boolean>(() =>
   openedBlockType.value === 'divider'
@@ -748,31 +753,17 @@ const currentBgColor = computed<string>(() => {
 // --- Menu contents --------------------------------------------------------
 
 /**
- * Turn the current block into `type`. Handles the Equation ⇄ text round-trip:
- *  - text block → equation: the block's plain text becomes the LaTeX source.
- *  - equation → text type: the LaTeX source is restored as the block's text
- *    (so the formula is never silently lost; this is the only place that
- *    relocates the equation's content, since the schema has no `expression`
- *    attr for text blocks).
+ * Turn the current block into `type`. The equation block is intentionally
+ * excluded from both directions of the "turn into" menu (equations can't be
+ * converted to other blocks, and other blocks can't be converted to equations),
+ * so this only ever converts between ordinary text-ish block types.
  */
 function applyTurnInto(type: string, attrs?: Record<string, unknown>): void {
   const blockId = props.blockId;
   if (!blockId) return;
   const b = editor.getState().doc.blocks.get(blockId);
   if (!b) return;
-  if (type === 'equation') {
-    const text = inlineText(b.content);
-    editor.commands.convertBlock?.({ id: blockId, type: 'equation', attrs: { expression: text } });
-    return;
-  }
-  const expr = b.type === 'equation' ? String((b.attrs as { expression?: unknown }).expression ?? '') : '';
   editor.commands.convertBlock?.({ id: blockId, type, attrs });
-  if (expr) {
-    const schema = editor.registries.schema.get(type);
-    if (schema && schema.content === 'text') {
-      editor.commands.setText?.({ id: blockId, content: inlineFromString(expr) });
-    }
-  }
 }
 
 const turnIntoActions = computed<readonly SettingsItem[]>(() => [
@@ -824,10 +815,6 @@ const turnIntoActions = computed<readonly SettingsItem[]>(() => [
     id: 'code', iconHtml: ICON_CODE, title: t('turnInto.code'), kind: 'turnInto',
     run: () => void applyTurnInto('codeBlock', { language: 'plain' }),
   },
-  {
-    id: 'equation', iconHtml: ICON_EQUATION, title: t('turnInto.equation'), kind: 'turnInto',
-    run: () => void applyTurnInto('equation'),
-  },
 ]);
 
 type TurnIntoId = (typeof turnIntoActions.value)[number]['id'];
@@ -848,7 +835,6 @@ function isTurnIntoActive(id: TurnIntoId): boolean {
     case 'todo': return b.type === 'todoList';
     case 'quote': return b.type === 'quote';
     case 'code': return b.type === 'codeBlock';
-    case 'equation': return b.type === 'equation';
     default: return false;
   }
 }

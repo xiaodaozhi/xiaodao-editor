@@ -519,7 +519,7 @@ src/
       LinkPopover.vue           # 链接浮层（查看模式：打开/复制/编辑/删除；编辑模式：href + 文本；定位在选区或被点击的 <a> 上方）
       FixedToolbar.vue            # 常驻顶/底操作栏（内嵌 HoverToolbar + plus/handle 按钮）。
                                   # 通过 toolbarPosition prop 控制位置：'auto'(桌面顶/移动端底)、'top'、'bottom'、'float'
-                                  # ('float' 仅桌面端：隐藏该栏，改为渲染跟随文本选区的浮动 HoverToolbar)。
+                                  # ('float' 仅桌面端：隐藏该栏，改为渲染跟随文本/表格选区的浮动 HoverToolbar)。
       SafeHtml.vue              # 隔离 v-html,用于可信的 SVG/HTML 图形渲染
       icons.ts                  # 内联 SVG 图标字符串(无 <text> 元素)
       inputRulesEngine.ts       # markdown 快捷键(# , > , [] , ```)

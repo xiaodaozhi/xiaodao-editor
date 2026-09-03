@@ -712,7 +712,7 @@ src/
       LinkPopover.vue           # link popover (view mode: open/copy/edit/remove; edit mode: href + text; positioned over selection or clicked <a>)
       FixedToolbar.vue            # persistent top/bottom action bar (embeds HoverToolbar inline + plus/handle buttons).
                                   # Position via toolbarPosition prop: 'auto' (top desktop / bottom mobile), 'top', 'bottom', 'float'
-                                  # ('float' = desktop only: hide this bar, render a floating HoverToolbar that follows the text selection).
+                                  # ('float' = desktop only: hide this bar, render a floating HoverToolbar that follows the text/table selection).
       SafeHtml.vue              # isolates v-html for trusted SVG/HTML glyph rendering
       icons.ts                  # inline SVG icon strings (no <text> elements)
       inputRulesEngine.ts       # markdown shortcuts (# , > , [] , ```)
