@@ -9,7 +9,7 @@
        block handle.
     2. The full HoverToolbar button set (type / align / verticalAlign / marks /
        color / copy / table operations) — rendered by embedding a single
-       <HoverToolbar mobile> instance. The props + handlers come from a
+       <HoverToolbar inline> instance. The props + handlers come from a
        "descriptor" that is sourced from EITHER:
          - the text-block selection state (passed as props from BlockEditor),
          - the table cell / cell-edit selection state (published by TableBlock
@@ -127,7 +127,7 @@
          for Teleported dropdown content (whose clicks don't bubble through
          FixedToolbar's @mousedown.capture root listener). -->
     <HoverToolbar
-      mobile
+      inline
       v-bind="descriptor"
       @interacting="emit('toolbarInteracting')"
     />

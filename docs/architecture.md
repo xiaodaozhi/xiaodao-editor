@@ -711,7 +711,8 @@ src/
       CodeLangPicker.vue        # set code-block language
       LinkPopover.vue           # link popover (view mode: open/copy/edit/remove; edit mode: href + text; positioned over selection or clicked <a>)
       FixedToolbar.vue            # persistent top/bottom action bar (embeds HoverToolbar inline + plus/handle buttons).
-                                  # Position via toolbarPosition prop: 'auto' (top desktop / bottom mobile), 'top', 'bottom'.
+                                  # Position via toolbarPosition prop: 'auto' (top desktop / bottom mobile), 'top', 'bottom', 'float'
+                                  # ('float' = desktop only: hide this bar, render a floating HoverToolbar that follows the text selection).
       SafeHtml.vue              # isolates v-html for trusted SVG/HTML glyph rendering
       icons.ts                  # inline SVG icon strings (no <text> elements)
       inputRulesEngine.ts       # markdown shortcuts (# , > , [] , ```)
@@ -761,7 +762,7 @@ because the design over-anticipated needs:
 | `state/invert.ts` not in design | Added | Step inversion is non-trivial and deserves its own focused module. |
 | `extensions/selection/`, `extensions/inputRules/`, `extensions/placeholder/` (Phase 2) | `view/ui/inputRulesEngine.ts` + `view/BlockContent.vue` placeholder | Input rules engine lives in the view layer (needs DOM access). Placeholder remains in `BlockContent.vue`. |
 | `extensions/` (Phase 3: Todo, Quote, CodeBlock, BulletList, OrderedList) | 5 separate files under `extensions/` | Each is a self-contained extension with schema + renderer. CodeBlock is `isolating`. |
-| `view/ui/` directory (Phase 4) | 9 Vue components + 6 composable/helper files | Floating UI components are Teleported to `<body>`. Shared scroll/dismiss composables deduplicate behavior. `MobileToolbar.vue` was later renamed/expanded into `FixedToolbar.vue` with a `toolbarPosition` prop (auto/top/bottom) so the toolbar is persistent across desktop and mobile, menus flip direction, and a `fixedToolbarBottomKey` injection key lets downstream menus know whether to open up or down. |
+| `view/ui/` directory (Phase 4) | 9 Vue components + 6 composable/helper files | Floating UI components are Teleported to `<body>`. Shared scroll/dismiss composables deduplicate behavior. `MobileToolbar.vue` was later renamed/expanded into `FixedToolbar.vue` with a `toolbarPosition` prop (auto/top/bottom/float) so the toolbar is persistent across desktop and mobile, menus flip direction, and a `fixedToolbarBottomKey` injection key lets downstream menus know whether to open up or down. The `'float'` value is desktop-only: it hides the FixedToolbar and renders a standalone floating `HoverToolbar` that follows the text selection. |
 | `view/clipboard.ts` + `view/inlineDom.ts` (Phase 5) | Added | Clipboard parsing (HTML/plain-text → blocks) and InlineSeq ↔ DOM conversion are view-layer concerns. |
 | `i18n.ts` + `theme` prop (cross-cutting) | Added | Zero-dep i18n module via provide/inject; theme synced to `<body>` for Teleport-ed popovers. |
 | `view/ui/SafeHtml.vue` | Added | Isolates `v-html` to a single component so the rest of the codebase satisfies `vue/no-v-html`. Only used for trusted internal SVG/HTML glyph strings. |

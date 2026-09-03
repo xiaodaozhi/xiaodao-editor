@@ -43,8 +43,10 @@
   >
     <!-- Fixed action bar (always visible — plus/handle + contextual buttons).
          Position is auto-detected: top on desktop, bottom on mobile.
-         Can be overridden via the `toolbarPosition` prop. -->
+         Can be overridden via the `toolbarPosition` prop. Hidden entirely in
+         floating mode (toolbarPosition='float' on desktop). -->
     <FixedToolbar
+      v-if="!useFloatToolbar"
       :root-el="rootEl"
       :focus-block-id="focusedBlockId"
       :hover-visible="hoverToolbar.visible"
@@ -60,6 +62,17 @@
       @open-settings-menu="onOpenSettingsMenu"
       @link-click="onHoverToolbarLinkClick"
       @hover-close="hoverToolbar.visible = false"
+    />
+
+    <!-- Floating selection toolbar: only when toolbarPosition='float' on desktop.
+         Reuses the same descriptor source as FixedToolbar (table bridge first,
+         then text-selection state) so it renders for table selections too.
+         `inline` is intentionally omitted so it renders in floating (teleported)
+         mode. -->
+    <HoverToolbar
+      v-if="useFloatToolbar"
+      v-bind="floatToolbarDescriptor"
+      @interacting="markToolbarInteracting"
     />
     <!-- Scrollable content area — vertical scrolling lives here, not on the
          editor root. When height is set this area scrolls internally; when
@@ -199,6 +212,7 @@ import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
 import BlockSettingsMenu from './ui/BlockSettingsMenu.vue';
 import FixedToolbar from './ui/FixedToolbar.vue';
+import HoverToolbar from './ui/HoverToolbar.vue';
 import OrderedListMenu from './ui/OrderedListMenu.vue';
 import NumberPicker from './ui/NumberPicker.vue';
 import CodeLangPicker from './ui/CodeLangPicker.vue';
@@ -252,10 +266,13 @@ const props = withDefaults(defineProps<{
   /** Optional: fixed height for the editor. When set, the editor scrolls
    *  internally instead of growing unbounded. */
   height?: string | number;
-  /** Optional: placement of the persistent FixedToolbar.
-   *  - 'auto' (default): top on desktop, bottom on mobile.
-   *  - 'top' / 'bottom': force the toolbar to top or bottom. */
-  toolbarPosition?: 'auto' | 'top' | 'bottom';
+  /** Optional: placement of the toolbar / action bar.
+   *  - 'auto' (default): FixedToolbar top on desktop, bottom on mobile.
+   *  - 'top' / 'bottom': force the FixedToolbar to top or bottom.
+   *  - 'float': on desktop, hide FixedToolbar and use a floating selection
+   *    toolbar (HoverToolbar) that follows the text selection. On mobile it
+   *    falls back to the auto FixedToolbar. */
+  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';
 }>(), {
   extensions: () => BuiltinExtensions,
   modelValue: () => ({ blocks: [] }),
@@ -387,6 +404,39 @@ const toolbarPosition = computed<'top' | 'bottom'>(() => {
   if (props.toolbarPosition === 'top') return 'top';
   if (props.toolbarPosition === 'bottom') return 'bottom';
   return isMobile.value ? 'bottom' : 'top';
+});
+
+// Floating selection toolbar mode: active only on desktop when the prop is
+// 'float'. On mobile, 'float' falls back to the FixedToolbar (useFloatToolbar
+// stays false, and the toolbarPosition computed above resolves to 'bottom').
+const useFloatToolbar = computed<boolean>(
+  () => props.toolbarPosition === 'float' && !isMobile.value,
+);
+
+// Floating-mode descriptor: mirrors FixedToolbar's `descriptor` computed so
+// the floating <HoverToolbar> handles BOTH table selections (cell / row /
+// column / corner-select-all / cell-edit text selection) and text-block
+// selections. Table selections arrive via the fixedToolbarBridge published by
+// TableBlock; text selections use the shared hoverToolbar reactive state.
+// Table descriptor takes priority when visible, exactly like FixedToolbar.
+const floatToolbarDescriptor = computed<FixedToolbarDescriptor>(() => {
+  const td = fixedToolbarBridge.value;
+  if (td && td.visible) {
+    return td;
+  }
+  return {
+    visible: hoverToolbar.visible,
+    selectionRect: hoverToolbar.selectionRect,
+    blockId: hoverToolbar.blockId,
+    blockType: hoverToolbar.blockType,
+    blockAttrs: hoverToolbar.blockAttrs,
+    rootEl: rootEl.value ?? null,
+    onClose: () => {
+      hoverToolbar.visible = false;
+    },
+    onLinkClick: (blockId: BlockId, from: number, to: number) =>
+      onHoverToolbarLinkClick(blockId, from, to),
+  };
 });
 
 // Provide the bottom flag so PlusMenu / BlockSettingsMenu (rendered as

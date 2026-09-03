@@ -1,7 +1,7 @@
 {
   "name": "xiaodao-editor",
-  "version": "0.1.17",
-  "description": "Notion-style block editor for Vue 3",
+  "version": "0.1.18",
+  "description": "Notion-style block editor for Vue 3 + TypeScript. Ships as a single zero-runtime-dependency package: a framework-agnostic core plus a Vue view layer. Keep developing!",
   "type": "module",
   "license": "MIT",
   "homepage": "https://xiaodaozhi.com/xiaodao-editor.html",

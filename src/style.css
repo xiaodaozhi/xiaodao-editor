@@ -3528,7 +3528,7 @@ body.theme-dark .table-cell-inner {
    filling the remaining width and using the existing ht-content overflow /
    nav-button mechanism for horizontal scrolling. */
 
-.hover-toolbar-shell.mobile-shell {
+.hover-toolbar-shell.inline-shell {
   position: static;
   z-index: auto;
   pointer-events: auto;
@@ -3539,7 +3539,7 @@ body.theme-dark .table-cell-inner {
   overflow: hidden;
 }
 
-.hover-toolbar.mobile-mode {
+.hover-toolbar.inline-mode {
   position: static;
   flex: 1;
   min-width: 0;
@@ -3561,80 +3561,80 @@ body.theme-dark .table-cell-inner {
 
 /* In inline mode this is a static top bar, not a floating toolbar
    anchored to a selection — hide the selection-pointer arrow entirely. */
-.hover-toolbar.mobile-mode.above::after,
-.hover-toolbar.mobile-mode.below::after {
+.hover-toolbar.inline-mode.above::after,
+.hover-toolbar.inline-mode.below::after {
   display: none;
 }
 
 /* When no contextual buttons are visible, hide the toolbar shell entirely
    so only the plus/handle buttons show. */
-.hover-toolbar-shell.mobile-shell:not(.mobile-visible) {
+.hover-toolbar-shell.inline-shell:not(.inline-visible) {
   display: none;
 }
 
 /* In inline mode the toolbar buttons inherit the bar's styling. Override
    the hover/active states to match a top bar.
    Height matches .tt-btn (36px) so the two sides share one grid line. */
-.hover-toolbar.mobile-mode .ht-btn {
+.hover-toolbar.inline-mode .ht-btn {
   height: 36px;
   min-width: 36px;
   padding: 0 8px;
   -webkit-tap-highlight-color: transparent;
 }
 
-.hover-toolbar.mobile-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
+.hover-toolbar.inline-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
   background: var(--be-hover, rgba(0 0 0 / 0.06));
 }
 
-.hover-toolbar.mobile-mode .ht-btn:active:not(.active):not(.open) {
+.hover-toolbar.inline-mode .ht-btn:active:not(.active):not(.open) {
   background: var(--be-hover, rgba(0 0 0 / 0.08));
 }
 
-.hover-toolbar.mobile-mode .ht-btn.active,
-.hover-toolbar.mobile-mode .ht-btn.open {
+.hover-toolbar.inline-mode .ht-btn.active,
+.hover-toolbar.inline-mode .ht-btn.open {
   background: var(--be-accent);
   color: #fff;
 }
 
-.theme-dark .hover-toolbar.mobile-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
+.theme-dark .hover-toolbar.inline-mode .ht-btn:hover:not(:disabled):not(.active):not(.open) {
   background: rgba(255 255 255 / 0.08);
 }
 
-.theme-dark .hover-toolbar.mobile-mode .ht-btn:active:not(.active):not(.open) {
+.theme-dark .hover-toolbar.inline-mode .ht-btn:active:not(.active):not(.open) {
   background: rgba(255 255 255 / 0.16);
 }
 
-.theme-dark .hover-toolbar.mobile-mode .ht-btn.active,
-.theme-dark .hover-toolbar.mobile-mode .ht-btn.open {
+.theme-dark .hover-toolbar.inline-mode .ht-btn.active,
+.theme-dark .hover-toolbar.inline-mode .ht-btn.open {
   background: var(--be-accent);
   color: #fff;
 }
 
 /* Inline mode nav buttons also use the 36px touch target. */
-.hover-toolbar.mobile-mode .ht-nav-btn {
+.hover-toolbar.inline-mode .ht-nav-btn {
   width: 28px;
   height: 36px;
   border-radius: 4px;
 }
 
-.hover-toolbar.mobile-mode .ht-nav-btn:hover:not(.disabled) {
+.hover-toolbar.inline-mode .ht-nav-btn:hover:not(.disabled) {
   background: var(--be-hover, rgba(0 0 0 / 0.06));
 }
 
-.theme-dark .hover-toolbar.mobile-mode .ht-nav-btn:hover:not(.disabled) {
+.theme-dark .hover-toolbar.inline-mode .ht-nav-btn:hover:not(.disabled) {
   background: rgba(255 255 255 / 0.08);
 }
 
 /* Allow the toolbar's button strip to be swiped horizontally on touch
    devices. */
-.hover-toolbar.mobile-mode .ht-content {
+.hover-toolbar.inline-mode .ht-content {
   touch-action: pan-x;
 }
 
 /* Inline dropdowns: teleported to <body> with position:fixed so they are NOT
    clipped by .fixed-toolbar's overflow:hidden. top/left/right are set
    via inline style using viewport-relative coords. */
-.ht-dropdown-mobile {
+.ht-dropdown-inline {
   position: fixed;
   top: auto;
   left: auto;
@@ -3643,7 +3643,7 @@ body.theme-dark .table-cell-inner {
 
 /* When not teleported (desktop / floating), keep the above-below absolute
    positioning within the ht-dropdown-wrap container. */
-.hover-toolbar:not(.mobile-mode) .ht-dropdown.above {
+.hover-toolbar:not(.inline-mode) .ht-dropdown.above {
   top: auto;
   bottom: calc(100% + 6px);
 }

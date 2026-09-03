@@ -33,7 +33,7 @@ export const mobileKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-mobile
  * FixedToolbar should render inside its embedded HoverToolbar. Produced by
  * whichever context currently owns the selection (text-block selection in
  * BlockEditor, or table cell / cell-edit selection in TableBlock) and
- * consumed by FixedToolbar which spreads it onto `<HoverToolbar mobile>`.
+ * consumed by FixedToolbar which spreads it onto `<HoverToolbar inline>`.
  *
  * This is the reuse mechanism: instead of duplicating HoverToolbar's buttons
  * and logic, the source context builds the exact same prop/handler bag it

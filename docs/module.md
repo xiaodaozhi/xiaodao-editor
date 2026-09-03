@@ -706,6 +706,13 @@ props: {
   placeholder?: string                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
   theme?: 'light' | 'dark'                 // default 'light'
   locale?: 'zh-CN' | 'en-US'               // default 'zh-CN'; any non-empty non-'zh-CN' value ⇒ 'en-US'
+  // — Sizing (optional): a number is interpreted as CSS pixels; a string is used as-is —
+  width?: string | number                  // default undefined (fills container, width: 100%)
+  height?: string | number                 // default undefined (grows with content; host page scrolls)
+  // — Toolbar placement (FixedToolbar): 'auto' = top on desktop / bottom on mobile.
+  //   'float' (desktop only) hides the FixedToolbar and renders a floating
+  //   HoverToolbar that follows the text selection; falls back to 'auto' on mobile.
+  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // default 'auto'
   // — Image upload hook (optional; see src/view/imageUpload.ts) —
   uploadImage?: (file: File, ctx: {
     blockId: BlockId
@@ -960,12 +967,13 @@ In `view` mode it renders: a clickable `<a :href="sanitizeUrl(currentHref)">` wi
 - `'auto'` (default): top on desktop, bottom on mobile (stays above the virtual keyboard via the `visualViewport` API; uses `env(safe-area-inset-bottom)` for iPhone home-indicator spacing).
 - `'top'`: force top. Menus (PlusMenu, BlockSettingsMenu) open **downward**.
 - `'bottom'`: force bottom. Menus open **upward**.
+- `'float'`: **desktop only** — the FixedToolbar is hidden and `BlockEditor.vue` renders a standalone floating `HoverToolbar` (teleported to `<body>`, follows the text selection) instead. On mobile (`(pointer: coarse)`), `'float'` falls back to `'auto'`.
 
 Embeds a single `<HoverToolbar>` instance **inline** (instead of rendering it as a floating overlay) so text-selection state is preserved when the user clicks formatting buttons. Left side: plus button (opens `PlusMenu`) and grip button (opens `BlockSettingsMenu`). Right side: the full `HoverToolbar` button set (type / align / marks / color / copy / table ops / link ops). Provides two injection keys that downstream menus consume to decide popup direction:
 - `fixedToolbarBottomKey: Ref<boolean>` — `true` when the toolbar is pinned to the bottom.
 - `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>` — passed to the embedded HoverToolbar so it knows what block type / attrs to show actions for.
 
-**Interactions.** Imports `vue`, `HoverToolbar.vue`, `i18n` (`useI18n`), and `view/context` (`useEditor`, `fixedToolbarBridgeKey`, `fixedToolbarBottomKey`). Rendered **unconditionally** inside `BlockEditor.vue`'s template. Emits events that `BlockEditor.vue` wires to the same `onOpenPlusMenu` / `onOpenSettingsMenu` handlers used by the desktop `BlockHandle.vue`. When a table cell is focused, `TableBlock` publishes a descriptor via the `fixedToolbarBridgeKey` injection key so the embedded `HoverToolbar` reflects cell/table state instead of text-block state.
+**Interactions.** Imports `vue`, `HoverToolbar.vue`, `i18n` (`useI18n`), and `view/context` (`useEditor`, `fixedToolbarBridgeKey`, `fixedToolbarBottomKey`). Rendered **conditionally** inside `BlockEditor.vue`'s template: it is skipped when `toolbarPosition='float'` on desktop (a floating `HoverToolbar` is rendered in its place; on mobile `'float'` falls back to `'auto'` and the FixedToolbar still renders). Emits events that `BlockEditor.vue` wires to the same `onOpenPlusMenu` / `onOpenSettingsMenu` handlers used by the desktop `BlockHandle.vue`. When a table cell is focused, `TableBlock` publishes a descriptor via the `fixedToolbarBridgeKey` injection key so the embedded `HoverToolbar` reflects cell/table state instead of text-block state.
 
 **Extension points.** The toolbar descriptor source is pluggable via the `fixedToolbarBridgeKey` injection key, so future block types with custom selection state (e.g. a database block) can feed their own actions into the fixed toolbar without modifying `FixedToolbar.vue`. The position auto-detection is isolated inside the component so external callers can override behavior purely via the `toolbarPosition` prop.
 

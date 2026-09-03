@@ -103,6 +103,7 @@
         :theme="theme"
         :extensions="extensions"
         :editable="editable"
+        :toolbar-position="'float'"
         :placeholder="locale === 'zh-CN' ? placeholderZh : placeholderEn"
       />
     </div>

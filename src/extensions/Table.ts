@@ -2950,7 +2950,7 @@ const TableBlock = defineComponent({
       };
 
       // --- Always publish descriptor to the bridge so FixedToolbar renders it
-      // via <HoverToolbar mobile>. Published AFTER the render flush with
+      // via <HoverToolbar inline>. Published AFTER the render flush with
       // content-signature dedupe — see publishBridge()/scheduleBridgePublish().
       if (fixedToolbarBridge) {
         if (tableModeDescriptor.visible) {

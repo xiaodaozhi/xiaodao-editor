@@ -21,7 +21,7 @@
 - **块级属性** — 对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
 - **斜杠菜单** — 输入 `/` 打开可搜索的命令面板；输入规则（`# `、`> `、`[] `、```` ``` ````）可即时转换块类型；`/image` 打开文件选择器
 - **块操作** — 拖拽手柄、悬浮工具栏、`+` 插入按钮，含「复制 / 剪切 / 上移 / 下移 / 删除」的操作菜单；**真实嵌套**（Tab / Shift-Tab 缩进/反缩进构建父子树；拖拽支持兄弟节点的上/下插入 + **"拖入块内"** 模式 — 在块中心停顿一下即可作为第一个子块嵌套进去）；复制会克隆整个子树；图片额外提供替换 / 删除、角部等比缩放手柄、可编辑 caption
-- **固定工具栏（FixedToolbar）** — 常驻操作栏，在工具栏内部内嵌了上下文相关的 **HoverToolbar**（点击格式化按钮时可以保持文本选区不丢失）。通过 `toolbarPosition` prop 控制三种位置：`'auto'`（默认，桌面端顶、移动端底）、`'top'`（强制顶部）或 `'bottom'`（强制底部）。工具栏在顶部时，PlusMenu / 手柄菜单会改为向下弹出。
+- **固定工具栏（FixedToolbar）** — 常驻操作栏，在工具栏内部内嵌了上下文相关的 **HoverToolbar**（点击格式化按钮时可以保持文本选区不丢失）。通过 `toolbarPosition` prop 控制四种位置：`'auto'`（默认，桌面端顶、移动端底）、`'top'`（强制顶部）、`'bottom'`（强制底部），或 `'float'`（仅桌面端——隐藏 FixedToolbar，改用跟随文本选区浮现的浮动工具栏；移动端自动回退为 FixedToolbar）。工具栏在顶部时，PlusMenu / 手柄菜单会改为向下弹出。
 - **尺寸控制与内部滚动** — 通过 `width` 和 `height` prop 约束编辑器（数字按 px 解析）。内容区域会**在编辑器内部纵向滚动**，而不是无限向下生长，外部布局无需自行管理 overflow。
 - **剪贴板** — HTML 与纯文本的干净复制 / 剪切 / 粘贴；多块选区覆盖层；**粘贴 HTML `<img>` / 图片文件 + 拖拽文件到编辑器内会自动创建图片块并发起上传**；选中文本后粘贴 URL 会包裹为链接
 - **移动端支持** — 长按后开始选中文本，然后拖动手指即可**跨多个独立 `contenteditable` 块**进行选择（通过 hit-testing + overlay 实现，因为原生 Selection API 不支持跨块边界）。固定工具栏会自动落到屏幕底部，位于虚拟键盘之上。
@@ -69,7 +69,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 | `uploadImage`     | `UploadImageHandler`                   | 内存内 mock            | 图片上传钩子；签名：`(name, file, controller, onProgress) => Promise<ImageUploadResult>`。要持久化文档**必须**提供此 prop（默认 mock 使用不可序列化的 `blob:` URL）。 |
 | `width`           | `string \| number`                     | `undefined`            | 可选：编辑器宽度。数字按 CSS px 解析；字符串直接使用（如 `'800px'`、`'100%'`）。未设置时默认撑满容器（`width: 100%`）。 |
 | `height`          | `string \| number`                     | `undefined`            | 可选：编辑器高度。设置后内容区域会在编辑器**内部**滚动，不再无限向下生长；未设置时编辑器随内容扩展，由宿主页面接管滚动。 |
-| `toolbarPosition` | `'auto' \| 'top' \| 'bottom'`          | `'auto'`               | 常驻 `FixedToolbar` 的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。 |
+| `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`               | 工具栏 / 操作栏的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。`'float'`（仅桌面端）隐藏 `FixedToolbar`，改用跟随文本选区的浮动工具栏（HoverToolbar）；移动端自动回退为 `FixedToolbar`。 |
 
 ### Emits 事件
 

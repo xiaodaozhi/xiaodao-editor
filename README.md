@@ -60,11 +60,13 @@ by an **extension**, so the core never switches on a block type.
   caption
 - **Fixed toolbar** — persistent action bar with a contextual
   **HoverToolbar** embedded inline (so text selection is preserved when
-  clicking formatting buttons). Supports three placement modes via the
+  clicking formatting buttons). Supports four placement modes via the
   `toolbarPosition` prop: `'auto'` (default — top on desktop, bottom on
-  mobile), `'top'` (always top), or `'bottom'` (always bottom). Menus
-  (PlusMenu / BlockSettingsMenu) open downward when the toolbar is at
-  the top.
+  mobile), `'top'` (always top), `'bottom'` (always bottom), or `'float'`
+  (desktop only — hides the FixedToolbar and shows a floating selection
+  toolbar that follows the text selection; falls back to the FixedToolbar
+  on mobile). Menus (PlusMenu / BlockSettingsMenu) open downward when the
+  toolbar is at the top.
 - **Sizing & internal scrolling** — constrain the editor with `width`
   and `height` props (numbers are treated as pixels). The content area
   scrolls vertically inside the editor instead of growing unbounded,
@@ -133,7 +135,7 @@ The editor ships with all 14 built-in extensions by default — no need to pass
 | `uploadImage`     | `UploadImageHandler`                   | in-memory mock     | Hook for image uploads. Signature: `(name, file, controller, onProgress) => Promise<ImageUploadResult>`. Consumers **must** provide this if they intend to persist documents (the default mock stores `blob:` URLs which are not serialisable). |
 | `width`           | `string \| number`                     | `undefined`        | Optional fixed width. A number is interpreted as CSS pixels; a string is used as-is (e.g. `'800px'`, `'100%'`). When unset, the editor fills its container (`width: 100%`). |
 | `height`          | `string \| number`                     | `undefined`        | Optional fixed height. When set, the editor scrolls its content area **internally** rather than growing unbounded; when unset the editor grows with content and the host page scrolls. |
-| `toolbarPosition` | `'auto' \| 'top' \| 'bottom'`          | `'auto'`           | Placement of the persistent `FixedToolbar`. `'auto'` = top on desktop, bottom on mobile (above the virtual keyboard). |
+| `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`           | Placement of the toolbar / action bar. `'auto'` = top on desktop, bottom on mobile (above the virtual keyboard). `'float'` (desktop only) hides the FixedToolbar and uses a floating selection toolbar (HoverToolbar) that follows the text selection; on mobile it falls back to the auto FixedToolbar. |
 
 ### Emits
 

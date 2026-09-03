@@ -1,6 +1,15 @@
 <!--
-  HoverToolbar: the floating mini-toolbar that appears when the user selects
-  text inside a block. Inspired by Feishu's selection toolbar.
+  HoverToolbar: the mini-toolbar that appears when the user selects text
+  inside a block. Inspired by Feishu's selection toolbar.
+
+  It has TWO presentation modes, switched by the `inline` prop:
+    - Floating mode (default, `inline` omitted): teleported to <body>,
+      positioned above/below the text selection and follows it on scroll.
+    - Inline mode (`inline` set): rendered statically inside the FixedToolbar
+      bar. Used on BOTH desktop and mobile — so despite the toolbar living in
+      the FixedToolbar, this is NOT a mobile-only mode. When
+      `toolbarPosition='float'` on desktop, BlockEditor renders this component
+      in floating mode instead of the FixedToolbar.
 
   Layout:
     [Type ▾] | [B] [I] [U] [S] [</>] | [Align ▾] | [Color ▾] | [Copy] [Delete]
@@ -21,12 +30,12 @@
 <template>
   <Teleport
     to="body"
-    :disabled="mobile"
+    :disabled="inline"
   >
     <div
       class="hover-toolbar-shell"
-      :class="{ visible, 'mobile-shell': mobile, 'mobile-visible': mobile && visible }"
-      :style="mobile ? undefined : shellStyle"
+      :class="{ visible, 'inline-shell': inline, 'inline-visible': inline && visible }"
+      :style="inline ? undefined : shellStyle"
       :aria-hidden="!visible"
       @mousedown.prevent.capture="onShellMouseDownCapture"
     >
@@ -37,9 +46,9 @@
           'above': placement.above,
           'below': !placement.above,
           'ht-overflow': htOverflow,
-          'mobile-mode': mobile,
+          'inline-mode': inline,
         }"
-        :style="mobile ? undefined : toolbarStyle"
+        :style="inline ? undefined : toolbarStyle"
         role="toolbar"
         :aria-label="t('hoverToolbar.label')"
       >
@@ -75,7 +84,7 @@
         <div
           ref="htContentEl"
           class="ht-content"
-          :class="{ 'dropdown-open': !mobile && !!openDropdown }"
+          :class="{ 'dropdown-open': !inline && !!openDropdown }"
           @scroll="updateHtScrollState"
           @touchmove.passive="onHtTouchMove"
           @touchend.stop="onHtTouchEnd"
@@ -110,17 +119,17 @@
                 />
               </svg>
             </button>
-            <!-- Teleport to body on mobile so the menu escapes the
+            <!-- Teleport to body in inline mode so the menu escapes the
                  .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
-              :disabled="!mobile"
+              :disabled="!inline"
             >
               <div
                 v-if="openDropdown === 'type'"
                 ref="typeDropdownEl"
                 class="ht-dropdown"
-                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :class="[inline ? 'ht-dropdown-inline' : '', { above: dropdownAbove }]"
                 :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
@@ -344,17 +353,17 @@
                 </template>
               </svg>
             </button>
-            <!-- Teleport to body on mobile so the menu escapes the
+            <!-- Teleport to body in inline mode so the menu escapes the
                  .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
-              :disabled="!mobile"
+              :disabled="!inline"
             >
               <div
                 v-if="openDropdown === 'align'"
                 ref="alignDropdownEl"
                 class="ht-dropdown"
-                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :class="[inline ? 'ht-dropdown-inline' : '', { above: dropdownAbove }]"
                 :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
@@ -671,17 +680,17 @@
                 </template>
               </svg>
             </button>
-            <!-- Teleport to body on mobile so the menu escapes the
+            <!-- Teleport to body in inline mode so the menu escapes the
                  .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
-              :disabled="!mobile"
+              :disabled="!inline"
             >
               <div
                 v-if="openDropdown === 'verticalAlign'"
                 ref="verticalAlignDropdownEl"
                 class="ht-dropdown"
-                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :class="[inline ? 'ht-dropdown-inline' : '', { above: dropdownAbove }]"
                 :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
@@ -922,17 +931,17 @@
                 />
               </svg>
             </button>
-            <!-- Teleport to body on mobile so the menu escapes the
+            <!-- Teleport to body in inline mode so the menu escapes the
                  .fixed-toolbar overflow:hidden clip. -->
             <Teleport
               to="body"
-              :disabled="!mobile"
+              :disabled="!inline"
             >
               <div
                 v-if="openDropdown === 'color'"
                 ref="colorDropdownEl"
                 class="ht-dropdown ht-color-dropdown"
-                :class="[mobile ? 'ht-dropdown-mobile' : '', { above: dropdownAbove }]"
+                :class="[inline ? 'ht-dropdown-inline' : '', { above: dropdownAbove }]"
                 :style="[dropdownStyle, dropdownFixedStyle]"
               >
                 <button
@@ -1258,10 +1267,12 @@ const props = defineProps<{
   tableActiveColor?: string;
   tableActiveBgColor?: string;
   tableActiveVerticalAlign?: string;
-  // Inline mode: render as a static top bar instead of a floating toolbar.
+  // Inline mode: render as a static bar inside the FixedToolbar instead of a
+  // floating toolbar. Used on BOTH desktop and mobile (the FixedToolbar itself
+  // is always present unless `toolbarPosition='float'` on desktop).
   // Disables Teleport, absolute positioning, arrow, and fade animation.
   // The parent (FixedToolbar) provides the fixed bar container.
-  mobile?: boolean;
+  inline?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -1326,7 +1337,7 @@ const dropdownStyle = computed(() => ({
 // button's getBoundingClientRect.
 const dropdownFixedRect = ref<{ left?: number; top?: number; bottom?: number; right?: number } | null>(null);
 const dropdownFixedStyle = computed(() => {
-  if (!props.mobile || !dropdownFixedRect.value) return undefined;
+  if (!props.inline || !dropdownFixedRect.value) return undefined;
   const r = dropdownFixedRect.value;
   const style: Record<string, string> = {
     position: 'fixed',
@@ -1535,14 +1546,15 @@ function updateActiveMarks(): void {
 
 // --- Mark button definitions -----------------------------------------------
 
-// In mobile mode without a text selection, the bottom toolbar is always shown
-// but its selection-dependent buttons (marks / color / copy) are disabled.
+// In inline mode (embedded in the FixedToolbar) without a text selection, the
+// bar is always shown but its selection-dependent buttons (marks / color /
+// copy) are disabled.
 // Block-level actions (type / align) remain enabled as long as a block is
 // focused, because they operate on the entire block not the text range.
 // tableMode and cellEditMode are handled separately (their own
 // selectionRect is supplied by the table renderer).
 const noTextSelection = computed(() =>
-  props.mobile && !props.tableMode && !props.cellEditMode && !props.selectionRect,
+  props.inline && !props.tableMode && !props.cellEditMode && !props.selectionRect,
 );
 
 // Block-level: code blocks disallow all inline marks.
@@ -1701,7 +1713,7 @@ function measureHtOverflow(): void {
   //   container, not the full viewport.
   // - Floating mode: use the viewport clientWidth (excluding scrollbar)
   //   with a 16px margin on each side.
-  const totalAvailable = props.mobile
+  const totalAvailable = props.inline
     ? Math.max(120, (el.parentElement?.clientWidth ?? el.clientWidth) - 8)
     : Math.max(200, document.documentElement.clientWidth - 32);
 
@@ -1820,17 +1832,28 @@ function hireTap(act: () => void, e: TouchEvent): void {
 }
 
 watch(
-  [() => props.visible, () => props.selectionRect, toolbarEl, () => props.mobile],
+  [() => props.visible, () => props.selectionRect, toolbarEl, () => props.inline],
   async () => {
-    // Mobile mode: no floating placement — just measure overflow so the
-    // left/right nav buttons work inside the fixed bottom bar.
-    if (props.mobile) {
+    // Inline mode: no floating placement — just measure overflow so the
+    // left/right nav buttons work inside the FixedToolbar.
+    if (props.inline) {
       if (props.visible) measureHtOverflow();
       return;
     }
     if (!props.visible || !props.selectionRect || !props.rootEl) return;
     const el = toolbarEl.value;
     if (!el) return;
+    // While a dropdown is open we must NOT re-measure overflow or re-run
+    // placement: opening a dropdown flips `.ht-content` from
+    // `overflow: hidden/scroll` to `overflow: visible`, which changes its
+    // `scrollWidth` (the absolutely-positioned dropdown with `min-width`
+    // participates in scrollWidth only when overflow is visible). Re-measuring
+    // here would then toggle `htOverflow` / `content.style.maxWidth`, changing
+    // the toolbar's rendered width, and the freshly-read width would feed
+    // placeBelowSelection's center-aligned left — shifting the toolbar (and the
+    // open dropdown riding on it) sideways by ~10px. Lock placement while a
+    // dropdown is open; it re-runs once the dropdown closes.
+    if (openDropdown.value) return;
     // Step 1: measure overflow FIRST (this sets content.style.maxWidth and
     // toggles htOverflow → adds/removes the nav buttons).  We must do this
     // BEFORE reading getBoundingClientRect(), otherwise we'd be sizing with
@@ -1909,6 +1932,38 @@ async function toggleDropdown(kind: 'type' | 'align' | 'verticalAlign' | 'color'
   }
 }
 
+// When a dropdown closes, re-run placement once so the toolbar re-syncs its
+// horizontal position (placement was locked while the dropdown was open).
+watch(openDropdown, (now, prev) => {
+  if (prev && !now && !props.inline) {
+    schedulePlacementRefresh();
+  }
+});
+
+function schedulePlacementRefresh(): void {
+  if (placementRefreshRaf !== null) return;
+  placementRefreshRaf = requestAnimationFrame(() => {
+    placementRefreshRaf = null;
+    if (props.inline) return;
+    const el = toolbarEl.value;
+    if (!props.visible || !props.selectionRect || !props.rootEl || !el) return;
+    measureHtOverflow();
+    void nextTick().then(() => {
+      const rect = el.getBoundingClientRect();
+      placement.value = (props.tableMode
+        ? placePreferAbove(props.rootEl!, props.selectionRect!, {
+            width: rect.width,
+            height: Math.max(rect.height, TOOLBAR_HEIGHT),
+          })
+        : placeSelection(props.rootEl!, props.selectionRect!, {
+            width: rect.width,
+            height: Math.max(rect.height, TOOLBAR_HEIGHT),
+          }));
+    });
+  });
+}
+let placementRefreshRaf: number | null = null;
+
 /**
  * Position the active dropdown: decide whether it pops below or above its
  * trigger button, and clamp its maxHeight to the available viewport space.
@@ -1953,14 +2008,14 @@ function positionActiveDropdown(): void {
   const spaceAbove = Math.floor(btnRect.top - margin);
   const natural = dropdown.scrollHeight;
 
-  // Mobile/inline mode: the toolbar is pinned to either the viewport top or
+  // Inline mode: the toolbar is pinned to either the viewport top or
   // bottom (FixedToolbar). Use the injected `fixedToolbarBottomKey` flag
   // (provided by FixedToolbar based on its `position` prop) to decide which
   // way dropdowns pop — bottom bar → UPWARD, top bar → downward.
   // Dropdowns are teleported to <body>, so we compute position:fixed coords
   // using the viewport-relative button rect (escapes the .fixed-toolbar
   // overflow:hidden clip).
-  if (props.mobile) {
+  if (props.inline) {
     const vh = document.documentElement.clientHeight;
     const VIEWPORT_GAP = 10; // keep 10px from the viewport edge the dropdown grows toward
     const popUpward = isFixedToolbarBottom.value;
@@ -2618,8 +2673,8 @@ defineExpose({});
 
 // Reposition on scroll/resize.
 async function onScrollOrResize(): Promise<void> {
-  if (props.mobile) {
-    // Mobile: no floating placement to refresh — just re-measure overflow
+  if (props.inline) {
+    // Inline mode: no floating placement to refresh — just re-measure overflow
     // and update dropdown position if one is open.
     if (props.visible) measureHtOverflow();
     if (openDropdown.value) positionActiveDropdown();
@@ -2630,7 +2685,19 @@ async function onScrollOrResize(): Promise<void> {
   }
   if (props.visible && props.selectionRect && props.rootEl && toolbarEl.value) {
     // Same ordering as the watch callback: measure overflow → await reflow
-    // → read actual rect → compute placement.
+    // → read actual rect → compute placement. Skip while a dropdown is open
+    // for the same reason as the placement watch (overflow flip changes
+    // scrollWidth → width jump → sideways drift of toolbar + open dropdown).
+    if (openDropdown.value) {
+      // Still refresh the open dropdown's own vertical position / maxHeight
+      // so it stays attached on scroll/resize, but do not touch the toolbar's
+      // horizontal placement.
+      positionActiveDropdown();
+      updateScrollState();
+      updateActiveMarks();
+      updateActiveColors();
+      return;
+    }
     measureHtOverflow();
     await nextTick();
     const rect = toolbarEl.value.getBoundingClientRect();

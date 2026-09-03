@@ -397,14 +397,14 @@ interface SlashCommandSpec {
   readonly icon?: unknown
   readonly command: string
   readonly args?: unknown
-  readonly applicableTo？: readonly BlockType[]   // 限定到当前的块类型
+  readonly applicableTo?: readonly BlockType[]   // 限定到当前的块类型
 }
 type SlashCommand = SlashCommandSpec
 
 class SlashCommandRegistry {
-  register（spec: SlashCommandSpec）: void        // 重复 id 时抛出
+  register(spec: SlashCommandSpec): void        // 重复 id 时抛出
   get all(): readonly SlashCommand[]
-  search（query: string）: readonly SlashCommand[]  // 对 title+keywords 的朴素子串匹配
+  search(query: string): readonly SlashCommand[]  // 对 title+keywords 的朴素子串匹配
 }
 ```
 
@@ -421,12 +421,12 @@ class SlashCommandRegistry {
 **公共 API。**
 
 ```ts
-interface BlockRendererSpec { readonly component: unknown； readonly editable？: boolean }  // component 对 Vue 不透明
+interface BlockRendererSpec { readonly component: unknown; readonly editable?: boolean }  // component 对 Vue 不透明
 interface ToolbarActionSpec { readonly id: string; readonly label: string; readonly command: string; readonly args?: unknown; readonly icon?: unknown }
 
 interface Extension {
   readonly name: string
-  readonly uses？: readonly Extension[]            // 捆绑的扩展；摊平，按名去重
+  readonly uses?: readonly Extension[]            // 捆绑的扩展；摊平，按名去重
   readonly schema?: BlockSchemaSpec
   readonly renderer?: BlockRendererSpec
   readonly commands?: readonly AnyCommandEntry[]
@@ -439,7 +439,7 @@ interface Extension {
   readonly plugins?: readonly Plugin[]
 }
 
-function extensionBlockType（ext: Extension）: BlockType | null   // 便捷：所声明的类型（若有）
+function extensionBlockType(ext: Extension): BlockType | null   // 便捷：所声明的类型(若有)
 ```
 
 `BlockRendererSpec.component` 被类型为 `unknown`，以便核心保持框架无关；`BlockHost.vue` 在唯一的视图层边界把它转换为 Vue 组件。
@@ -456,11 +456,11 @@ function extensionBlockType（ext: Extension）: BlockType | null   // 便捷：
 
 ```ts
 class RendererRegistry {
-  register（type: BlockType， spec: BlockRendererSpec）: void  // 重复时抛出
+  register(type: BlockType, spec: BlockRendererSpec): void  // 重复时抛出
   get(type: BlockType): BlockRendererSpec | undefined
 }
 class ToolbarRegistry {
-  register（type: BlockType， actions: readonly ToolbarActionSpec[]）: void  // 追加
+  register(type: BlockType, actions: readonly ToolbarActionSpec[]): void  // 追加
   get(type: BlockType): readonly ToolbarActionSpec[]
 }
 
@@ -480,7 +480,7 @@ interface EditorRegistries {
 }
 interface BuildRegistriesOptions { readonly defaultBlockType?: BlockType }
 
-function flattenExtensions（extensions: readonly Extension[]）: Extension[]  // 按名后者胜出
+function flattenExtensions(extensions: readonly Extension[]): Extension[]  // 按名后者胜出
 function buildRegistries(extensions: readonly Extension[], options?: BuildRegistriesOptions): EditorRegistries
 ```
 
@@ -539,7 +539,7 @@ function isCaret(sel: Selection): sel is Extract<Selection, { kind: 'caret' }>
 function isText(sel: Selection): sel is Extract<Selection, { kind: 'text' }>
 function isBlocks(sel: Selection): sel is Extract<Selection, { kind: 'blocks' }>
 function isCollapsed(sel: Selection): boolean
-function primaryBlock（sel: Selection）: BlockId | null       // Enter 等命令作用的地方
+function primaryBlock(sel: Selection): BlockId | null       // Enter 等命令作用的地方
 function focusOffset(sel: Selection): number
 function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => number): readonly [Anchor, Anchor] | null
 ```
@@ -560,13 +560,13 @@ function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => numbe
 
 ```ts
 class HistoryManager {
-  constructor（limit？: number）                 // 默认 500 个条目
+  constructor(limit?: number)                 // 默认 500 个条目
   record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void
   canUndo(): boolean
   canRedo(): boolean
-  reset（）: void                               // 清空两个栈（用于文档替换）
-  undo（）: Transaction | null                  // 构建逆事务；压入 redo
-  redo（）: Transaction | null                  // 重新应用原事务；压回 undo
+  reset(): void                               // 清空两个栈(用于文档替换)
+  undo(): Transaction | null                  // 构建逆事务；压入 redo
+  redo(): Transaction | null                  // 重新应用原事务；压回 undo
 }
 ```
 
@@ -602,8 +602,8 @@ class SerializerRegistry {
 }
 class DeserializerRegistry {
   register(spec: DeserializerSpec): void
-  parseMarkdownLine（line: string）: SerializeResult | null   // 首个匹配胜出
-  parseHtmlElement（node: HTMLElement, inlines: InlineSeq）: SerializeResult | null
+  parseMarkdownLine(line: string): SerializeResult | null   // 首个匹配胜出
+  parseHtmlElement(node: HTMLElement, inlines: InlineSeq): SerializeResult | null
 }
 ```
 
@@ -641,10 +641,10 @@ class Editor {
   constructor(config: EditorConfig)
   getState(): EditorState
   toData(): DocumentData
-  setDocument（json: DocumentData）: void      // 整体替换；重置历史；重新初始化插件
+  setDocument(json: DocumentData): void      // 整体替换；重置历史；重新初始化插件
   toMarkdown(): string                       // 把当前文档导出为 Markdown 字符串
   setDocFromMarkdown(markdown: string): void // 用 Markdown 解析结果整体替换文档；重置历史
-  dispatch（tr: Transaction）: void            // 唯一的变更路径；记录历史；通知
+  dispatch(tr: Transaction): void            // 唯一的变更路径；记录历史；通知
   undo(): boolean
   redo(): boolean
   canUndo(): boolean
@@ -657,7 +657,7 @@ class Editor {
   destroy(): void
 }
 
-function hasBlock（editor: Editor， id: BlockId）: boolean  // 调试辅助
+function hasBlock(editor: Editor, id: BlockId): boolean  // 调试辅助
 ```
 
 构造：运行 `buildRegistries`，注册原语命令，让扩展命令按名 `override`，构建文档(若根为空则播种一个空默认块)，初始化插件(`init`)，注册核心 `undo`/`redo` 命令(委托给 `HistoryManager`)，并构建命令代理。`dispatch` 运行 `applyTransaction`，把事务记录到历史，并通过差异通知订阅者。`setDocument` 重建状态并调用 `history.reset()`。
@@ -687,7 +687,7 @@ function hasBlock（editor: Editor， id: BlockId）: boolean  // 调试辅助
 ```ts
 const editorKey: InjectionKey<Editor>
 interface BlockRenderItem { readonly id: BlockId; readonly block: Block }
-function useEditor（）: Editor  // 在 <BlockEditor> 树之外调用时抛出
+function useEditor(): Editor  // 在 <BlockEditor> 树之外调用时抛出
 ```
 
 `BlockRenderItem` 把 id 与 `block` 分开携带，以便 `BlockList` 能把它用作 `:key` 而无需深入 block 对象。该类型位于这里(而非 `.vue` 文件中)，因为 TypeScript 的 `*.vue` 模块垫片只声明默认导出，无法从 `.vue` 文件再导出具名类型。
@@ -704,24 +704,31 @@ function useEditor（）: Editor  // 在 <BlockEditor> 树之外调用时抛出
 
 ```ts
 props: {
-  extensions？: readonly Extension[]        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
-  modelValue？: DocumentData                // 默认 { blocks: [] }
-  editable？: boolean                       // 默认 true
-  placeholder？: string                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
-  theme？: 'light' | 'dark'                 // 默认 'light'
-  locale？: 'zh-CN' | 'en-US'               // 默认 'zh-CN'；任何非空非 'zh-CN' 值 ⇒ 'en-US'
+  extensions?: readonly Extension[]        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
+  modelValue?: DocumentData                // 默认 { blocks: [] }
+  editable?: boolean                       // 默认 true
+  placeholder?: string                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
+  theme?: 'light' | 'dark'                 // 默认 'light'
+  locale?: 'zh-CN' | 'en-US'               // 默认 'zh-CN'；任何非空非 'zh-CN' 值 ⇒ 'en-US'
+  // —— 尺寸约束(可选)：数字按 CSS 像素解析；字符串原样使用 ——
+  width?: string | number                  // 默认 undefined（填满容器）
+  height?: string | number                 // 默认 undefined（随内容生长，宿主页面滚动）
+  // —— 工具栏位置(FixedToolbar)：'auto' = 桌面端顶栏/移动端底栏。
+  //    'float'（仅桌面端）隐藏 FixedToolbar，改用跟随文本选区的浮动 HoverToolbar；
+  //    移动端回退为 'auto' ——
+  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // 默认 'auto'
   // —— 图片上传钩子(可选；见 src/view/imageUpload.ts) ——
-  uploadImage？: (file: File, ctx: {
+  uploadImage?: (file: File, ctx: {
     blockId: BlockId
     onProgress(percent: number): void
   }) => Promise<{
     src: string
-    fileId？: string
-    alt？: string
-    title？: string
-    caption？: string
-    width？: number
-    height？: number
+    fileId?: string
+    alt?: string
+    title?: string
+    caption?: string
+    width?: number
+    height?: number
   }>
 }
 emits: {
@@ -844,14 +851,14 @@ function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq
 ```ts
 interface ParsedBlock {
   type: BlockType
-  attrs？: Attrs
+  attrs?: Attrs
   content: InlineSeq
   // —— 阶段 6 瞬时字段，绝不写入 DocState ——
-  readonly _pendingFile？: File          // 剪贴板图片文件(走 imageUpload 管线上传)
+  readonly _pendingFile?: File          // 剪贴板图片文件(走 imageUpload 管线上传)
 }
 interface PasteDecision {
-  blocks？: ParsedBlock[]
-  wrapSelectionInLink？: { href: string } // 非空选择 + URL 文本粘贴
+  blocks?: ParsedBlock[]
+  wrapSelectionInLink?: { href: string } // 非空选择 + URL 文本粘贴
 }
 
 function parseClipboardHtml(html: string): ParsedBlock[]
@@ -875,8 +882,8 @@ type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
 interface ImageUploadState {
   readonly status: UploadStatus
   readonly progress: number        // 0..100
-  readonly error？: string
-  readonly tempSrc？: string       // URL.createObjectURL(file); done/error 时 revoke
+  readonly error?: string
+  readonly tempSrc?: string       // URL.createObjectURL(file); done/error 时 revoke
 }
 
 interface ImageUploadStore {
@@ -884,7 +891,7 @@ interface ImageUploadStore {
   subscribe(blockId: BlockId, cb: (s: ImageUploadState) => void): () => void
   beginUpload(blockId: BlockId, file: File, handlers: {
     onProgress(pct: number): void
-    resolve(result: { src: string; fileId？: string; alt？: string; title？: string; caption？: string; width？: number; height？: number }): void
+    resolve(result: { src: string; fileId?: string; alt?: string; title?: string; caption?: string; width?: number; height?: number }): void
     reject(err: Error): void
   }): void
   retry(blockId: BlockId): void        // 重试缓存的 file;若无缓存则拒绝
@@ -944,7 +951,7 @@ emits: {
   'copy-link': [string]           // → BlockEditor 把 href 写入剪贴板 + 显示 toast
   'edit': []                      // 切到 'edit' 模式
   'remove': []                    // → editor.commands.unsetLink
-  'save': [{ href: string; text？: string }]
+  'save': [{ href: string; text?: string }]
   'cancel': []
 }
 ```
@@ -961,12 +968,13 @@ emits: {
 - `'auto'`（默认）：桌面端顶栏、移动端底栏（通过 `visualViewport` API 始终显示在虚拟键盘之上；使用 `env(safe-area-inset-bottom)` 适配 iPhone 主屏指示条）。
 - `'top'`：强制顶栏。PlusMenu / BlockSettingsMenu 等菜单改为**向下**弹出。
 - `'bottom'`：强制底栏。菜单改为**向上**弹出。
+- `'float'`：**仅桌面端**——隐藏 FixedToolbar，改由 `BlockEditor.vue` 渲染一个独立的浮动 `HoverToolbar`（Teleport 到 `<body>`，跟随文本选区）。在移动端（`(pointer: coarse)`）下 `'float'` 会回退为 `'auto'`。
 
 内嵌一个 **inline 的** `<HoverToolbar>` 实例（而不是作为浮动叠加层渲染），这样用户点击格式化按钮时可以**保留文本选区状态**。左侧：plus 按钮（打开 `PlusMenu`）和 grip 按钮（打开 `BlockSettingsMenu`）。右侧：完整的 `HoverToolbar` 按钮集（类型 / 对齐 / 标记 / 颜色 / 复制 / 表格操作 / 链接操作）。它对外提供两个注入键，供下游菜单决定弹出方向：
 - `fixedToolbarBottomKey: Ref<boolean>` — 当工具栏被钉在底部时为 `true`。
 - `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>` — 传递给内嵌的 HoverToolbar，告知当前需要展示哪个块类型/属性的动作。
 
-**交互。** 导入 `vue`、`HoverToolbar.vue`、`i18n`（`useI18n`）和 `view/context`（`useEditor`、`fixedToolbarBridgeKey`、`fixedToolbarBottomKey`）。**无条件**渲染在 `BlockEditor.vue` 的 template 中。发出的事件由 `BlockEditor.vue` 连接到与桌面端 `BlockHandle.vue` 相同的 `onOpenPlusMenu` / `onOpenSettingsMenu` 处理器。当表格单元格获得焦点时，`TableBlock` 通过 `fixedToolbarBridgeKey` 注入键发布描述符，使内嵌的 `HoverToolbar` 反映单元格/表格状态而非文本块状态。
+**交互。** 导入 `vue`、`HoverToolbar.vue`、`i18n`（`useI18n`）和 `view/context`（`useEditor`、`fixedToolbarBridgeKey`、`fixedToolbarBottomKey`）。**条件**渲染在 `BlockEditor.vue` 的 template 中：当桌面端 `toolbarPosition='float'` 时跳过该组件（改为渲染浮动 `HoverToolbar`；移动端 `'float'` 回退为 `'auto'`，仍渲染 FixedToolbar）。发出的事件由 `BlockEditor.vue` 连接到与桌面端 `BlockHandle.vue` 相同的 `onOpenPlusMenu` / `onOpenSettingsMenu` 处理器。当表格单元格获得焦点时，`TableBlock` 通过 `fixedToolbarBridgeKey` 注入键发布描述符，使内嵌的 `HoverToolbar` 反映单元格/表格状态而非文本块状态。
 
 **扩展点。** 工具栏描述符来源可通过 `fixedToolbarBridgeKey` 注入键插拔，未来具有自定义选区状态的块类型（如数据库块）可以向固定工具栏注入自己的动作，无需修改 `FixedToolbar.vue`。位置自动检测逻辑被封装在组件内部，外部调用方只需通过 `toolbarPosition` prop 就能覆盖行为。
 
