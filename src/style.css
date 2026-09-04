@@ -220,7 +220,10 @@ body.theme-light {
 }
 
 /* 分隔符：focus 时线条变蓝 + 整块淡蓝背景框选 */
-.block-host.block-focused[data-block-type="divider"] > .block-host-content::after {
+/* 注意：overlay 必须挂在 .block-divider 上（而非 .block-host-content），
+   因为 .block-divider 带 be-indent-n 的 margin-left，挂在父容器上会忽略
+   缩进、让高亮框在左侧超出实际线条。 */
+.block-host.block-focused[data-block-type="divider"] > .block-host-content > .block-divider::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -899,7 +902,11 @@ body.theme-light {
 /* --- Divider / Horizontal Rule (Divider.ts renderer) --------------------- */
 
 .block-divider {
-  width: 100%;
+  /* 用默认 width: auto 而不是 100%：这样 be-indent-n 的 margin-left
+     会被正确计入，避免 width:100% + margin-left 导致右侧溢出内容区域。
+     块级元素 width:auto 会自动占满父容器的可用宽度（减去 margin）。
+     与 .block-image-container 的处理保持一致。 */
+  width: auto;
   height: 1px;
   background: var(--be-border);
   background-clip: content-box;
