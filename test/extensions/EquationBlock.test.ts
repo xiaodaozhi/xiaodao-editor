@@ -59,11 +59,12 @@ describe('EquationBlock component', () => {
     expect(wrapper.find('.equation-edit-btn').exists()).toBe(false);
   });
 
-  it('renders the KaTeX output for a valid expression (read mode)', () => {
+  it('renders the built-in renderer output for a valid expression (read mode)', () => {
     const { wrapper } = mountEquation('x^2');
     expect(wrapper.find('.equation-placeholder').exists()).toBe(false);
     expect(wrapper.find('.equation-render').exists()).toBe(true);
-    expect(wrapper.html()).toContain('katex');
+    expect(wrapper.html()).toContain('math-equation');
+    expect(wrapper.html()).toContain('math-sup');
   });
 
   it('carries the `.block-focus-root` class so block-level click selection is handled by the shared delegation', () => {

@@ -3713,21 +3713,7 @@ body.theme-dark .table-cell-inner {
   border-radius: 3px;
 }
 
-/* KaTeX display output: keep it inside the block, allow horizontal scroll.
-   IMPORTANT: the scroll container here is .equation-block (full container width).
-   We do NOT add overflow-x:auto on .katex-display itself — when the math is
-   wider than the block, .equation-block produces a scrollbar that spans the
-   full block width (not just the formula's own width). */
-.equation-block .katex-display {
-  margin: 0;
-  padding: 2px 0;
-  text-align: center;
-}
-.equation-block .katex-display > .katex {
-  white-space: nowrap;
-}
-
-/* Fill the block (block-level, 100% width) so the inner .katex-display gets
+/* Fill the block (block-level, 100% width) so the math output gets
    the FULL container width. Previously this was inline-block with shrink-to-fit
    width = formula width, which made the scrollbar match the formula content
    instead of the block. */
@@ -3855,7 +3841,7 @@ body.theme-dark .equation-toolbar {
   background: var(--be-bg);
   border-radius: 0 0 6px 6px;
 }
-.equation-edit-preview .katex-display {
+.equation-edit-preview .math-equation {
   margin: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -3886,4 +3872,231 @@ body.theme-dark .equation-toolbar {
 .theme-dark .equation-error-badge,
 body.theme-dark .equation-error-badge {
   background: rgba(255, 138, 128, 0.16);
+}
+
+/* ==========================================================================
+   Built-in math renderer (.math-*)
+   --------------------------------------------------------------------------
+   Emitted by the zero-dependency math engine (src/extensions/math). Every
+   rule is scoped under `.math-*` so nothing leaks into ordinary editor
+   content (p / span / table / strong / em) and no external font is loaded.
+   ========================================================================== */
+
+.math-equation {
+  font-family: math, "Cambria Math", "Latin Modern Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 1.05em;
+  line-height: 1.5;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.math-equation.math-display {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.math-identifier {
+  font-style: italic;
+}
+
+.math-number,
+.math-text,
+.math-symbol,
+.math-function,
+.math-delimiter,
+.math-op-symbol {
+  font-style: normal;
+}
+
+.math-operator {
+  margin: 0 0.18em;
+}
+
+.math-function {
+  margin-right: 0.16em;
+}
+
+.math-group {
+  display: inline-block;
+}
+
+/* --- Fraction ----------------------------------------------------------- */
+.math-fraction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0.16em;
+}
+
+.math-fraction-numerator,
+.math-fraction-denominator {
+  display: block;
+  padding: 0 0.4em;
+  text-align: center;
+}
+
+.math-fraction-bar {
+  display: block;
+  width: 100%;
+  margin: 0.12em 0;
+  border-top: 1px solid currentColor;
+}
+
+/* --- Superscript / subscript -------------------------------------------- */
+.math-script {
+  display: inline-flex;
+  align-items: baseline;
+  vertical-align: middle;
+}
+
+.math-base {
+  display: inline-block;
+}
+
+.math-scripts {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 0.06em;
+}
+
+.math-sup,
+.math-sub {
+  font-size: 0.7em;
+  line-height: 1.05;
+  font-style: normal;
+}
+
+/* --- Root --------------------------------------------------------------- */
+.math-root {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+
+.math-root-index {
+  font-size: 0.6em;
+  margin-right: -0.15em;
+  transform: translateY(-0.35em);
+}
+
+.math-root-sign {
+  display: inline-block;
+}
+
+.math-root-radicand {
+  display: inline-block;
+  margin-top: 0.14em;
+  padding: 0.06em 0.2em 0 0.15em;
+  border-top: 1px solid currentColor;
+}
+
+/* --- Large operators (sum / prod / int) --------------------------------- */
+.math-large-operator {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.12em;
+}
+
+.math-op-symbol {
+  font-size: 1.55em;
+  line-height: 1;
+}
+
+.math-op-limits {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.math-op-upper,
+.math-op-lower {
+  font-size: 0.62em;
+  line-height: 1.15;
+  font-style: normal;
+}
+
+/* --- \lim_{x \to 0} style under-limit ----------------------------------- */
+.math-limit {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.12em;
+}
+
+.math-limit-under {
+  font-size: 0.7em;
+  line-height: 1.15;
+  font-style: normal;
+}
+
+/* --- Matrix (CSS grid, never <table>) ----------------------------------- */
+.math-matrix {
+  display: inline-grid;
+  gap: 0.12em 0.55em;
+  align-items: center;
+  justify-items: center;
+  vertical-align: middle;
+  margin: 0.15em 0;
+}
+
+/* Rows collapse into the parent grid so every column auto-sizes. */
+.math-matrix-row {
+  display: contents;
+}
+
+.math-matrix-cell {
+  text-align: center;
+}
+
+/* --- Aligned environment ------------------------------------------------ */
+.math-aligned {
+  display: grid;
+  grid-template-columns: auto auto;
+  width: fit-content;
+  margin-right: auto;
+  gap: 0.12em 0;
+  align-items: baseline;
+}
+
+.math-aligned-row {
+  display: contents;
+}
+
+.math-aligned-left {
+  justify-self: end;
+  text-align: right;
+  padding-right: 0.15em;
+}
+
+.math-aligned-right {
+  justify-self: start;
+  text-align: left;
+}
+
+/* --- Degraded output ---------------------------------------------------- */
+.math-unknown {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  opacity: 0.72;
+}
+
+.math-error {
+  color: var(--be-color-red, #d93025);
+}
+
+/* Mobile: keep a wide formula scrollable instead of overflowing the page. */
+@media (max-width: 600px) {
+  .math-equation.math-display {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }

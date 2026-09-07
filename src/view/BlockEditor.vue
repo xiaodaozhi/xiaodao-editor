@@ -222,6 +222,8 @@ import { blockBefore, flatten as flattenDoc, indexOf as blockIndexOf, parentOf }
 import { orderedListNumber } from '../extensions/OrderedList';
 import { inlineToHtml } from './inlineDom';
 import { BuiltinExtensions } from '../extensions/builtin';
+import { createEquationExtension } from '../extensions/Equation';
+import type { EquationRenderer } from '../extensions/Equation';
 import '../style.css';
 import { provideI18n, useI18n, normalizeLocale, normalizeTheme, type Theme, type Locale } from '../i18n';
 import {
@@ -261,6 +263,13 @@ const props = withDefaults(defineProps<{
    * persisted documents.
    */
   uploadImage?: UploadImageHandler;
+  /**
+   * Optional: replace the built-in equation renderer (KaTeX / MathJax / ...).
+   * The renderer is captured when the editor is constructed, and drives BOTH
+   * the on-screen block and `serialize.toHTML`. Omit it to use the built-in
+   * zero-dependency renderer.
+   */
+  equationRenderer?: EquationRenderer;
   /** Optional: fixed width for the editor (e.g. '800px', '100%', 600). */
   width?: string | number;
   /** Optional: fixed height for the editor. When set, the editor scrolls
@@ -283,6 +292,8 @@ const props = withDefaults(defineProps<{
 
   // optional: when omitted, the editor falls back to its built-in mock upload.
   uploadImage: undefined,
+  // `undefined` = use the built-in zero-dependency equation renderer.
+  equationRenderer: undefined,
   width: undefined,
   height: undefined,
   toolbarPosition: 'auto',
@@ -361,8 +372,17 @@ const effectivePlaceholder = computed<string>(
 
 // --- Editor construction ------------------------------------------------
 
+// A custom equation renderer is injected by appending an override extension:
+// `flattenExtensions` de-duplicates by name and later entries win, so this
+// replaces the built-in `equation` extension without touching anything else.
+// The same renderer instance therefore drives the block component AND
+// `serialize.toHTML`. (Like `extensions`, it is captured at construction time.)
+const effectiveExtensions: readonly Extension[] = props.equationRenderer
+  ? [...props.extensions, createEquationExtension({ renderer: props.equationRenderer })]
+  : props.extensions;
+
 const editor = new Editor({
-  extensions: props.extensions,
+  extensions: effectiveExtensions,
   initialDocument: props.modelValue,
   editable: props.editable,
 });

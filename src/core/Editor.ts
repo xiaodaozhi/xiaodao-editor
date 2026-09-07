@@ -812,17 +812,18 @@ function splitBlocks(md: string): LogicalBlock[] {
       i += 1;
       continue;
     }
-    // Math fence: a line that is exactly "$$" (whitespace allowed) opens a
-    // block-level LaTeX equation; a following "$$" line closes it. The body is
-    // the raw LaTeX source.
-    const mathFence = /^\s*\$\$\s*$/.exec(line);
+    // Math fence: a line that is exactly "$$" or "$$$" (whitespace allowed)
+    // opens a block-level LaTeX equation; the same marker closes it. The body
+    // is the raw LaTeX source. Both markers are accepted on import because
+    // `toMarkdown` exports "$$$" while most external Markdown uses "$$".
+    const mathFence = /^\s*\${2,3}\s*$/.exec(line);
     if (mathFence) {
       flush();
       const body: string[] = [];
       i += 1;
       while (i < rawLines.length) {
         const l = rawLines[i]!;
-        if (/^\s*\$\$\s*$/.test(l)) break;
+        if (/^\s*\${2,3}\s*$/.test(l)) break;
         body.push(l);
         i += 1;
       }

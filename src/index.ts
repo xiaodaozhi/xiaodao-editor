@@ -27,8 +27,26 @@ export { KeymapExtension } from './extensions/Keymap';
 export { HistoryExtension } from './extensions/History';
 export { ImageExtension } from './extensions/Image';
 export type { ImageAttrs } from './extensions/Image';
-export { EquationExtension } from './extensions/Equation';
-export type { EquationAttrs } from './extensions/Equation';
+export {
+  EquationExtension,
+  createEquationExtension,
+  builtinEquationRenderer,
+  EquationBlock,
+  renderEquation,
+} from './extensions/Equation';
+export type {
+  EquationAttrs,
+  EquationDiagnostic,
+  EquationExtensionOptions,
+  EquationRenderer,
+  EquationRenderOptions,
+  EquationRenderResult,
+  RenderResult,
+} from './extensions/Equation';
+
+// Built-in math engine (advanced usage: custom renderers, tooling)
+export { parseMath, SUPPORTED_COMMANDS } from './extensions/math';
+export type { MathNode, ParseResult as MathParseResult } from './extensions/math';
 export { TableExtension } from './extensions/Table';
 export type { TableAttrs, TableCellData } from './extensions/tableModel';
 export { DividerExtension } from './extensions/Divider';

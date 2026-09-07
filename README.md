@@ -21,14 +21,19 @@ by an **extension**, so the core never switches on a block type.
   ordered list, to-do, quote, code block, **image**, **equation** (LaTeX math),
   **divider**, **table**, **table of contents** (14 extensions total including
   Keymap and History behavior extensions)
-- **Equation (LaTeX math) block** — renders LaTeX via KaTeX as a centered
-  display formula. The document stores **only the raw `expression` string** —
-  KaTeX output is recomputed on the fly and never persisted, so serialization
-  stays lean. Insert via the `/equation` slash command or the `+` menu; an empty
-  block opens directly in edit mode. Click the block to select it; the floating
-  ✎ button (or clicking an empty block) opens the source editor with a live
-  preview. Supports block selection and **nesting as a child block** (indents
-  to match its depth). Markdown export uses `$$$ … $$$` fenced blocks.
+- **Equation (LaTeX math) block** — renders LaTeX as a centered display
+  formula via the **built-in zero-dependency math renderer** (a lightweight
+  LaTeX-math subset: fractions, roots, scripts, Greek letters, functions,
+  large operators, matrices, aligned rows). The document stores **only the raw
+  `expression` string** — rendered output is recomputed on the fly and never
+  persisted, so serialization stays lean. The renderer is **pluggable**: pass
+  `equationRenderer` to `<BlockEditor>` (or use `createEquationExtension`) to
+  swap in KaTeX, MathJax or any custom engine with full LaTeX support. Insert
+  via the `/equation` slash command or the `+` menu; an empty block opens
+  directly in edit mode. Click the block to select it; the floating ✎ button
+  (or clicking an empty block) opens the source editor with a live preview.
+  Supports block selection and **nesting as a child block** (indents to match
+  its depth). Markdown export uses `$$$ … $$$` fenced blocks.
 - **Table block** — `attrs`-based N×M grid; default 120 px column widths,
   new tables default to header row; row/column selection strips,
   corner-handle to select the whole table; insert dots between rows/cols;
@@ -122,6 +127,71 @@ const doc = ref<DocumentData>({ blocks: [] })
 The editor ships with all 14 built-in extensions by default — no need to pass
 `extensions` unless you want a custom set.
 
+## Pluggable equation renderer
+
+The equation block stores only the raw LaTeX `expression` string. How that
+string becomes pixels is up to a pluggable renderer:
+
+```ts
+interface EquationRenderer {
+  render(expression: string, options?: { displayMode?: boolean }): EquationRenderResult;
+}
+
+interface EquationRenderResult {
+  /** Safe HTML string — always available (export / SSR / non-Vue consumers). */
+  html: string;
+  /** Optional Vue VNode tree; when present the view renders it directly (no innerHTML). */
+  vnode: VNode | VNode[] | null;
+  /** True when the expression has at least one error diagnostic. */
+  error: boolean;
+  diagnostics: readonly EquationDiagnostic[];
+}
+```
+
+By default the editor uses the **built-in math renderer** — a zero-dependency
+implementation of a lightweight LaTeX-math subset (tokenizer → parser → AST →
+DOM): numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq …`),
+superscripts/subscripts, `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters,
+`\sin \cos \tan \log \ln \exp \lim \min \max`, large operators
+(`\sum \prod \int` with display limits), `\begin{matrix}` and
+`\begin{aligned}`. Unknown commands degrade gracefully (rendered literally)
+and syntax errors show an inline warning instead of crashing — the source is
+always preserved and re-parses automatically once fixed. It is *not* a full
+TeX engine; for that, inject an external renderer:
+
+```vue
+<script setup lang="ts">
+import katex from 'katex' // your own dependency, not bundled with xiaodao-editor
+import type { EquationRenderer } from 'xiaodao-editor'
+
+const katexRenderer: EquationRenderer = {
+  render(expression: string, options?: { displayMode?: boolean }) {
+    try {
+      const html = katex.renderToString(expression, {
+        displayMode: options?.displayMode ?? true,
+        throwOnError: false,
+        trust: false,
+        strict: false,
+      });
+      return { html, vnode: null, error: false, diagnostics: [] };
+    } catch {
+      return { html: '', vnode: null, error: true, diagnostics: [] };
+    }
+  },
+};
+</script>
+
+<template>
+  <BlockEditor v-model="doc" :equation-renderer="katexRenderer" />
+</template>
+```
+
+Advanced: `createEquationExtension({ renderer })` builds an equation extension
+with a specific renderer — append it to your `extensions` array to override
+the built-in one. You can also import the built-in engine pieces
+(`parseMath`, `renderMathToHtml`, …) from `xiaodao-editor` to build custom
+renderers on top of the AST.
+
 ## Props
 
 | Prop              | Type                                   | Default            | Description                                                                   |
@@ -136,6 +206,7 @@ The editor ships with all 14 built-in extensions by default — no need to pass
 | `width`           | `string \| number`                     | `undefined`        | Optional fixed width. A number is interpreted as CSS pixels; a string is used as-is (e.g. `'800px'`, `'100%'`). When unset, the editor fills its container (`width: 100%`). |
 | `height`          | `string \| number`                     | `undefined`        | Optional fixed height. When set, the editor scrolls its content area **internally** rather than growing unbounded; when unset the editor grows with content and the host page scrolls. |
 | `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`           | Placement of the toolbar / action bar. `'auto'` = top on desktop, bottom on mobile (above the virtual keyboard). `'float'` (desktop only) hides the FixedToolbar and uses a floating selection toolbar (HoverToolbar) that follows the text selection; on mobile it falls back to the auto FixedToolbar. |
+| `equationRenderer`| `EquationRenderer`                     | built-in renderer  | Pluggable equation renderer for the equation block. Defaults to the built-in zero-dependency math renderer; pass your own to use KaTeX, MathJax, or any other engine. See *Pluggable equation renderer*. |
 
 ### Emits
 
@@ -188,7 +259,7 @@ Set it explicitly if needed:
 | `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
 | `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating — Enter inserts a newline.           |
 | `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `uploadImage` prop + `cleanup:image-file`. |
-| `EquationExtension`   | `equation`      | `content: 'none'`; isolated block — stores only `attrs.expression` (raw LaTeX). KaTeX renders a centered display formula on the fly (output never persisted). Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
+| `EquationExtension`   | `equation`      | `content: 'none'`; isolated block — stores only `attrs.expression` (raw LaTeX). A pluggable renderer produces the centered display formula on the fly (output never persisted); the default is the built-in **zero-dependency math renderer** (lightweight LaTeX subset — see the *Pluggable equation renderer* section), and KaTeX/MathJax can be injected via the `equationRenderer` prop or `createEquationExtension`. Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
 | `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |
 | `DividerExtension`    | `divider`       | Isolating horizontal rule.                                       |
 | `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`; empty attrs — the heading list is a **dynamic view** computed from the editor state on every render. Non-editable block (`editable: false`); collects all `heading` blocks in document order (table-cell headings excluded automatically); click an entry to scroll the heading into view. Serialize emits empty string (the real headings are exported by their own blocks). |
@@ -334,9 +405,11 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
   selection expansion, header row toggle, column width helpers, HTML/Markdown
   serialization, attrs validation/coercion). **Divider** lives in `Divider.ts`.
   **Table of contents** lives in `TableOfContents.ts` (non-editable block that
-  renders a live heading list). **Equation** lives in `Equation.ts` (LaTeX/KaTeX
+  renders a live heading list). **Equation** lives in `Equation.ts` (LaTeX math
   block; stores only `attrs.expression`, renders a centered display formula; its
-  `attrs.indent` mirrors nesting depth so it indents as a child block).
+  `attrs.indent` mirrors nesting depth so it indents as a child block). The
+  built-in math engine lives in `extensions/math/` (tokenizer → parser → AST →
+  render tree → DOM/HTML), with zero third-party dependencies.
 - **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
   provide/inject so popovers rendered through `<Teleport>` stay reactive.
 

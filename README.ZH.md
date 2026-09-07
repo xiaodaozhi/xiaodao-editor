@@ -15,7 +15,7 @@
 ## 功能特性
 
 - **12 种内置块类型** — 段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**公式**（LaTeX 数学公式）、**分割线**、**表格**、**目录**（共 **14 个扩展**，另含 Keymap 与 History 两个行为扩展）
-- **公式（LaTeX 数学）块** — 通过 KaTeX 渲染居中的展示型公式。文档中**只保存原始 `expression` 字符串**——KaTeX 输出在渲染时即时计算、永不持久化，因此序列化保持精简。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
+- **公式（LaTeX 数学）块** — 通过**内置零依赖数学渲染器**渲染居中的展示型公式（轻量 LaTeX 数学子集：分数、根号、上下标、希腊字母、常用函数、大型运算符、矩阵、aligned 多行对齐）。文档中**只保存原始 `expression` 字符串**——渲染输出在渲染时即时计算、永不持久化，因此序列化保持精简。渲染器**可插拔**：向 `<BlockEditor>` 传入 `equationRenderer`（或使用 `createEquationExtension`）即可换用 KaTeX、MathJax 或任何自定义引擎获得完整 LaTeX 支持。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
 - **表格块** — 基于 `attrs` 的 N×M 网格；新建表格默认列宽 120 px、默认启用标题行；行/列选择条 + 左上角角部全选手柄；行/列之间插入点；浮动操作栏提供合并/拆分单元格、**切换标题行**（设置 `attrs.headerRow`）、删除行/列/整个表；单元格使用独立的 `contenteditable`，支持段落/标题/代码块类型、富行内标记、单元格背景色与对齐；Tab 在单元格间导航，Enter 退出编辑（代码块单元格按 Enter 插入换行），Escape 失焦；仿 Arco Design 的内部水平滚动条；矩形选区遇到合并单元格时会自动扩展以保证永远不会只选中合并单元格的一半。
 - **行内样式标记** — 粗体、斜体、下划线、删除线、行内代码、**链接**（`Mod-K` 快捷键、粘贴 URL、自动识别、浮层查看/编辑/复制/删除、href 净化阻断 `javascript:` / XSS），以及按选区设置的文字颜色与背景色
 - **块级属性** — 对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
@@ -56,6 +56,65 @@ const doc = ref<DocumentData>({ blocks: [] })
 
 编辑器默认内置全部 14 种扩展 — 除非你需要自定义集合，否则无需传入 `extensions`。
 
+## 可插拔公式渲染器
+
+公式块只保存原始 LaTeX `expression` 字符串，字符串如何变成像素由可插拔的渲染器决定：
+
+```ts
+interface EquationRenderer {
+  render(expression: string, options?: { displayMode?: boolean }): EquationRenderResult;
+}
+
+interface EquationRenderResult {
+  /** 安全 HTML 字符串 —— 始终可用（导出 / SSR / 非 Vue 消费方）。 */
+  html: string;
+  /** 可选的 Vue VNode 树；存在时视图直接渲染它（不走 innerHTML）。 */
+  vnode: VNode | VNode[] | null;
+  /** 表达式存在 error 级诊断时为 true。 */
+  error: boolean;
+  diagnostics: readonly EquationDiagnostic[];
+}
+```
+
+默认使用**内置数学渲染器** —— 零第三方依赖的轻量 LaTeX 数学子集实现
+（tokenizer → parser → AST → DOM）：数字/标识符、运算符（`\pm \times \div \cdot \le \ge \neq` 等）、
+上下标、`\frac`、`\sqrt` / `\sqrt[n]`、希腊字母、`\sin \cos \tan \log \ln \exp \lim \min \max`、
+大型运算符（`\sum \prod \int`，display 模式下上下标置于符号上下方）、
+`\begin{matrix}` 与 `\begin{aligned}`。未知命令会优雅降级（原样显示），
+语法错误显示内联警告而不会让编辑器崩溃——源码始终保留，修复后自动重新解析。
+它**不是**完整 TeX 引擎；需要完整支持时注入外部渲染器：
+
+```vue
+<script setup lang="ts">
+import katex from 'katex' // 你自己的依赖，xiaodao-editor 不内置
+import type { EquationRenderer } from 'xiaodao-editor'
+
+const katexRenderer: EquationRenderer = {
+  render(expression: string, options?: { displayMode?: boolean }) {
+    try {
+      const html = katex.renderToString(expression, {
+        displayMode: options?.displayMode ?? true,
+        throwOnError: false,
+        trust: false,
+        strict: false,
+      });
+      return { html, vnode: null, error: false, diagnostics: [] };
+    } catch {
+      return { html: '', vnode: null, error: true, diagnostics: [] };
+    }
+  },
+};
+</script>
+
+<template>
+  <BlockEditor v-model="doc" :equation-renderer="katexRenderer" />
+</template>
+```
+
+进阶：`createEquationExtension({ renderer })` 可以构建带指定渲染器的公式扩展，
+追加到你的 `extensions` 数组即可覆盖内置版本。也可以从 `xiaodao-editor` 导入
+内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
+
 ## Props 属性
 
 | 属性名            | 类型                                   | 默认值                 | 说明                                                                          |
@@ -70,6 +129,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 | `width`           | `string \| number`                     | `undefined`            | 可选：编辑器宽度。数字按 CSS px 解析；字符串直接使用（如 `'800px'`、`'100%'`）。未设置时默认撑满容器（`width: 100%`）。 |
 | `height`          | `string \| number`                     | `undefined`            | 可选：编辑器高度。设置后内容区域会在编辑器**内部**滚动，不再无限向下生长；未设置时编辑器随内容扩展，由宿主页面接管滚动。 |
 | `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`               | 工具栏 / 操作栏的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。`'float'`（仅桌面端）隐藏 `FixedToolbar`，改用跟随文本/表格选区的浮动工具栏（HoverToolbar）；移动端自动回退为 `FixedToolbar`。 |
+| `equationRenderer`| `EquationRenderer`                     | 内置渲染器             | 公式块的可插拔渲染器。默认为零依赖的内置数学渲染器；传入自定义实现即可使用 KaTeX、MathJax 或其他引擎。详见「可插拔公式渲染器」。 |
 
 ### Emits 事件
 
@@ -118,7 +178,7 @@ const doc = ref<DocumentData>({ blocks: [] })
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
 | `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式 — Enter 插入换行。                 |
 | `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `uploadImage` prop 与 `cleanup:image-file` 事件走上传侧信道。 |
-| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。KaTeX 在渲染时即时计算居中展示公式（输出永不持久化）。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
+| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。可插拔渲染器在渲染时即时计算居中展示公式（输出永不持久化）；默认为零依赖的**内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），可通过 `equationRenderer` prop 或 `createEquationExtension` 注入 KaTeX/MathJax。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |
 | `DividerExtension`     | `divider`      | 隔离型水平分割线。                                                     |
 | `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`；空 attrs — 标题列表是每次渲染时从编辑器状态计算的**动态视图**。不可编辑块（`editable: false`）；按文档顺序收集所有 `heading` 块（表格单元格内的标题自动排除）；点击条目滚动到对应标题。序列化输出空字符串（真正的标题由各自的块导出）。 |
@@ -243,7 +303,7 @@ const extensions = [...BuiltinExtensions, CalloutExtension]
 - **`src/core/`** — 与框架无关的引擎（零 Vue 导入，由 ESLint 强制约束）。负责文档模型、事务、历史记录、命令、schema、扩展注册表，以及 **Markdown 原生导入/导出**
   （`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()` — 直接操作 `DocState`，不经过中间的 `BlockData`）。
 - **`src/view/`** — Vue 桥接层：`BlockEditor.vue`（根组件）、`BlockList`、`BlockHost`、`BlockContent`（每个块的 `contenteditable`），以及 UI 组件（`BlockHandle`、`BlockSettingsMenu`、`HoverToolbar`、`PlusMenu`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`、`FixedToolbar`）。
-- **`src/extensions/`** — 13 种内置扩展，以及 `_commonAttrs.ts`（共享的 align / color / bgColor / indent 规格与颜色预设，`ImageExtension` 还在此层实现了上传侧信道的渲染逻辑）。**表格** 位于 `Table.ts`（Vue 渲染器 + 命令注册）与 `tableModel.ts`（纯函数式结构操作：插入/删除行/列、合并/拆分单元格、合并选区完整矩形扩展、切换标题行、列宽辅助、HTML/Markdown 序列化、attrs 校验/规整）。**分割线** 位于 `Divider.ts`。**目录** 位于 `TableOfContents.ts`（不可编辑的动态块，实时渲染文档标题列表）。
+- **`src/extensions/`** — 14 种内置扩展，以及 `_commonAttrs.ts`（共享的 align / color / bgColor / indent 规格与颜色预设，`ImageExtension` 还在此层实现了上传侧信道的渲染逻辑）。**表格** 位于 `Table.ts`（Vue 渲染器 + 命令注册）与 `tableModel.ts`（纯函数式结构操作：插入/删除行/列、合并/拆分单元格、合并选区完整矩形扩展、切换标题行、列宽辅助、HTML/Markdown 序列化、attrs 校验/规整）。**分割线** 位于 `Divider.ts`。**目录** 位于 `TableOfContents.ts`（不可编辑的动态块，实时渲染文档标题列表）。**公式** 位于 `Equation.ts`（LaTeX 数学块；只保存 `attrs.expression`，渲染居中展示公式；`attrs.indent` 镜像嵌套深度，作为子块时随深度缩进）。内置数学引擎位于 `extensions/math/`（tokenizer → parser → AST → 渲染树 → DOM/HTML），零第三方依赖。
 - **`src/i18n.ts`** — locale + 主题模块；通过 Vue 的 provide/inject 提供 `t(key)`，让 `<Teleport>` 渲染的浮层也保持响应式。
 
 ## 开发

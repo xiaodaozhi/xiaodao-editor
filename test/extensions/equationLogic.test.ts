@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderEquation,
+  builtinEquationRenderer,
   turnIntoEquation,
   turnEquationIntoParagraph,
   EquationExtension,
@@ -46,7 +47,9 @@ describe('renderEquation', () => {
   it('renders valid LaTeX to an HTML string', () => {
     const { html } = renderEquation('x^2 + 1');
     expect(typeof html).toBe('string');
-    expect(html).toContain('katex');
+    expect(html).toContain('math-equation');
+    // x^2 must come out as a real superscript node
+    expect(html).toContain('math-sup');
   });
 
   it('marks valid LaTeX with error=false', () => {
@@ -76,23 +79,41 @@ describe('renderEquation', () => {
     expect(a.html).toBe(b.html);
   });
 
-  it('does not emit javascript: URLs when trust=false (security)', () => {
-    // With trust:false, KaTeX must refuse to render a clickable javascript:
-    // href. The raw source may still appear inside a MathML <annotation> (used
-    // for round-tripping), so we assert there is NO executable href attribute
-    // and the formula is never turned into an <a> link.
-    const { html, error } = renderEquation('\\href{javascript:alert(1)}{x}');
+  it('does not emit javascript: URLs (security)', () => {
+    // The built-in renderer has no hyperlink support at all: `javascript:`
+    // can never become an executable href.
+    const { html } = renderEquation('\\href{javascript:alert(1)}{x}');
     expect(html).not.toContain('href="javascript:');
     expect(html).not.toContain('<a ');
-    // trust:false treats \href as an unknown command (rendered literally), so it
-    // is NOT a parse error — but the security boundary (no live link) holds.
-    expect(error).toBe(false);
+    // \href is simply not a supported command -> graceful degradation.
+    expect(html).toContain('math-unknown');
   });
 
-  it('produces MathML output (displayMode) for accessibility', () => {
-    const { html } = renderEquation('E = mc^2');
-    // htmlAndMathml output contains both the visual HTML and a MathML block.
-    expect(html).toContain('katex-mathml');
+  it('exposes a VNode tree so the view never falls back to innerHTML', () => {
+    const result = builtinEquationRenderer.render('E = mc^2', { displayMode: true });
+    expect(result.vnode).not.toBeNull();
+    expect(result.error).toBe(false);
+  });
+
+  it('reports diagnostics without throwing for a broken expression', () => {
+    const result = builtinEquationRenderer.render('\\frac{', { displayMode: true });
+    expect(result.error).toBe(true);
+    expect(result.diagnostics.some((d) => d.severity === 'error')).toBe(true);
+    // The user can still keep editing: a rendered string is always produced.
+    expect(typeof result.html).toBe('string');
+  });
+
+  it('treats an unknown command as a warning, not an error', () => {
+    const result = builtinEquationRenderer.render('\\foobar', { displayMode: true });
+    expect(result.error).toBe(false);
+    expect(result.diagnostics.some((d) => d.severity === 'warning')).toBe(true);
+  });
+
+  it('honours displayMode: false (no math-display class)', () => {
+    const block = builtinEquationRenderer.render('x^2', { displayMode: true });
+    const inline = builtinEquationRenderer.render('x^2', { displayMode: false });
+    expect(block.html).toContain('math-display');
+    expect(inline.html).not.toContain('math-display');
   });
 });
 
@@ -186,12 +207,12 @@ describe('serialize', () => {
   it('toHTML wraps valid output in equation-block-rendered', () => {
     const html = serialize.toHTML!(makeBlock({ attrs: { expression: 'x^2' } }));
     expect(html).toContain('equation-block-rendered');
-    expect(html).toContain('katex');
+    expect(html).toContain('math-equation');
   });
 
-  it('toHTML emits a katex-error-block for invalid LaTeX', () => {
+  it('toHTML emits a math-error-block for invalid LaTeX', () => {
     const html = serialize.toHTML!(makeBlock({ attrs: { expression: '\\frac{1}' } }));
-    expect(html).toContain('katex-error-block');
+    expect(html).toContain('math-error-block');
   });
 
   it('toHTML returns empty string for an empty expression', () => {
