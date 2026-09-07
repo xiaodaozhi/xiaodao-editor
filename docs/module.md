@@ -11,44 +11,44 @@ This document is the per-module API reference for the `xiaodao-editor` package, 
 **Public API.**
 
 ```ts
-type BlockId = string & { readonly __brand: 'BlockId' } // branded opaque id
-type BlockType = string
-type JSONValue = string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue }
-type Attrs = Readonly<Record<string, JSONValue>>
+type BlockId = string & { readonly __brand: 'BlockId' }; // branded opaque id
+type BlockType = string;
+type JSONValue = string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue };
+type Attrs = Readonly<Record<string, JSONValue>>;
 
 interface Mark { readonly type: string; readonly attrs?: Attrs }
 interface TextRun { readonly type: 'text'; readonly text: string; readonly marks?: readonly Mark[] }
-type InlineNode = TextRun                  // discriminated union; future: mention | equation
-type InlineSeq = readonly InlineNode[]
+type InlineNode = TextRun;                 // discriminated union; future: mention | equation
+type InlineSeq = readonly InlineNode[];
 
 interface Block {
-  readonly id: BlockId
-  readonly type: BlockType
-  readonly attrs: Attrs
-  readonly content: InlineSeq
-  readonly children: readonly BlockId[]
+  readonly id: BlockId;
+  readonly type: BlockType;
+  readonly attrs: Attrs;
+  readonly content: InlineSeq;
+  readonly children: readonly BlockId[];
 }
 
 interface DocState {
-  readonly id: string
-  readonly root: readonly BlockId[]
-  readonly blocks: ReadonlyMap<BlockId, Block>
-  readonly parent: ReadonlyMap<BlockId, BlockId | null>
+  readonly id: string;
+  readonly root: readonly BlockId[];
+  readonly blocks: ReadonlyMap<BlockId, Block>;
+  readonly parent: ReadonlyMap<BlockId, BlockId | null>;
 }
 
 interface Anchor { readonly blockId: BlockId; readonly offset: number }
 type Selection =
   | { readonly kind: 'caret'; readonly blockId: BlockId; readonly offset: number }
   | { readonly kind: 'text'; readonly anchor: Anchor; readonly focus: Anchor }
-  | { readonly kind: 'blocks'; readonly blockIds: readonly BlockId[] }
+  | { readonly kind: 'blocks'; readonly blockIds: readonly BlockId[] };
 
 interface BlockData { readonly id?: string; readonly type: string; readonly attrs?: Attrs; readonly content?: InlineSeq; readonly children?: readonly BlockData[] }
 interface DocumentData { readonly id?: string; readonly blocks: readonly BlockData[] }
 
-function isBlockId(value: unknown): value is BlockId
-function isTextRun(node: InlineNode): node is TextRun
-function inlineText(seq: InlineSeq): string            // concatenate text runs
-function inlineFromString(text: string): InlineSeq      // build a seq from a string
+function isBlockId(value: unknown): value is BlockId;
+function isTextRun(node: InlineNode): node is TextRun;
+function inlineText(seq: InlineSeq): string;            // concatenate text runs
+function inlineFromString(text: string): InlineSeq;     // build a seq from a string
 ```
 
 **Interactions.** Imported by virtually every other core module. `ids.ts` produces `BlockId`; `state/store.ts` builds `DocState` from `DocumentData`; `Step.ts` mutates `DocState`; `Selection.ts` constructs `Selection`; `primitiveCommands.ts` uses `inlineText`/`inlineFromString`. The view layer imports `Block`, `BlockId`, `InlineSeq`, `Selection` for rendering and DOM sync.
@@ -62,8 +62,8 @@ function inlineFromString(text: string): InlineSeq      // build a seq from a st
 **Public API.**
 
 ```ts
-function createBlockId(): BlockId   // 12 chars from a 64-symbol alphabet (~71 bits)
-function asBlockId(value: string): BlockId  // coerce trusted strings (rehydration only)
+function createBlockId(): BlockId;   // 12 chars from a 64-symbol alphabet (~71 bits)
+function asBlockId(value: string): BlockId;  // coerce trusted strings (rehydration only)
 ```
 
 `createBlockId` throws if `globalThis.crypto.getRandomValues` is unavailable. `ALPHABET` is `A–Za–z0–9_-` and `ID_LENGTH` is 12.
@@ -83,25 +83,25 @@ function asBlockId(value: string): BlockId  // coerce trusted strings (rehydrati
 ```ts
 interface DocBuildResult { readonly doc: DocState; readonly idMap: ReadonlyMap<string, BlockId> }
 
-function docFromData(json: DocumentData): DocBuildResult   // preserve unique source ids, else regenerate
-function docToData(doc: DocState): DocumentData
+function docFromData(json: DocumentData): DocBuildResult;  // preserve unique source ids, else regenerate
+function docToData(doc: DocState): DocumentData;
 
 // Pure lookups
-function getBlock(doc: DocState, id: BlockId): Block | undefined
-function requireBlock(doc: DocState, id: BlockId): Block          // throws if missing
-function parentOf(doc: DocState, id: BlockId): BlockId | null
-function siblingList(doc: DocState, id: BlockId): readonly BlockId[]
-function indexOf(doc: DocState, id: BlockId): number
-function prevSibling(doc: DocState, id: BlockId): Block | undefined
-function nextSibling(doc: DocState, id: BlockId): Block | undefined
-function flatten(doc: DocState): BlockId[]                        // depth-first document order
-function blockBefore(doc: DocState, id: BlockId): Block | undefined
-function blockAfter(doc: DocState, id: BlockId): Block | undefined
-function lastDescendant(doc: DocState, id: BlockId): Block
+function getBlock(doc: DocState, id: BlockId): Block | undefined;
+function requireBlock(doc: DocState, id: BlockId): Block;          // throws if missing
+function parentOf(doc: DocState, id: BlockId): BlockId | null;
+function siblingList(doc: DocState, id: BlockId): readonly BlockId[];
+function indexOf(doc: DocState, id: BlockId): number;
+function prevSibling(doc: DocState, id: BlockId): Block | undefined;
+function nextSibling(doc: DocState, id: BlockId): Block | undefined;
+function flatten(doc: DocState): BlockId[];                        // depth-first document order
+function blockBefore(doc: DocState, id: BlockId): Block | undefined;
+function blockAfter(doc: DocState, id: BlockId): Block | undefined;
+function lastDescendant(doc: DocState, id: BlockId): Block;
 
 // Content helpers (produce new immutable Block)
-function withContent(block: Block, content: InlineSeq): Block
-function withAttrs(block: Block, attrs: Block['attrs']): Block
+function withContent(block: Block, content: InlineSeq): Block;
+function withAttrs(block: Block, attrs: Block['attrs']): Block;
 ```
 
 **Interactions.** Depends on `types.ts` and `ids.ts`. Used by `Step.ts` (apply reads parents/children), `invert.ts` (`indexOf`, `parentOf`, `requireBlock` to invert steps), `Editor.ts` (`docFromData`, `docToData`, `flatten`, `getBlock`), and `primitiveCommands.ts` (traversal for Enter/Backspace/navigation).
@@ -121,11 +121,11 @@ type Step =
   | { op: 'replaceBlock'; id: BlockId; type: BlockType; attrs: Attrs }
   | { op: 'moveBlock'; id: BlockId; toParent: BlockId | null; toIndex: number }
   | { op: 'setText'; id: BlockId; content: InlineSeq }
-  | { op: 'setAttrs'; id: BlockId; attrs: Attrs }
+  | { op: 'setAttrs'; id: BlockId; attrs: Attrs };
 
 interface ApplyResult { readonly doc: DocState; readonly changed: ReadonlySet<BlockId>; readonly removed: ReadonlySet<BlockId> }
 
-function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult
+function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult;
 ```
 
 `removeBlock` detaches an entire subtree (recursively deleting descendants). `moveBlock` handles both reorder-within-siblings and cross-parent reparenting. Indexes are clamped with `Math.max(0, Math.min(index, len))`.
@@ -142,31 +142,31 @@ function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult
 
 ```ts
 interface TransactionMeta {
-  readonly addToHistory?: boolean
-  readonly historyGroup?: string | null
-  readonly viewHints?: { readonly skipDomWrite?: readonly BlockId[] }
-  readonly source?: string
-  readonly [key: string]: unknown
+  readonly addToHistory?: boolean;
+  readonly historyGroup?: string | null;
+  readonly viewHints?: { readonly skipDomWrite?: readonly BlockId[] };
+  readonly source?: string;
+  readonly [key: string]: unknown;
 }
 interface Transaction { readonly steps: readonly Step[]; readonly selectionAfter?: Selection; readonly meta: TransactionMeta }
 interface InsertBlockParams { parent: BlockId | null; index: number; type: BlockType; attrs?: Attrs; content?: InlineSeq; id?: BlockId }
 
 class TransactionBuilder {
-  insertBlock(params: InsertBlockParams): BlockId   // returns the (generated or explicit) id
-  removeBlock(id: BlockId): this
-  replaceBlock(id: BlockId, type: BlockType, attrs: Attrs): this
-  moveBlock(id: BlockId, toParent: BlockId | null, toIndex: number): this
-  setText(id: BlockId, content: InlineSeq): this
-  setAttrs(id: BlockId, attrs: Attrs): this
-  appendSteps(steps: readonly Step[]): this          // used by history undo/redo
-  setSelection(selection: Selection): this
-  setMeta(meta: Partial<TransactionMeta>): this
-  addToHistory(value: boolean): this
-  historyGroup(key: string | null): this
-  skipDomWrite(ids: readonly BlockId[]): this
-  build(): Transaction
+  insertBlock(params: InsertBlockParams): BlockId;   // returns the (generated or explicit) id
+  removeBlock(id: BlockId): this;
+  replaceBlock(id: BlockId, type: BlockType, attrs: Attrs): this;
+  moveBlock(id: BlockId, toParent: BlockId | null, toIndex: number): this;
+  setText(id: BlockId, content: InlineSeq): this;
+  setAttrs(id: BlockId, attrs: Attrs): this;
+  appendSteps(steps: readonly Step[]): this;          // used by history undo/redo
+  setSelection(selection: Selection): this;
+  setMeta(meta: Partial<TransactionMeta>): this;
+  addToHistory(value: boolean): this;
+  historyGroup(key: string | null): this;
+  skipDomWrite(ids: readonly BlockId[]): this;
+  build(): Transaction;
 }
-function createTransaction(): TransactionBuilder
+function createTransaction(): TransactionBuilder;
 ```
 
 `insertBlock` generates an id via `createBlockId()` when `params.id` is omitted; the explicit form is used by undo/redo and paste.
@@ -183,15 +183,15 @@ function createTransaction(): TransactionBuilder
 
 ```ts
 interface EditorState {
-  readonly doc: DocState
-  readonly selection: Selection
-  readonly pluginState: Readonly<Record<string, PluginState>>
-  readonly version: number
+  readonly doc: DocState;
+  readonly selection: Selection;
+  readonly pluginState: Readonly<Record<string, PluginState>>;
+  readonly version: number;
 }
 interface ApplyTransactionResult extends ApplyResult { readonly state: EditorState }
 
-function applyTransaction(state: EditorState, tr: Transaction, plugins: readonly TransactionApplier[]): ApplyTransactionResult
-function createState(doc: DocState, selection: Selection, pluginState?: Readonly<Record<string, PluginState>>): EditorState
+function applyTransaction(state: EditorState, tr: Transaction, plugins: readonly TransactionApplier[]): ApplyTransactionResult;
+function createState(doc: DocState, selection: Selection, pluginState?: Readonly<Record<string, PluginState>>): EditorState;
 ```
 
 `applyTransaction` runs `applySteps`, inherits `selectionAfter` (falling back to the prior selection), invokes each plugin's `applyTransaction` hook to update its state slice, and bumps `version`. Plugins are passed as a minimal `TransactionApplier` view (`{ name, applyTransaction? }`) to avoid a runtime coupling to the `Plugin` module.
@@ -207,7 +207,7 @@ function createState(doc: DocState, selection: Selection, pluginState?: Readonly
 **Public API.**
 
 ```ts
-function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[]
+function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[];
 ```
 
 Per-op inversion: `insertBlock` → `removeBlock`; `removeBlock` → a pre-order `insertBlock` sequence recreating the subtree (`reinsertSubtree`); `replaceBlock`/`setText`/`setAttrs` → restore the previous value from `prevDoc`; `moveBlock` → move back to the previous parent and index.
@@ -227,23 +227,23 @@ Per-op inversion: `insertBlock` → `removeBlock`; `removeBlock` → a pre-order
 ```ts
 interface AttrSpec { readonly default: JSONValue; readonly validate?: (value: unknown) => boolean }
 interface BlockSchemaSpec {
-  readonly type: BlockType
-  readonly attrs?: Readonly<Record<string, AttrSpec>>
-  readonly content?: 'text' | 'none'
-  readonly nestable?: boolean
-  readonly allowedChildren?: readonly BlockType[] | '*'
-  readonly isolating?: boolean
-  readonly empty?: (block: Block) => boolean
+  readonly type: BlockType;
+  readonly attrs?: Readonly<Record<string, AttrSpec>>;
+  readonly content?: 'text' | 'none';
+  readonly nestable?: boolean;
+  readonly allowedChildren?: readonly BlockType[] | '*';
+  readonly isolating?: boolean;
+  readonly empty?: (block: Block) => boolean;
 }
 interface BlockSchema { /* same fields, all required, normalized */ }
 
-function defineSchema(spec: BlockSchemaSpec): BlockSchema
-function defaultAttrs(schema: BlockSchema): Attrs
-function coerceAttrs(schema: BlockSchema, raw: Readonly<Record<string, unknown>>): Attrs
-function canContain(parent: BlockSchema, childType: BlockType): boolean
-function hasText(schema: BlockSchema): boolean
-function isIsolating(schema: BlockSchema): boolean
-function isEmpty(schema: BlockSchema, block: Block): boolean
+function defineSchema(spec: BlockSchemaSpec): BlockSchema;
+function defaultAttrs(schema: BlockSchema): Attrs;
+function coerceAttrs(schema: BlockSchema, raw: Readonly<Record<string, unknown>>): Attrs;
+function canContain(parent: BlockSchema, childType: BlockType): boolean;
+function hasText(schema: BlockSchema): boolean;
+function isIsolating(schema: BlockSchema): boolean;
+function isEmpty(schema: BlockSchema, block: Block): boolean;
 ```
 
 The default schema (when a field is omitted) is `content: 'text'`, `nestable: false`, `allowedChildren: '*'`, `isolating: false`, and an `empty` predicate that treats no-content or all-empty-text-runs as empty.
@@ -260,15 +260,15 @@ The default schema (when a field is omitted) is `content: 'text'`, `nestable: fa
 
 ```ts
 class SchemaRegistry {
-  constructor(schemas: ReadonlyMap<BlockType, BlockSchema>, fallback: BlockSchema)
-  get(type: BlockType): BlockSchema          // falls back to the paragraph-like default
-  has(type: BlockType): boolean
-  defaultAttrsFor(type: BlockType): Attrs
-  coerceAttrsFor(type: BlockType, raw: Readonly<Record<string, unknown>>): Attrs
-  canContain(parentType: BlockType, childType: BlockType): boolean
-  hasText(type: BlockType): boolean
-  isIsolating(type: BlockType): boolean
-  isEmpty(block: Block): boolean
+  constructor(schemas: ReadonlyMap<BlockType, BlockSchema>, fallback: BlockSchema);
+  get(type: BlockType): BlockSchema;          // falls back to the paragraph-like default
+  has(type: BlockType): boolean;
+  defaultAttrsFor(type: BlockType): Attrs;
+  coerceAttrsFor(type: BlockType, raw: Readonly<Record<string, unknown>>): Attrs;
+  canContain(parentType: BlockType, childType: BlockType): boolean;
+  hasText(type: BlockType): boolean;
+  isIsolating(type: BlockType): boolean;
+  isEmpty(block: Block): boolean;
 }
 ```
 
@@ -285,19 +285,19 @@ class SchemaRegistry {
 **Public API.**
 
 ```ts
-type Dispatch = (tr: Transaction) => void
-type CommandFn<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean
+type Dispatch = (tr: Transaction) => void;
+type CommandFn<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean;
 interface CommandEntry<TArgs = void> { readonly name: string; readonly run: CommandFn<TArgs> }
-type CommandSpec<TArgs = void> = CommandEntry<TArgs>
-type AnyCommandEntry = CommandEntry<any>      // type-erased for the heterogeneous registry
-type CommandDispatcher = (name: string, args: unknown) => boolean
+type CommandSpec<TArgs = void> = CommandEntry<TArgs>;
+type AnyCommandEntry = CommandEntry<any>;      // type-erased for the heterogeneous registry
+type CommandDispatcher = (name: string, args: unknown) => boolean;
 
 class CommandRegistry {
-  register(spec: AnyCommandEntry): void       // throws on duplicate name
-  override(spec: AnyCommandEntry): void       // replace (extensions override primitives)
-  has(name: string): boolean
-  get(name: string): AnyCommandEntry | undefined
-  createProxy(dispatch: CommandDispatcher): Record<string, (...args: unknown[]) => boolean>
+  register(spec: AnyCommandEntry): void;       // throws on duplicate name
+  override(spec: AnyCommandEntry): void;       // replace (extensions override primitives)
+  has(name: string): boolean;
+  get(name: string): AnyCommandEntry | undefined;
+  createProxy(dispatch: CommandDispatcher): Record<string, (...args: unknown[]) => boolean>;
 }
 ```
 
@@ -322,7 +322,7 @@ interface MoveCaretArgs { offset?: number }
 interface SetLinkArgs { readonly id: BlockId; readonly href: string; readonly from: number; readonly to: number; readonly text?: string }
 interface UnsetLinkArgs { readonly id: BlockId; readonly from: number; readonly to: number }
 
-function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[]
+function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[];
 ```
 
 `createPrimitiveCommands` returns entries for: `insertBlock`, `removeBlock`, `replaceBlock`, `setText` (carries `historyGroup('type')` + `skipDomWrite` + `source: 'input'`), `setAttrs`, `splitBlock` (splits text at offset, inserts the `defaultBlockType` after), `mergeBlock` (joins with the previous block in document order), `enter` (split, or insert default block to exit, or insert after a non-text/isolating block), `backspace` (merge at offset 0, delete a within-block range, or remove a blocks selection; respects `isolating`), `moveToPreviousBlock`, `moveToNextBlock`, `setSelection`, `selectBlock`, `moveBlock`, **`setLink`** (applies `{type:'link', attrs:{href: sanitizeUrl(href)}}` mark to `[from,to)` in block `id`; when `text` is provided, replaces the range's literal text with `text` in the same transaction so link text can be rewritten atomically; skips ranges containing a `code` mark since code & link are mutually exclusive), and **`unsetLink`** (strips the `link` mark from `[from,to)`).
@@ -339,14 +339,14 @@ function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[
 
 ```ts
 interface KeymapBinding { readonly key: string; readonly command: string; readonly args?: unknown; readonly priority?: number }
-type KeymapSpec = readonly KeymapBinding[]
+type KeymapSpec = readonly KeymapBinding[];
 
-function keyNameFromEvent(event: KeyboardEvent): string   // e.g. "Cmd-Shift-Z"; "" for bare modifier
-function keyMatches(bindingKey: string, eventKey: string): boolean  // resolves Mod, case-insensitive
+function keyNameFromEvent(event: KeyboardEvent): string;   // e.g. "Cmd-Shift-Z"; "" for bare modifier
+function keyMatches(bindingKey: string, eventKey: string): boolean;  // resolves Mod, case-insensitive
 
 class KeymapRegistry {
-  register(spec: KeymapSpec): void          // re-sorts by priority (lower first)
-  resolve(eventKey: string): KeymapBinding | undefined
+  register(spec: KeymapSpec): void;          // re-sorts by priority (lower first)
+  resolve(eventKey: string): KeymapBinding | undefined;
 }
 ```
 
@@ -365,16 +365,16 @@ class KeymapRegistry {
 ```ts
 interface InputRuleContext { readonly blockId: BlockId; readonly textBeforeCaret: string }
 interface InputRuleSpec {
-  readonly name: string
-  readonly pattern: RegExp                  // must be anchored, e.g. /^# $/
-  readonly command: string
-  readonly args?: (match: RegExpExecArray) => unknown
+  readonly name: string;
+  readonly pattern: RegExp;                  // must be anchored, e.g. /^# $/
+  readonly command: string;
+  readonly args?: (match: RegExpExecArray) => unknown;
 }
-type InputRule = InputRuleSpec
+type InputRule = InputRuleSpec;
 
 class InputRuleRegistry {
-  register(spec: InputRuleSpec): void
-  get all(): readonly InputRule[]
+  register(spec: InputRuleSpec): void;
+  get all(): readonly InputRule[];
 }
 ```
 
@@ -390,21 +390,21 @@ class InputRuleRegistry {
 
 ```ts
 interface SlashCommandSpec {
-  readonly id: string
-  readonly title: string
-  readonly keywords?: readonly string[]
-  readonly description?: string
-  readonly icon?: unknown
-  readonly command: string
-  readonly args?: unknown
-  readonly applicableTo?: readonly BlockType[]   // restrict to current block types
+  readonly id: string;
+  readonly title: string;
+  readonly keywords?: readonly string[];
+  readonly description?: string;
+  readonly icon?: unknown;
+  readonly command: string;
+  readonly args?: unknown;
+  readonly applicableTo?: readonly BlockType[];   // restrict to current block types
 }
-type SlashCommand = SlashCommandSpec
+type SlashCommand = SlashCommandSpec;
 
 class SlashCommandRegistry {
-  register(spec: SlashCommandSpec): void        // throws on duplicate id
-  get all(): readonly SlashCommand[]
-  search(query: string): readonly SlashCommand[]  // naive substring over title+keywords
+  register(spec: SlashCommandSpec): void;        // throws on duplicate id
+  get all(): readonly SlashCommand[];
+  search(query: string): readonly SlashCommand[];  // naive substring over title+keywords
 }
 ```
 
@@ -425,21 +425,21 @@ interface BlockRendererSpec { readonly component: unknown; readonly editable?: b
 interface ToolbarActionSpec { readonly id: string; readonly label: string; readonly command: string; readonly args?: unknown; readonly icon?: unknown }
 
 interface Extension {
-  readonly name: string
-  readonly uses?: readonly Extension[]            // bundled extensions; flattened, de-duped by name
-  readonly schema?: BlockSchemaSpec
-  readonly renderer?: BlockRendererSpec
-  readonly commands?: readonly AnyCommandEntry[]
-  readonly keymap?: KeymapSpec
-  readonly inputRules?: readonly InputRuleSpec[]
-  readonly slashCommands?: readonly SlashCommandSpec[]
-  readonly toolbar?: readonly ToolbarActionSpec[]
-  readonly serialize?: SerializerSpec
-  readonly deserialize?: DeserializerSpec
-  readonly plugins?: readonly Plugin[]
+  readonly name: string;
+  readonly uses?: readonly Extension[];            // bundled extensions; flattened, de-duped by name
+  readonly schema?: BlockSchemaSpec;
+  readonly renderer?: BlockRendererSpec;
+  readonly commands?: readonly AnyCommandEntry[];
+  readonly keymap?: KeymapSpec;
+  readonly inputRules?: readonly InputRuleSpec[];
+  readonly slashCommands?: readonly SlashCommandSpec[];
+  readonly toolbar?: readonly ToolbarActionSpec[];
+  readonly serialize?: SerializerSpec;
+  readonly deserialize?: DeserializerSpec;
+  readonly plugins?: readonly Plugin[];
 }
 
-function extensionBlockType(ext: Extension): BlockType | null   // convenience: the declared type, if any
+function extensionBlockType(ext: Extension): BlockType | null;   // convenience: the declared type, if any
 ```
 
 `BlockRendererSpec.component` is typed `unknown` so the core stays framework-agnostic; `BlockHost.vue` casts it to a Vue component at the single view-layer boundary.
@@ -456,32 +456,32 @@ function extensionBlockType(ext: Extension): BlockType | null   // convenience: 
 
 ```ts
 class RendererRegistry {
-  register(type: BlockType, spec: BlockRendererSpec): void  // throws on duplicate
-  get(type: BlockType): BlockRendererSpec | undefined
+  register(type: BlockType, spec: BlockRendererSpec): void;  // throws on duplicate
+  get(type: BlockType): BlockRendererSpec | undefined;
 }
 class ToolbarRegistry {
-  register(type: BlockType, actions: readonly ToolbarActionSpec[]): void  // appends
-  get(type: BlockType): readonly ToolbarActionSpec[]
+  register(type: BlockType, actions: readonly ToolbarActionSpec[]): void;  // appends
+  get(type: BlockType): readonly ToolbarActionSpec[];
 }
 
 interface EditorRegistries {
-  readonly schema: SchemaRegistry
-  readonly renderers: RendererRegistry
-  readonly commands: CommandRegistry
-  readonly keymap: KeymapRegistry
-  readonly inputRules: InputRuleRegistry
-  readonly slash: SlashCommandRegistry
-  readonly toolbar: ToolbarRegistry
-  readonly serializers: SerializerRegistry
-  readonly deserializers: DeserializerRegistry
-  readonly plugins: readonly Plugin[]
-  readonly extensionCommands: readonly AnyCommandEntry[]
-  readonly defaultBlockType: BlockType
+  readonly schema: SchemaRegistry;
+  readonly renderers: RendererRegistry;
+  readonly commands: CommandRegistry;
+  readonly keymap: KeymapRegistry;
+  readonly inputRules: InputRuleRegistry;
+  readonly slash: SlashCommandRegistry;
+  readonly toolbar: ToolbarRegistry;
+  readonly serializers: SerializerRegistry;
+  readonly deserializers: DeserializerRegistry;
+  readonly plugins: readonly Plugin[];
+  readonly extensionCommands: readonly AnyCommandEntry[];
+  readonly defaultBlockType: BlockType;
 }
 interface BuildRegistriesOptions { readonly defaultBlockType?: BlockType }
 
-function flattenExtensions(extensions: readonly Extension[]): Extension[]  // last wins by name
-function buildRegistries(extensions: readonly Extension[], options?: BuildRegistriesOptions): EditorRegistries
+function flattenExtensions(extensions: readonly Extension[]): Extension[];  // last wins by name
+function buildRegistries(extensions: readonly Extension[], options?: BuildRegistriesOptions): EditorRegistries;
 ```
 
 `buildRegistries` iterates the flattened list, normalizing each schema via `defineSchema`, registering renderers/keymaps/input rules/slash commands/toolbar actions/serializers/deserializers/plugins, and collecting extension commands separately (they are registered after primitives so they can override). The fallback schema is `type: '__fallback__'`. `defaultBlockType` defaults to `'paragraph'`.
@@ -499,23 +499,23 @@ function buildRegistries(extensions: readonly Extension[], options?: BuildRegist
 **Public API.**
 
 ```ts
-type PluginState = unknown
+type PluginState = unknown;
 
 interface EventContext {
-  readonly state: EditorState
-  readonly dispatch: (tr: Transaction) => void
-  readonly focusBlockId: () => string | null
+  readonly state: EditorState;
+  readonly dispatch: (tr: Transaction) => void;
+  readonly focusBlockId: () => string | null;
 }
 
 interface Plugin {
-  readonly name: string
-  init?(state: EditorState): PluginState
-  applyTransaction?(tr: Transaction, prevState: EditorState, nextDoc: EditorState['doc'], nextSelection: EditorState['selection']): PluginState
-  onKeyDown?(event: KeyboardEvent, ctx: EventContext): boolean
-  onInput?(event: InputEvent, ctx: EventContext): boolean
-  onCompositionStart?(event: CompositionEvent, ctx: EventContext): void
-  onCompositionEnd?(event: CompositionEvent, ctx: EventContext): void
-  onDestroy?(): void
+  readonly name: string;
+  init?(state: EditorState): PluginState;
+  applyTransaction?(tr: Transaction, prevState: EditorState, nextDoc: EditorState['doc'], nextSelection: EditorState['selection']): PluginState;
+  onKeyDown?(event: KeyboardEvent, ctx: EventContext): boolean;
+  onInput?(event: InputEvent, ctx: EventContext): boolean;
+  onCompositionStart?(event: CompositionEvent, ctx: EventContext): void;
+  onCompositionEnd?(event: CompositionEvent, ctx: EventContext): void;
+  onDestroy?(): void;
 }
 ```
 
@@ -532,16 +532,16 @@ interface Plugin {
 **Public API.**
 
 ```ts
-function caretSelection(blockId: BlockId, offset: number): Selection
-function textSelection(anchor: Anchor, focus: Anchor): Selection
-function blocksSelection(blockIds: readonly BlockId[]): Selection
-function isCaret(sel: Selection): sel is Extract<Selection, { kind: 'caret' }>
-function isText(sel: Selection): sel is Extract<Selection, { kind: 'text' }>
-function isBlocks(sel: Selection): sel is Extract<Selection, { kind: 'blocks' }>
-function isCollapsed(sel: Selection): boolean
-function primaryBlock(sel: Selection): BlockId | null       // where commands like Enter operate
-function focusOffset(sel: Selection): number
-function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => number): readonly [Anchor, Anchor] | null
+function caretSelection(blockId: BlockId, offset: number): Selection;
+function textSelection(anchor: Anchor, focus: Anchor): Selection;
+function blocksSelection(blockIds: readonly BlockId[]): Selection;
+function isCaret(sel: Selection): sel is Extract<Selection, { kind: 'caret' }>;
+function isText(sel: Selection): sel is Extract<Selection, { kind: 'text' }>;
+function isBlocks(sel: Selection): sel is Extract<Selection, { kind: 'blocks' }>;
+function isCollapsed(sel: Selection): boolean;
+function primaryBlock(sel: Selection): BlockId | null;       // where commands like Enter operate
+function focusOffset(sel: Selection): number;
+function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => number): readonly [Anchor, Anchor] | null;
 ```
 
 `primaryBlock` returns the caret's block, the text selection's focus block, or the first selected block. `orderedAnchors` normalizes a text selection so the anchor precedes (or equals) the focus in document order, using a caller-supplied comparator.
@@ -560,13 +560,13 @@ function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => numbe
 
 ```ts
 class HistoryManager {
-  constructor(limit?: number)                 // default 500 entries
-  record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void
-  canUndo(): boolean
-  canRedo(): boolean
-  reset(): void                               // clears both stacks (used on document replace)
-  undo(): Transaction | null                  // builds the inverse transaction; pushes to redo
-  redo(): Transaction | null                  // re-applies originals; pushes back to undo
+  constructor(limit?: number);                 // default 500 entries
+  record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  reset(): void;                               // clears both stacks (used on document replace)
+  undo(): Transaction | null;                  // builds the inverse transaction; pushes to redo
+  redo(): Transaction | null;                  // re-applies originals; pushes back to undo
 }
 ```
 
@@ -587,21 +587,21 @@ class HistoryManager {
 ```ts
 interface SerializeResult { readonly type: BlockType; readonly attrs?: Attrs; readonly content?: InlineSeq }
 interface SerializerSpec {
-  readonly toMarkdown?: (block: Block) => string
-  readonly toHTML?: (block: Block) => string
+  readonly toMarkdown?: (block: Block) => string;
+  readonly toHTML?: (block: Block) => string;
 }
 interface DeserializerSpec {
-  readonly fromMarkdown?: (line: string) => SerializeResult | null
+  readonly fromMarkdown?: (line: string) => SerializeResult | null;
 }
 
 class SerializerRegistry {
-  register(type: BlockType, spec: SerializerSpec): void
-  markdownFor(block: Block): string | undefined
-  htmlFor(block: Block): string | undefined
+  register(type: BlockType, spec: SerializerSpec): void;
+  markdownFor(block: Block): string | undefined;
+  htmlFor(block: Block): string | undefined;
 }
 class DeserializerRegistry {
-  register(spec: DeserializerSpec): void
-  parseMarkdownLine(line: string): SerializeResult | null   // first match wins
+  register(spec: DeserializerSpec): void;
+  parseMarkdownLine(line: string): SerializeResult | null;   // first match wins
 }
 ```
 
@@ -619,41 +619,41 @@ class DeserializerRegistry {
 
 ```ts
 interface EditorConfig {
-  readonly extensions: readonly Extension[]
-  readonly defaultBlockType?: string
-  readonly initialDocument?: DocumentData
-  readonly initialSelection?: Selection
-  readonly editable?: boolean
-  readonly historyLimit?: number
+  readonly extensions: readonly Extension[];
+  readonly defaultBlockType?: string;
+  readonly initialDocument?: DocumentData;
+  readonly initialSelection?: Selection;
+  readonly editable?: boolean;
+  readonly historyLimit?: number;
 }
 interface StateUpdate { readonly state: EditorState; readonly changed: ReadonlySet<BlockId>; readonly removed: ReadonlySet<BlockId> }
-type EditorListener = (update: StateUpdate) => void
+type EditorListener = (update: StateUpdate) => void;
 
 class Editor {
-  readonly registries: EditorRegistries
-  readonly commands: Record<string, (...args: unknown[]) => boolean>
-  editable: boolean
-  focusBlockId: BlockId | null               // set by the view layer (focused contenteditable)
-  constructor(config: EditorConfig)
-  getState(): EditorState
-  toData(): DocumentData
-  setDocument(json: DocumentData): void      // replace wholesale; resets history; re-inits plugins
-  toMarkdown(): string                       // export the current document as a Markdown string
-  setDocFromMarkdown(markdown: string): void // replace the whole document by parsing Markdown; resets history
-  dispatch(tr: Transaction): void            // the single mutation path; records history; notifies
-  undo(): boolean
-  redo(): boolean
-  canUndo(): boolean
-  canRedo(): boolean
-  subscribe(listener: EditorListener): () => void
-  handleKeyDown(event: KeyboardEvent): boolean
-  handleInput(event: InputEvent): boolean
-  handleCompositionStart(event: CompositionEvent): void
-  handleCompositionEnd(event: CompositionEvent): void
-  destroy(): void
+  readonly registries: EditorRegistries;
+  readonly commands: Record<string, (...args: unknown[]) => boolean>;
+  editable: boolean;
+  focusBlockId: BlockId | null;               // set by the view layer (focused contenteditable)
+  constructor(config: EditorConfig);
+  getState(): EditorState;
+  toData(): DocumentData;
+  setDocument(json: DocumentData): void;      // replace wholesale; resets history; re-inits plugins
+  toMarkdown(): string;                       // export the current document as a Markdown string
+  setDocFromMarkdown(markdown: string): void; // replace the whole document by parsing Markdown; resets history
+  dispatch(tr: Transaction): void;            // the single mutation path; records history; notifies
+  undo(): boolean;
+  redo(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  subscribe(listener: EditorListener): () => void;
+  handleKeyDown(event: KeyboardEvent): boolean;
+  handleInput(event: InputEvent): boolean;
+  handleCompositionStart(event: CompositionEvent): void;
+  handleCompositionEnd(event: CompositionEvent): void;
+  destroy(): void;
 }
 
-function hasBlock(editor: Editor, id: BlockId): boolean  // debugging helper
+function hasBlock(editor: Editor, id: BlockId): boolean;  // debugging helper
 ```
 
 Construction: `buildRegistries`, register primitive commands, let extension commands `override` by name, build the document (seeding an empty default block if root is empty), initialize plugins (`init`), register the core `undo`/`redo` commands (which delegate to `HistoryManager`), and build the command proxy. `dispatch` runs `applyTransaction`, records the transaction in history, and notifies subscribers with the diff. `setDocument` rebuilds state and calls `history.reset()`.
@@ -681,9 +681,9 @@ Construction: `buildRegistries`, register primitive commands, let extension comm
 **Public API.**
 
 ```ts
-const editorKey: InjectionKey<Editor>
+const editorKey: InjectionKey<Editor>;
 interface BlockRenderItem { readonly id: BlockId; readonly block: Block }
-function useEditor(): Editor  // throws if called outside a <BlockEditor> tree
+function useEditor(): Editor;  // throws if called outside a <BlockEditor> tree
 ```
 
 `BlockRenderItem` carries the id separately from `block` so `BlockList` can use it as a `:key` without reaching into the block object. The type lives here (not in a `.vue` file) because TypeScript's `*.vue` module shim only declares a default export, making named type re-exports from `.vue` files impossible.
@@ -700,19 +700,19 @@ function useEditor(): Editor  // throws if called outside a <BlockEditor> tree
 
 ```ts
 props: {
-  extensions?: readonly Extension[]        // default BuiltinExtensions (14 extensions, including Image/Table/Divider/Equation/TableOfContents)
-  modelValue?: DocumentData                // default { blocks: [] }
-  editable?: boolean                       // default true
-  placeholder?: string                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
-  theme?: 'light' | 'dark'                 // default 'light'
-  locale?: 'zh-CN' | 'en-US'               // default 'zh-CN'; any non-empty non-'zh-CN' value ⇒ 'en-US'
+  extensions?: readonly Extension[];        // default BuiltinExtensions (14 extensions, including Image/Table/Divider/Equation/TableOfContents)
+  modelValue?: DocumentData;                // default { blocks: [] }
+  editable?: boolean;                       // default true
+  placeholder?: string;                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
+  theme?: 'light' | 'dark';                 // default 'light'
+  locale?: 'zh-CN' | 'en-US';               // default 'zh-CN'; any non-empty non-'zh-CN' value ⇒ 'en-US'
   // — Sizing (optional): a number is interpreted as CSS pixels; a string is used as-is —
-  width?: string | number                  // default undefined (fills container, width: 100%)
-  height?: string | number                 // default undefined (grows with content; host page scrolls)
+  width?: string | number;                  // default undefined (fills container, width: 100%)
+  height?: string | number;                 // default undefined (grows with content; host page scrolls)
   // — Toolbar placement (FixedToolbar): 'auto' = top on desktop / bottom on mobile.
   //   'float' (desktop only) hides the FixedToolbar and renders a floating
   //   HoverToolbar that follows the text selection; falls back to 'auto' on mobile.
-  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // default 'auto'
+  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';    // default 'auto'
   // NOTE: there is NO `equationRenderer` prop. To use a custom renderer, compose
   // `createEquationExtension({ renderer })` AFTER the built-in EquationExtension
   // in `:extensions` — name-based de-duplication picks up the later entry.
@@ -721,7 +721,7 @@ props: {
   // callback. See `src/extensions/Image.ts`.
 }
 emits: {
-  'update:modelValue': [DocumentData]
+  'update:modelValue': [DocumentData];
   // NOTE: there is NO `cleanup:image-file` emit. ImageExtension invokes
   // `onFileCleanup(fileId)` itself from its `image-upload` plugin's
   // `applyTransaction` hook.
@@ -743,17 +743,17 @@ The `suppressSelectionSync` flag prevents feedback loops: when the DOM selection
 
 ```ts
 props: {
-  items: readonly BlockRenderItem[]
-  blocksMap: ReadonlyMap<BlockId, Block>   // full blocks view; nested lists resolve child snapshots
-  firstBlockPlaceholder?: string           // shown only on the first (root) block
-  isNested?: boolean                       // true for recursively-rendered child lists
-  hoveredBlockId: BlockId | null           // forwarded so handles show/hide correctly
-  focusedBlockId: BlockId | null
-  hasTextSelection?: boolean
-  draggingBlockId?: BlockId | null
-  dropTargetBlockId?: BlockId | null
-  dropPosition?: 'before' | 'after' | 'first' | 'last' | 'into'
-  menuOpenBlockId?: BlockId | null
+  items: readonly BlockRenderItem[];
+  blocksMap: ReadonlyMap<BlockId, Block>;   // full blocks view; nested lists resolve child snapshots
+  firstBlockPlaceholder?: string;           // shown only on the first (root) block
+  isNested?: boolean;                       // true for recursively-rendered child lists
+  hoveredBlockId: BlockId | null;           // forwarded so handles show/hide correctly
+  focusedBlockId: BlockId | null;
+  hasTextSelection?: boolean;
+  draggingBlockId?: BlockId | null;
+  dropTargetBlockId?: BlockId | null;
+  dropPosition?: 'before' | 'after' | 'first' | 'last' | 'into';
+  menuOpenBlockId?: BlockId | null;
 }
 ```
 
@@ -770,8 +770,8 @@ All props and events are forwarded verbatim to the recursively-rendered nested l
 **Public API (props/events).**
 
 ```ts
-props: { block: Block; placeholder?: string }
-emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] }
+props: { block: Block; placeholder?: string };
+emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] };
 ```
 
 `resolvedComponent` is a `computed` that reads `editor.registries.renderers.get(block.type)` and casts the opaque `component` to a Vue `Component` — the single boundary where the view layer interprets the framework-agnostic spec. The host wraps the renderer in a `.block-host` div carrying `data-block-type`.
@@ -787,7 +787,7 @@ emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: numbe
 **Public API (props/events).**
 
 ```ts
-props: { block: Block; placeholder?: string }
+props: { block: Block; placeholder?: string };
 // DOM: contenteditable="true", data-block-id, data-empty, data-placeholder
 // events: @input, @compositionstart, @compositionend, @focus, @blur
 // emits: 'linkClick' ({ blockId, href, from, to, clientRect })
@@ -806,12 +806,12 @@ On `input` (outside composition) it first applies `autoLinkInlineSeq(newSeq)` to
 **Public API.**
 
 ```ts
-function findBlockEl(root: HTMLElement, id: BlockId): HTMLElement | null
-function readDomSelection(root: HTMLElement, doc: DocState): Selection | null
-function applySelectionToDom(root: HTMLElement, selection: Selection): void
-function positionFromPoint(root: HTMLElement, x: number, y: number): { blockId: BlockId; offset: number } | null
-function crossBlockSelectionRects(root: HTMLElement, selection: Selection): DOMRect[]
-function isCrossBlockText(selection: Selection): boolean
+function findBlockEl(root: HTMLElement, id: BlockId): HTMLElement | null;
+function readDomSelection(root: HTMLElement, doc: DocState): Selection | null;
+function applySelectionToDom(root: HTMLElement, selection: Selection): void;
+function positionFromPoint(root: HTMLElement, x: number, y: number): { blockId: BlockId; offset: number } | null;
+function crossBlockSelectionRects(root: HTMLElement, selection: Selection): DOMRect[];
+function isCrossBlockText(selection: Selection): boolean;
 ```
 
 `readDomSelection` walks up from the selection's end node to find the nearest `[data-block-id]` ancestor, computes the caret offset by cloning a range to the element start, clamps it to the block's text length, and returns a `caret` (or a single-block `text` selection when non-collapsed within one block). `applySelectionToDom` focuses the target block's element and places the caret via `setCaretInElement`. `crossBlockSelectionRects` computes the per-line rectangles spanning multiple blocks for the selection overlay rendered by `BlockEditor.vue`.
@@ -827,8 +827,8 @@ function isCrossBlockText(selection: Selection): boolean
 **Public API.**
 
 ```ts
-function inlineToHtml(content: InlineSeq): string
-function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq
+function inlineToHtml(content: InlineSeq): string;
+function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq;
 ```
 
 `inlineToHtml` maps each mark type to its semantic HTML tag (`<b>`, `<i>`, `<u>`, `<s>`, `<code>`, **`<a href=sanitizeUrl(attrs.href)>` for `link`**) and applies color/background-color classes. `inlineFromDom` walks DOM text nodes and element children, reconstructing `InlineSeq` runs with marks.
@@ -843,21 +843,21 @@ function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq
 
 ```ts
 interface ParsedBlock {
-  type: BlockType
-  attrs?: Attrs
-  content: InlineSeq
+  type: BlockType;
+  attrs?: Attrs;
+  content: InlineSeq;
   // — Phase 6 transient, never written into DocState —
-  readonly _pendingFile?: File           // clipboard image file (uploaded via imageUpload pipeline)
+  readonly _pendingFile?: File;           // clipboard image file (uploaded via imageUpload pipeline)
 }
 interface PasteDecision {
-  blocks?: ParsedBlock[]
-  wrapSelectionInLink?: { href: string } // when non-empty selection + URL text paste
+  blocks?: ParsedBlock[];
+  wrapSelectionInLink?: { href: string }; // when non-empty selection + URL text paste
 }
 
-function parseClipboardHtml(html: string): ParsedBlock[]
-function parseClipboardText(text: string): ParsedBlock[]
-function blocksToClipboardHtml(blocks: readonly Block[]): string
-function blocksToClipboardText(blocks: readonly Block[]): string
+function parseClipboardHtml(html: string): ParsedBlock[];
+function parseClipboardText(text: string): ParsedBlock[];
+function blocksToClipboardHtml(blocks: readonly Block[]): string;
+function blocksToClipboardText(blocks: readonly Block[]): string;
 ```
 
 **Interactions.** Depends on `core/types` (`Block`, `InlineSeq`), `view/inlineDom` (`inlineFromDom`, `inlineToHtml`), **`view/urlUtils` (`looksLikeUrl`, `autoLinkInlineSeq`)**. Used by `BlockEditor.vue`'s `onCopy`/`onCut`/`onPaste` handlers, which intercept clipboard events to write clean data-model HTML/text instead of the browser's default DOM serialization and which dispatch image-block insertion or link-mark setting for the special Phase-6 cases above.
@@ -871,29 +871,29 @@ function blocksToClipboardText(blocks: readonly Block[]): string
 **Public API.**
 
 ```ts
-type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
+type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 interface ImageUploadState {
-  readonly status: UploadStatus
-  readonly progress: number         // 0..100
-  readonly error?: string
-  readonly tempSrc?: string         // URL.createObjectURL(file); revoked on done/error
+  readonly status: UploadStatus;
+  readonly progress: number;         // 0..100
+  readonly error?: string;
+  readonly tempSrc?: string;         // URL.createObjectURL(file); revoked on done/error
 }
 
 interface ImageUploadStore {
-  readonly state: Readonly<Record<string, ImageUploadState>> // key = blockId
-  subscribe(blockId: BlockId, cb: (s: ImageUploadState) => void): () => void
+  readonly state: Readonly<Record<string, ImageUploadState>>; // key = blockId
+  subscribe(blockId: BlockId, cb: (s: ImageUploadState) => void): () => void;
   beginUpload(blockId: BlockId, file: File, handlers: {
-    onProgress(pct: number): void
-    resolve(result: { src: string; fileId?: string; alt?: string; title?: string; caption?: string; width?: number; height?: number }): void
-    reject(err: Error): void
-  }): void
-  retry(blockId: BlockId): void        // retries the cached file (rejects if none cached)
-  cancel(blockId: BlockId): void       // revokes temp URL, clears state
-  clearBlock(blockId: BlockId): void   // called when block is removed / replaced
+    onProgress(pct: number): void;
+    resolve(result: { src: string; fileId?: string; alt?: string; title?: string; caption?: string; width?: number; height?: number }): void;
+    reject(err: Error): void;
+  }): void;
+  retry(blockId: BlockId): void;        // retries the cached file (rejects if none cached)
+  cancel(blockId: BlockId): void;       // revokes temp URL, clears state
+  clearBlock(blockId: BlockId): void;   // called when block is removed / replaced
 }
 
-export const imageUploadStore: ImageUploadStore
-export function setUploadHook(hook: UploadImageHandler | null): void
+export const imageUploadStore: ImageUploadStore;
+export function setUploadHook(hook: UploadImageHandler | null): void;
 ```
 
 The default behavior uses a built-in mock uploader (no `uploadImage` ever existed on `<BlockEditor>` — it is injected via `createImageExtension({ upload })`): the mock waits 800–2500 ms, emits fake progress ticks, and ~30% of the time rejects — so retry/error UI can be developed and tested without a backend. On `beginUpload`, the `tempSrc` object URL is created and pushed to state so `Image.ts` can render it immediately; on `resolve` the caller dispatches `setAttrs` to write the real `src`/`fileId` and then calls `cancel(blockId)` to revoke. On `reject` the error string is kept in state plus the cached `File`, so the user can click **Retry** on the image overlay.
@@ -909,14 +909,14 @@ The default behavior uses a built-in mock uploader (no `uploadImage` ever existe
 **Public API.**
 
 ```ts
-function looksLikeUrl(text: string): boolean
-function normalizeUrl(text: string): string
-function sanitizeUrl(raw: string): string  // returns "" on unsafe/missing scheme
+function looksLikeUrl(text: string): boolean;
+function normalizeUrl(text: string): string;
+function sanitizeUrl(raw: string): string;  // returns "" on unsafe/missing scheme
 
 // InlineSeq transformer: text runs without a 'link' or 'code' mark → split at URL boundaries
 // and wrap URL segments in a {type:'link', attrs:{ href: sanitizeUrl(match) }} mark.
 // Returns seq unchanged if no matches.
-function autoLinkInlineSeq(seq: InlineSeq): InlineSeq
+function autoLinkInlineSeq(seq: InlineSeq): InlineSeq;
 ```
 
 `looksLikeUrl` matches: absolute schemes `https?://`, `mailto:`, `tel:`; bare `www.` prefix (→ normalized to `https://www.`); emails matching `user@domain.tld` (→ normalized to `mailto:user@domain.tld`). It deliberately avoids matching anything inside a `code` mark. `sanitizeUrl` whitelists only `http https mailto tel`, removes `\t\n\r` mid-URL, rejects schemes with non-ASCII letters, and strips whitespace — the result is either empty or guaranteed to have a whitelisted scheme and no obvious obfuscation. Caller rule: **if `sanitizeUrl` returns `""`, treat the link as having no href** (do not write `href` to DOM).
@@ -931,21 +931,21 @@ function autoLinkInlineSeq(seq: InlineSeq): InlineSeq
 
 ```ts
 props: {
-  visible: boolean
-  mode: 'view' | 'edit'
-  href: string                    // current sanitized href
-  text: string                    // current visible link text (for editable copy)
-  anchor: { left: number; top: number; right: number; bottom: number } | null
+  visible: boolean;
+  mode: 'view' | 'edit';
+  href: string;                    // current sanitized href
+  text: string;                    // current visible link text (for editable copy)
+  anchor: { left: number; top: number; right: number; bottom: number } | null;
 }
 emits: {
-  'open-link': [string]           // Open external URL. The popover also renders its own
+  'open-link': [string];           // Open external URL. The popover also renders its own
                                   // safe <a target="_blank" rel="noopener noreferrer"> so
                                   // middle-click/right-click work; the emit is for analytics.
-  'copy-link': [string]           // → BlockEditor writes href to clipboard + shows toast
-  'edit': []                      // switch mode to 'edit'
-  'remove': []                    // → editor.commands.unsetLink
-  'save': [{ href: string; text?: string }]
-  'cancel': []
+  'copy-link': [string];           // → BlockEditor writes href to clipboard + shows toast
+  'edit': [];                      // switch mode to 'edit'
+  'remove': [];                    // → editor.commands.unsetLink
+  'save': [{ href: string; text?: string }];
+  'cancel': [];
 }
 ```
 
@@ -978,7 +978,7 @@ Embeds a single `<HoverToolbar>` instance **inline** (instead of rendering it as
 **Public API.**
 
 ```ts
-function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean
+function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean;
 ```
 
 Returns `true` if a binding matched and the command returned `true` (handled); the caller should `preventDefault()` in that case. Flow: `keyNameFromEvent(event)` → `editor.registries.keymap.resolve(key)` → `editor.commands[binding.command](binding.args)`.
@@ -996,7 +996,7 @@ Returns `true` if a binding matched and the command returned `true` (handled); t
 **Public API.**
 
 ```ts
-export const ParagraphExtension: Extension
+export const ParagraphExtension: Extension;
 // schema: { type: 'paragraph', content: 'text', nestable: true }
 // renderer: { component: ParagraphBlock }
 ```
@@ -1014,7 +1014,7 @@ export const ParagraphExtension: Extension
 **Public API.**
 
 ```ts
-export const HeadingExtension: Extension
+export const HeadingExtension: Extension;
 // schema: { type: 'heading', content: 'text', nestable: true,
 //   attrs: { level: { default: 1, validate: v => typeof v === 'number' && v >= 1 && v <= 6 } } }
 // renderer: { component: HeadingBlock }
@@ -1033,7 +1033,7 @@ export const HeadingExtension: Extension
 **Public API.**
 
 ```ts
-export const BulletListExtension: Extension
+export const BulletListExtension: Extension;
 // schema: { type: 'bulletList', content: 'text', nestable: true,
 //   attrs: COMMON_ATTRS }
 // renderer: { component: BulletListBlock }
@@ -1048,7 +1048,7 @@ export const BulletListExtension: Extension
 **Public API.**
 
 ```ts
-export const OrderedListExtension: Extension
+export const OrderedListExtension: Extension;
 // schema: { type: 'orderedList', content: 'text', nestable: true,
 //   attrs: { ...COMMON_ATTRS, startNumber: { default: null, validate: v => v == null || (Number.isInteger(v) && v >= 1) } } }
 // renderer: { component: OrderedListBlock }
@@ -1065,7 +1065,7 @@ export const OrderedListExtension: Extension
 **Public API.**
 
 ```ts
-export const TodoListExtension: Extension
+export const TodoListExtension: Extension;
 // schema: { type: 'todoList', content: 'text', nestable: true,
 //   attrs: { ...COMMON_ATTRS, checked: { default: false, validate: v => typeof v === 'boolean' } } }
 // renderer: { component: TodoListBlock }
@@ -1082,7 +1082,7 @@ export const TodoListExtension: Extension
 **Public API.**
 
 ```ts
-export const QuoteExtension: Extension
+export const QuoteExtension: Extension;
 // schema: { type: 'quote', content: 'text', nestable: false,
 //   attrs: COMMON_ATTRS_NO_INDENT, disallowedMarks: ['italic'] }
 // renderer: { component: QuoteBlock }
@@ -1097,7 +1097,7 @@ export const QuoteExtension: Extension
 **Public API.**
 
 ```ts
-export const CodeBlockExtension: Extension
+export const CodeBlockExtension: Extension;
 // schema: { type: 'codeBlock', content: 'text', isolating: true,
 //   attrs: { language: { default: 'plain', validate: v => typeof v === 'string' } } }
 // renderer: { component: CodeBlock, editable: true }
@@ -1114,17 +1114,17 @@ export const CodeBlockExtension: Extension
 **Public API.**
 
 ```ts
-export const COMMON_ATTRS: BlockSchemaSpec['attrs']             // align + color + bgColor + indent
-export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs']   // align + color + bgColor (quote)
-export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs'] // color + bgColor
-export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs']         // {} (codeBlock: no attrs)
-export const INDENT_TYPES: readonly string[]                     // block types that support indent
-export const MAX_INDENT = 10
-export function classesFromAttrs(attrs: Attrs): string[]         // → ['be-align-center', 'be-color-red', …]
+export const COMMON_ATTRS: BlockSchemaSpec['attrs'];             // align + color + bgColor + indent
+export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs'];   // align + color + bgColor (quote)
+export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs']; // color + bgColor
+export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // {} (codeBlock: no attrs)
+export const INDENT_TYPES: readonly string[];                     // block types that support indent
+export const MAX_INDENT = 10;
+export function classesFromAttrs(attrs: Attrs): string[];         // → ['be-align-center', 'be-color-red', …]
 export interface ColorPreset { readonly key: string; readonly label: string; readonly cssValue: string; readonly opacity: number }
-export const TEXT_COLOR_PRESETS: readonly ColorPreset[]
-export const BG_COLOR_PRESETS: readonly ColorPreset[]
-export const IMAGE_ATTRS: BlockSchemaSpec['attrs']              // {} (image: persistent attrs defined by ImageExtension.schema.attrs, no text/indent/color attrs)
+export const TEXT_COLOR_PRESETS: readonly ColorPreset[];
+export const BG_COLOR_PRESETS: readonly ColorPreset[];
+export const IMAGE_ATTRS: BlockSchemaSpec['attrs'];              // {} (image: persistent attrs defined by ImageExtension.schema.attrs, no text/indent/color attrs)
 ```
 
 Color presets use CSS variables (`var(--be-color-gray)`, `var(--be-swatch-bg-gray)`) so they adapt to light/dark themes automatically. Background colors use semi-transparent tints with an `opacity` field.
@@ -1138,7 +1138,7 @@ Color presets use CSS variables (`var(--be-color-gray)`, `var(--be-swatch-bg-gra
 **Public API.**
 
 ```ts
-export const ImageExtension: Extension
+export const ImageExtension: Extension;
 // name: 'image'
 // schema: {
 //   type: 'image',
@@ -1179,7 +1179,7 @@ The `ImageBlock` renderer renders `.block-image-wrapper` → `<img class="block-
 **Public API.**
 
 ```ts
-export const TableExtension: Extension
+export const TableExtension: Extension;
 // name: 'table'
 // schema: { content: 'none', nestable: false, attrs: TABLE_ATTRS_SCHEMA }
 //   attr validation: rows>=1 / cols>=1 / colWidths.length===cols / cells globally coerced (defaults fill, coverage reconciled)
@@ -1187,21 +1187,21 @@ export const TableExtension: Extension
 // commands: registered via createTableCommands() on editor.commands (table* prefix)
 
 export function createTableCommands(editor: Editor): {
-  tableInsert(args: { rows?: number; cols?: number; insertAfterBlockId?: BlockId }): BlockId
-  tableInsertRow(args: { id: BlockId; index: number; count?: number }): void
-  tableRemoveRow(args: { id: BlockId; index: number }): void
-  tableInsertCol(args: { id: BlockId; index: number; count?: number }): void
-  tableRemoveCol(args: { id: BlockId; index: number }): void
-  tableMergeRect(args: { id: BlockId; rect: TableSelectionRect }): void
-  tableSplitCell(args: { id: BlockId; row: number; col: number }): void
-  tableSplitCellsInRect(args: { id: BlockId; rect: TableSelectionRect }): void
-  tableToggleHeaderRow(args: { id: BlockId }): void
-  tableSetColWidth(args: { id: BlockId; col: number; width: number }): void
-  tableSetCellAttrs<A extends Record<string, unknown>>(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; attrs: A }): void
-  tableSetCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; mark: Mark }): void
-  tableToggleCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; markType: MarkType }): void
-  tableTransformCellType(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; targetType: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock' }): void
-}
+  tableInsert(args: { rows?: number; cols?: number; insertAfterBlockId?: BlockId }): BlockId;
+  tableInsertRow(args: { id: BlockId; index: number; count?: number }): void;
+  tableRemoveRow(args: { id: BlockId; index: number }): void;
+  tableInsertCol(args: { id: BlockId; index: number; count?: number }): void;
+  tableRemoveCol(args: { id: BlockId; index: number }): void;
+  tableMergeRect(args: { id: BlockId; rect: TableSelectionRect }): void;
+  tableSplitCell(args: { id: BlockId; row: number; col: number }): void;
+  tableSplitCellsInRect(args: { id: BlockId; rect: TableSelectionRect }): void;
+  tableToggleHeaderRow(args: { id: BlockId }): void;
+  tableSetColWidth(args: { id: BlockId; col: number; width: number }): void;
+  tableSetCellAttrs<A extends Record<string, unknown>>(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; attrs: A }): void;
+  tableSetCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; mark: Mark }): void;
+  tableToggleCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; markType: MarkType }): void;
+  tableTransformCellType(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; targetType: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock' }): void;
+};
 ```
 
 `TableBlock` component behavior:
@@ -1218,7 +1218,7 @@ export function createTableCommands(editor: Editor): {
 
 ### `src/extensions/Equation.ts` and `src/extensions/math/`
 
-**Responsibility.** Equation (LaTeX math) block type extension — a `content: 'none'`, **isolated** block that stores only `attrs.expression` (the raw LaTeX source). Rendering goes through an **injectable `EquationRenderer`** (`render(expression, { displayMode }) => EquationRenderResult` with `{ html, vnode, error, diagnostics }`): the **built-in renderer** is a zero-dependency math engine in `src/extensions/math/` that pipelines tokenizer → parser → Math AST → render tree → DOM (Vue `h` VNodes in the view, escaped HTML strings for `serialize.toHTML` / SSR). The engine supports a lightweight LaTeX-math subset — numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq` …), superscripts/subscripts (merged into a single `scripts` node), `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters, function names, large operators (`\sum \prod \int` with display limits), `\begin{matrix}` and `\begin{aligned}` (CSS grid) — unknown commands degrade to a literal `\foo` node and syntax errors surface as a `⚠` badge with position-tagged diagnostics; parsing never throws into the editor. The renderer is **pluggable**: `createEquationExtension({ renderer })` builds the extension with a custom engine (KaTeX/MathJax adapter example in README), and `<BlockEditor equationRenderer=...>` appends such an override extension automatically. The component (`createEquationBlock(renderer)`) stays renderer-agnostic: in view mode it renders the computed result (VNode when provided, otherwise `SafeHtml` for string-only engines); in edit mode it shows a textarea bound to the draft expression with a live preview; Enter submits (`setAttrs`), Escape cancels, an empty expression deletes the block, and an empty block auto-enters edit mode on insert. Only `attrs.expression` is persisted — rendered output is never stored. Selection and nesting follow the editor-wide generic non-text block convention: the root element carries `block-focus-root` so the block-handle/selection ring is driven entirely by `focusedBlockId`, and `classesFromAttrs(attrs)` injects the `be-indent-N` class (`attrs.indent` mirrors depth). Markdown export serializes as `$$$ … $$$` fenced blocks; Markdown import accepts both `$$$` and `$$` fences; HTML export emits `<div class="equation-block-rendered">` (error case: `<p class="math-error-block">`).
+**Responsibility.** Equation (LaTeX math) block type extension — a `content: 'none'`, **isolated** block that stores only `attrs.expression` (the raw LaTeX source). Rendering goes through an **injectable `EquationRenderer`** (`render(expression, { displayMode }) => EquationRenderResult` with `{ html, vnode, error, diagnostics }`): the **built-in renderer** is a zero-dependency math engine in `src/extensions/math/` that pipelines tokenizer → parser → Math AST → render tree → DOM (Vue `h` VNodes in the view, escaped HTML strings for `serialize.toHTML` / SSR). The engine supports a lightweight LaTeX-math subset — numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq` …), superscripts/subscripts (merged into a single `scripts` node), `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters, function names, large operators (`\sum \prod \int` with display limits), `\begin{matrix}` and `\begin{aligned}` (CSS grid) — unknown commands degrade to a literal `\foo` node and syntax errors surface as a `⚠` badge with position-tagged diagnostics; parsing never throws into the editor. The renderer is **pluggable**: `createEquationExtension({ renderer })` builds the extension with a custom engine (KaTeX/MathJax adapter example in README), composed **after** `BuiltinExtensions` (name-based deduplication, last entry wins) to take effect. **`<BlockEditor>` has no `equationRenderer` prop.** The component (`createEquationBlock(renderer)`) stays renderer-agnostic: in view mode it renders the computed result (VNode when provided, otherwise `SafeHtml` for string-only engines); in edit mode it shows a textarea bound to the draft expression with a live preview; Enter submits (`setAttrs`), Escape cancels, an empty expression deletes the block, and an empty block auto-enters edit mode on insert. Only `attrs.expression` is persisted — rendered output is never stored. Selection and nesting follow the editor-wide generic non-text block convention: the root element carries `block-focus-root` so the block-handle/selection ring is driven entirely by `focusedBlockId`, and `classesFromAttrs(attrs)` injects the `be-indent-N` class (`attrs.indent` mirrors depth). Markdown export serializes as `$$$ … $$$` fenced blocks; Markdown import accepts both `$$$` and `$$` fences; HTML export emits `<div class="equation-block-rendered">` (error case: `<p class="math-error-block">`).
 
 **Interactions.** `Equation.ts` imports `vue`, `core/types`, `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/ui/SafeHtml.vue`, `view/ui/icons` (`ICON_EQUATION`, `ICON_EDIT`), `extensions/_commonAttrs` (`COMMON_ATTRS`, `classesFromAttrs`), `view/context` (`useEditor` / `useEditable`), and `i18n` (`useI18n`) — **no third-party math library anywhere**. `extensions/math/` (`ast.ts`, `tokens.ts`, `symbols.ts`, `parser.ts`, `renderTree.ts`, `renderVNode.ts`, `renderHtml.ts`) is a self-contained engine with zero imports beyond Vue's `h` (VNode backend only). Included by default in `BuiltinExtensions` via `EquationExtension = createEquationExtension()`. Like Image/Table, Equation is a `content: 'none'` attrs-storage block — zero core changes. Enter on an empty equation exits to the default block type; the edit button calls `editor.commands.selectBlock({ id })` before entering edit mode so the block is always selected while editing. Public exports: `EquationRenderer`, `EquationRenderOptions`, `EquationRenderResult`, `EquationDiagnostic`, `builtinEquationRenderer`, `createEquationExtension`, `EquationBlock`, `renderEquation` (legacy helper), plus the engine pieces `parseMath`, `SUPPORTED_COMMANDS`, `MathNode`, `MathParseResult` from `xiaodao-editor`.
 
@@ -1229,43 +1229,43 @@ export function createTableCommands(editor: Editor): {
 **Public API.**
 
 ```ts
-export const TABLE_ATTRS_SCHEMA: BlockSchemaSpec['attrs']
+export const TABLE_ATTRS_SCHEMA: BlockSchemaSpec['attrs'];
 // → rows>=1, cols>=1, colWidths?.length===cols, cells globally normalized by validateTableAttrs
 
-export function validateTableAttrs(attrs: Attrs): Attrs         // coerce defaults: missing rows/cols/cells/colWidths/headerRow filled; missing rowspan/colspan/covered/content per-cell filled; coverage re-aligned to rowspan/colspan
+export function validateTableAttrs(attrs: Attrs): Attrs;         // coerce defaults: missing rows/cols/cells/colWidths/headerRow filled; missing rowspan/colspan/covered/content per-cell filled; coverage re-aligned to rowspan/colspan
 
-export function createEmptyTableAttrs(rows: number, cols: number, opts?: { defaultColWidth?: number; headerRow?: boolean }): TableAttrs
+export function createEmptyTableAttrs(rows: number, cols: number, opts?: { defaultColWidth?: number; headerRow?: boolean }): TableAttrs;
 
-export function insertRows(attrs: TableAttrs, index: number, count?: number): TableAttrs
-export function removeRow(attrs: TableAttrs, index: number): TableAttrs
-export function insertCols(attrs: TableAttrs, index: number, count?: number, newColWidth?: number): TableAttrs
-export function removeCol(attrs: TableAttrs, index: number): TableAttrs
-export function setColWidth(attrs: TableAttrs, col: number, width: number): TableAttrs
+export function insertRows(attrs: TableAttrs, index: number, count?: number): TableAttrs;
+export function removeRow(attrs: TableAttrs, index: number): TableAttrs;
+export function insertCols(attrs: TableAttrs, index: number, count?: number, newColWidth?: number): TableAttrs;
+export function removeCol(attrs: TableAttrs, index: number): TableAttrs;
+export function setColWidth(attrs: TableAttrs, col: number, width: number): TableAttrs;
 
-export function isRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): boolean
-export function expandSelectionToFullRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): TableSelectionRect
-export function mergeCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs
-export function splitCell(attrs: TableAttrs, row: number, col: number): TableAttrs
-export function splitCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs
+export function isRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): boolean;
+export function expandSelectionToFullRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): TableSelectionRect;
+export function mergeCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs;
+export function splitCell(attrs: TableAttrs, row: number, col: number): TableAttrs;
+export function splitCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs;
 
-export function toggleHeaderRow(attrs: TableAttrs): TableAttrs
-export function setCellsAttrs<A extends Record<string, unknown>>(attrs: TableAttrs, cells: readonly { row: number; col: number }[], patch: A): TableAttrs
-export function setCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], mark: Mark): TableAttrs
-export function toggleCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], markType: MarkType): TableAttrs
-export function transformCellsToType(attrs: TableAttrs, cells: readonly { row: number; col: number }[], targetType: CellType): TableAttrs
+export function toggleHeaderRow(attrs: TableAttrs): TableAttrs;
+export function setCellsAttrs<A extends Record<string, unknown>>(attrs: TableAttrs, cells: readonly { row: number; col: number }[], patch: A): TableAttrs;
+export function setCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], mark: Mark): TableAttrs;
+export function toggleCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], markType: MarkType): TableAttrs;
+export function transformCellsToType(attrs: TableAttrs, cells: readonly { row: number; col: number }[], targetType: CellType): TableAttrs;
 
-export function recomputeCovered(cells: TableCell[][], rows: number, cols: number): TableCell[][]
-export function getColWidthsSum(colWidths: readonly number[]): number
+export function recomputeCovered(cells: TableCell[][], rows: number, cols: number): TableCell[][];
+export function getColWidthsSum(colWidths: readonly number[]): number;
 
 // Serialize / deserialize (called by the extension's serializers/deserializers)
-export function tableToHtml(attrs: Attrs, inlineToHtml: (inline: readonly InlineNode[]) => string): string
-export function tableFromHtml(html: string, inlineFromHtml: (html: string) => InlineNode[]): TableAttrs
-export function tableToMarkdown(attrs: Attrs, inlineToMd: (inline: readonly InlineNode[]) => string): string
-export function tableFromMarkdown(md: string, mdToInline: (md: string) => InlineNode[]): TableAttrs
+export function tableToHtml(attrs: Attrs, inlineToHtml: (inline: readonly InlineNode[]) => string): string;
+export function tableFromHtml(html: string, inlineFromHtml: (html: string) => InlineNode[]): TableAttrs;
+export function tableToMarkdown(attrs: Attrs, inlineToMd: (inline: readonly InlineNode[]) => string): string;
+export function tableFromMarkdown(md: string, mdToInline: (md: string) => InlineNode[]): TableAttrs;
 
 export interface TableAttrs { rows: number; cols: number; cells: TableCell[][]; colWidths: number[]; headerRow?: boolean }
 export interface TableCell { content: InlineNode[]; rowspan: number; colspan: number; covered: boolean; cellType?: CellType; align?: 'left'|'center'|'right'; bgColor?: string }
-export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock'
+export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock';
 export interface TableSelectionRect { startRow: number; endRow: number; startCol: number; endCol: number }
 ```
 
@@ -1278,7 +1278,7 @@ export interface TableSelectionRect { startRow: number; endRow: number; startCol
 **Public API.**
 
 ```ts
-export const DividerExtension: Extension
+export const DividerExtension: Extension;
 // name: 'divider'
 // schema: { content: 'none', nestable: false, isolation: true, attrs: {} }
 // renderer: { component: DividerBlock, editable: true }
@@ -1296,18 +1296,18 @@ export const DividerExtension: Extension
 
 ```ts
 export interface TocItem {
-  readonly id: BlockId
-  readonly level: number
-  readonly text: string
+  readonly id: BlockId;
+  readonly level: number;
+  readonly text: string;
 }
 
-export function collectHeadings(doc: DocState): readonly TocItem[]
+export function collectHeadings(doc: DocState): readonly TocItem[];
 // Walks the block tree via `flatten`, filters `type === 'heading'`, skips
 // empty headings; returns { id, level, text } in document order. Table-cell
 // headings are automatically excluded (cell content lives in Block.attrs,
 // not the block tree).
 
-export const TableOfContentsExtension: Extension
+export const TableOfContentsExtension: Extension;
 // name: 'tableOfContents'
 // schema: { type: 'tableOfContents', content: 'none', nestable: false,
 //           inlineMarks: false, attrs: {}, empty: () => false }
@@ -1331,7 +1331,7 @@ The renderer subscribes to editor state updates (`editor.subscribe`) and recompu
 **Public API.**
 
 ```ts
-export const KeymapExtension: Extension
+export const KeymapExtension: Extension;
 // name: 'default-keymap'
 // keymap: [
 //   { key: 'Enter', command: 'enter' },
@@ -1355,7 +1355,7 @@ For Phase 1 (single-line blocks), ArrowUp/Down always move between blocks; multi
 **Public API.**
 
 ```ts
-export const HistoryExtension: Extension
+export const HistoryExtension: Extension;
 // name: 'history-keymap'
 // keymap: [
 //   { key: 'Mod-z', command: 'undo' },
@@ -1375,25 +1375,25 @@ export const HistoryExtension: Extension
 **Public API.**
 
 ```ts
-export const BuiltinExtensions: readonly Extension[]
+export const BuiltinExtensions: readonly Extension[];
 // = [ ParagraphExtension, HeadingExtension, BulletListExtension,
 //     OrderedListExtension, TodoListExtension, QuoteExtension,
 //     CodeBlockExtension, ImageExtension, TableExtension, DividerExtension,
 //     TableOfContentsExtension, KeymapExtension, HistoryExtension ]
 
-export { ParagraphExtension } from './Paragraph'
-export { HeadingExtension } from './Heading'
-export { BulletListExtension } from './BulletList'
-export { OrderedListExtension } from './OrderedList'
-export { TodoListExtension } from './TodoList'
-export { QuoteExtension } from './Quote'
-export { CodeBlockExtension } from './CodeBlock'
-export { ImageExtension } from './Image'
-export { TableExtension, createTableCommands } from './Table'
-export { DividerExtension } from './Divider'
-export { TableOfContentsExtension } from './TableOfContents'
-export { KeymapExtension } from './Keymap'
-export { HistoryExtension } from './History'
+export { ParagraphExtension } from './Paragraph';
+export { HeadingExtension } from './Heading';
+export { BulletListExtension } from './BulletList';
+export { OrderedListExtension } from './OrderedList';
+export { TodoListExtension } from './TodoList';
+export { QuoteExtension } from './Quote';
+export { CodeBlockExtension } from './CodeBlock';
+export { ImageExtension } from './Image';
+export { TableExtension, createTableCommands } from './Table';
+export { DividerExtension } from './Divider';
+export { TableOfContentsExtension } from './TableOfContents';
+export { KeymapExtension } from './Keymap';
+export { HistoryExtension } from './History';
 ```
 
 **Interactions.** Imports the 14 built-in extension modules and `core/extension/Extension`. Re-exported by `src/index.ts`. Consumers compose `[...BuiltinExtensions, ...userExtensions]`, or omit `extensions` entirely (the `BlockEditor` prop defaults to `BuiltinExtensions`).
@@ -1409,16 +1409,16 @@ export { HistoryExtension } from './History'
 **Public API.**
 
 ```ts
-export type Theme = 'light' | 'dark'
-export type Locale = 'zh-CN' | 'en-US'
+export type Theme = 'light' | 'dark';
+export type Locale = 'zh-CN' | 'en-US';
 
-export function normalizeLocale(raw: string | undefined | null): Locale  // '' / null / 'zh-CN' → 'zh-CN'; else → 'en-US'
-export function normalizeTheme(raw: string | undefined | null): Theme    // 'dark' → 'dark'; else → 'light'
+export function normalizeLocale(raw: string | undefined | null): Locale;  // '' / null / 'zh-CN' → 'zh-CN'; else → 'en-US'
+export function normalizeTheme(raw: string | undefined | null): Theme;    // 'dark' → 'dark'; else → 'light'
 
-export const localeKey: InjectionKey<Ref<Locale>>
-export const themeKey: InjectionKey<Ref<Theme>>
-export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void
-export function useI18n(): I18nBundle    // { locale, theme, t(key) }
+export const localeKey: InjectionKey<Ref<Locale>>;
+export const themeKey: InjectionKey<Ref<Theme>>;
+export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void;
+export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 ```
 
 `provideI18n` provides the raw locale/theme refs directly (not wrapped in an object) so each consumer's `t()` function reads `localeRef.value` — a plain ref read that Vue's reactivity system tracks reliably across `<Teleport>` boundaries. `useI18n()` injects the refs and builds a fresh `t()` that looks up the key in the current locale's dictionary, falling back to the raw key if missing.
@@ -1463,39 +1463,39 @@ Dark mode overrides are defined on `.block-editor.theme-dark` and `body.theme-da
 
 ```ts
 // Core engine (framework-agnostic) — re-exports core/index.ts
-export * from './core/index'
+export * from './core/index';
 
 // Vue components
-export { default as BlockEditor } from './view/BlockEditor.vue'
-export { default as BlockList } from './view/BlockList.vue'
-export { default as BlockHost } from './view/BlockHost.vue'
-export { default as BlockContent } from './view/BlockContent.vue'
-export { editorKey, useEditor } from './view/context'
-export type { BlockRenderItem } from './view/context'
+export { default as BlockEditor } from './view/BlockEditor.vue';
+export { default as BlockList } from './view/BlockList.vue';
+export { default as BlockHost } from './view/BlockHost.vue';
+export { default as BlockContent } from './view/BlockContent.vue';
+export { editorKey, useEditor } from './view/context';
+export type { BlockRenderItem } from './view/context';
 
 // Built-in extensions
-export { BuiltinExtensions } from './extensions/builtin'
-export { ParagraphExtension } from './extensions/Paragraph'
-export { HeadingExtension } from './extensions/Heading'
-export { BulletListExtension } from './extensions/BulletList'
-export { OrderedListExtension } from './extensions/OrderedList'
-export { TodoListExtension } from './extensions/TodoList'
-export { QuoteExtension } from './extensions/Quote'
-export { CodeBlockExtension } from './extensions/CodeBlock'
-export { ImageExtension } from './extensions/Image'
-export { TableExtension, createTableCommands } from './extensions/Table'
-export { DividerExtension } from './extensions/Divider'
-export { KeymapExtension } from './extensions/Keymap'
-export { HistoryExtension } from './extensions/History'
+export { BuiltinExtensions } from './extensions/builtin';
+export { ParagraphExtension } from './extensions/Paragraph';
+export { HeadingExtension } from './extensions/Heading';
+export { BulletListExtension } from './extensions/BulletList';
+export { OrderedListExtension } from './extensions/OrderedList';
+export { TodoListExtension } from './extensions/TodoList';
+export { QuoteExtension } from './extensions/Quote';
+export { CodeBlockExtension } from './extensions/CodeBlock';
+export { ImageExtension } from './extensions/Image';
+export { TableExtension, createTableCommands } from './extensions/Table';
+export { DividerExtension } from './extensions/Divider';
+export { KeymapExtension } from './extensions/Keymap';
+export { HistoryExtension } from './extensions/History';
 
 // — Phase 6 utilities —
-export { sanitizeUrl, looksLikeUrl, normalizeUrl, autoLinkInlineSeq } from './view/urlUtils'
-export { imageUploadStore, setUploadHook } from './view/imageUpload'
-export type { UploadStatus, ImageUploadState } from './view/imageUpload'
+export { sanitizeUrl, looksLikeUrl, normalizeUrl, autoLinkInlineSeq } from './view/urlUtils';
+export { imageUploadStore, setUploadHook } from './view/imageUpload';
+export type { UploadStatus, ImageUploadState } from './view/imageUpload';
 
 // i18n + theme
-export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n'
-export type { Theme, Locale, I18nBundle } from './i18n'
+export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n';
+export type { Theme, Locale, I18nBundle } from './i18n';
 ```
 
 **Interactions.** Imports `core/index`, the four `.vue` components, `view/context`, `i18n.ts`, `view/urlUtils`, `view/imageUpload`, and the built-in extensions bundle (14 extensions, including `Equation`/`TableOfContents`). This is the file the package `main`/`module` fields point at; the `playground/App.vue` and external consumers import from here.

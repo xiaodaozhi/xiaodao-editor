@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch } from 'vue';
 import {
   BlockEditor,
   BuiltinExtensions,
@@ -125,7 +125,7 @@ import {
   type Locale,
   type Theme,
   type UploadImageHandler,
-} from '../src'
+} from '../src';
 
 /**
  * Demo compose: extend the default extension set without bypassing it.
@@ -152,18 +152,18 @@ const extensions: readonly Extension[] = [
       // resolve to a blob URL. A real handler would call fetch() / OSS
       // SDK here. fileId=0 means "no managed file" (no cleanup will fire).
       return new Promise((resolve, reject) => {
-        let progress = 0
-        console.log('[pg:upload] start', name, file?.size, 'bytes')
+        let progress = 0;
+        console.log('[pg:upload] start', name, file?.size, 'bytes');
         const timer = setInterval(() => {
           if (controller.signal.aborted) {
-            clearInterval(timer)
-            reject(new Error('aborted'))
-            return
+            clearInterval(timer);
+            reject(new Error('aborted'));
+            return;
           }
-          progress = Math.min(100, progress + 20)
-          onProgress(progress)
+          progress = Math.min(100, progress + 20);
+          onProgress(progress);
           if (progress >= 100) {
-            clearInterval(timer)
+            clearInterval(timer);
             resolve({
               url: URL.createObjectURL(file),
               width: 320,
@@ -171,23 +171,23 @@ const extensions: readonly Extension[] = [
               alt: name,
               title: '',
               fileId: 0,
-            })
+            });
           }
-        }, 200)
-      })
+        }, 200);
+      });
     }) satisfies UploadImageHandler,
     onFileCleanup(fileId) {
-      console.log('[pg:cleanup] file removed:', fileId)
+      console.log('[pg:cleanup] file removed:', fileId);
     },
   }),
-]
+];
 
-const locale = ref<Locale>('zh-CN')
-const theme = ref<Theme>('light')
-const editable = ref(true)
+const locale = ref<Locale>('zh-CN');
+const theme = ref<Theme>('light');
+const editable = ref(true);
 
-const placeholderZh = "输入文字，或按 '/' 获取命令…"
-const placeholderEn = "Type '/' for commands…"
+const placeholderZh = "输入文字，或按 '/' 获取命令…";
+const placeholderEn = "Type '/' for commands…";
 
 const doc = ref<DocumentData>({
   blocks: [
@@ -1257,14 +1257,14 @@ const doc = ref<DocumentData>({
       content: [],
     },
   ],
-})
+});
 
 watch(() => doc, (newDoc) => {
-  console.log(newDoc)
-})
+  console.log(newDoc);
+});
 
 // Update document title based on locale (i18n)
 watch(locale, (v) => {
-  document.title = v === 'zh-CN' ? '小刀编辑器' : 'Xiaodao Editor'
-}, { immediate: true })
+  document.title = v === 'zh-CN' ? '小刀编辑器' : 'Xiaodao Editor';
+}, { immediate: true });
 </script>

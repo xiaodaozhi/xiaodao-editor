@@ -11,44 +11,44 @@
 **公共 API。**
 
 ```ts
-type BlockId = string & { readonly __brand: 'BlockId' } // 带品牌的不透明 id
-type BlockType = string
-type JSONValue = string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue }
-type Attrs = Readonly<Record<string, JSONValue>>
+type BlockId = string & { readonly __brand: 'BlockId' }; // 带品牌的不透明 id
+type BlockType = string;
+type JSONValue = string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue };
+type Attrs = Readonly<Record<string, JSONValue>>;
 
 interface Mark { readonly type: string; readonly attrs?: Attrs }
 interface TextRun { readonly type: 'text'; readonly text: string; readonly marks?: readonly Mark[] }
-type InlineNode = TextRun                  // 可判别联合;未来:mention | equation
-type InlineSeq = readonly InlineNode[]
+type InlineNode = TextRun;                 // 可判别联合;未来:mention | equation
+type InlineSeq = readonly InlineNode[];
 
 interface Block {
-  readonly id: BlockId
-  readonly type: BlockType
-  readonly attrs: Attrs
-  readonly content: InlineSeq
-  readonly children: readonly BlockId[]
+  readonly id: BlockId;
+  readonly type: BlockType;
+  readonly attrs: Attrs;
+  readonly content: InlineSeq;
+  readonly children: readonly BlockId[];
 }
 
 interface DocState {
-  readonly id: string
-  readonly root: readonly BlockId[]
-  readonly blocks: ReadonlyMap<BlockId, Block>
-  readonly parent: ReadonlyMap<BlockId, BlockId | null>
+  readonly id: string;
+  readonly root: readonly BlockId[];
+  readonly blocks: ReadonlyMap<BlockId, Block>;
+  readonly parent: ReadonlyMap<BlockId, BlockId | null>;
 }
 
 interface Anchor { readonly blockId: BlockId; readonly offset: number }
 type Selection =
   | { readonly kind: 'caret'; readonly blockId: BlockId; readonly offset: number }
   | { readonly kind: 'text'; readonly anchor: Anchor; readonly focus: Anchor }
-  | { readonly kind: 'blocks'; readonly blockIds: readonly BlockId[] }
+  | { readonly kind: 'blocks'; readonly blockIds: readonly BlockId[] };
 
 interface BlockData { readonly id?: string; readonly type: string; readonly attrs?: Attrs; readonly content?: InlineSeq; readonly children?: readonly BlockData[] }
 interface DocumentData { readonly id?: string; readonly blocks: readonly BlockData[] }
 
-function isBlockId(value: unknown): value is BlockId
-function isTextRun(node: InlineNode): node is TextRun
-function inlineText(seq: InlineSeq): string            // 连接文本段
-function inlineFromString(text: string): InlineSeq      // 从字符串构建序列
+function isBlockId(value: unknown): value is BlockId;
+function isTextRun(node: InlineNode): node is TextRun;
+function inlineText(seq: InlineSeq): string;            // 连接文本段
+function inlineFromString(text: string): InlineSeq;     // 从字符串构建序列
 ```
 
 **交互。** 几乎被其他每个核心模块导入。`ids.ts` 产出 `BlockId`；`state/store.ts` 从 `DocumentData` 构建 `DocState`；`Step.ts` 变更 `DocState`；`Selection.ts` 构造 `Selection`；`primitiveCommands.ts` 使用 `inlineText`/`inlineFromString`。视图层导入 `Block`、`BlockId`、`InlineSeq`、`Selection` 用于渲染和 DOM 同步。
@@ -62,8 +62,8 @@ function inlineFromString(text: string): InlineSeq      // 从字符串构建序
 **公共 API。**
 
 ```ts
-function createBlockId(): BlockId   // 64 符号字母表中的 12 个字符(~71 位)
-function asBlockId(value: string): BlockId  // 强制转换可信字符串(仅重水合)
+function createBlockId(): BlockId;   // 64 符号字母表中的 12 个字符(~71 位)
+function asBlockId(value: string): BlockId;  // 强制转换可信字符串(仅重水合)
 ```
 
 若 `globalThis.crypto.getRandomValues` 不可用，`createBlockId` 会抛出异常。`ALPHABET` 是 `A–Za–z0–9_-`，`ID_LENGTH` 是 12。
@@ -83,25 +83,25 @@ function asBlockId(value: string): BlockId  // 强制转换可信字符串(仅�
 ```ts
 interface DocBuildResult { readonly doc: DocState; readonly idMap: ReadonlyMap<string, BlockId> }
 
-function docFromData(json: DocumentData): DocBuildResult   // 保留唯一的源 id,否则重新生成
-function docToData(doc: DocState): DocumentData
+function docFromData(json: DocumentData): DocBuildResult;  // 保留唯一的源 id,否则重新生成
+function docToData(doc: DocState): DocumentData;
 
 // 纯查找
-function getBlock(doc: DocState, id: BlockId): Block | undefined
-function requireBlock(doc: DocState, id: BlockId): Block          // 缺失时抛出
-function parentOf(doc: DocState, id: BlockId): BlockId | null
-function siblingList(doc: DocState, id: BlockId): readonly BlockId[]
-function indexOf(doc: DocState, id: BlockId): number
-function prevSibling(doc: DocState, id: BlockId): Block | undefined
-function nextSibling(doc: DocState, id: BlockId): Block | undefined
-function flatten(doc: DocState): BlockId[]                        // 深度优先文档序
-function blockBefore(doc: DocState, id: BlockId): Block | undefined
-function blockAfter(doc: DocState, id: BlockId): Block | undefined
-function lastDescendant(doc: DocState, id: BlockId): Block
+function getBlock(doc: DocState, id: BlockId): Block | undefined;
+function requireBlock(doc: DocState, id: BlockId): Block;          // 缺失时抛出
+function parentOf(doc: DocState, id: BlockId): BlockId | null;
+function siblingList(doc: DocState, id: BlockId): readonly BlockId[];
+function indexOf(doc: DocState, id: BlockId): number;
+function prevSibling(doc: DocState, id: BlockId): Block | undefined;
+function nextSibling(doc: DocState, id: BlockId): Block | undefined;
+function flatten(doc: DocState): BlockId[];                        // 深度优先文档序
+function blockBefore(doc: DocState, id: BlockId): Block | undefined;
+function blockAfter(doc: DocState, id: BlockId): Block | undefined;
+function lastDescendant(doc: DocState, id: BlockId): Block;
 
 // 内容辅助函数(产出新的不可变 Block)
-function withContent(block: Block, content: InlineSeq): Block
-function withAttrs(block: Block, attrs: Block['attrs']): Block
+function withContent(block: Block, content: InlineSeq): Block;
+function withAttrs(block: Block, attrs: Block['attrs']): Block;
 ```
 
 **交互。** 依赖 `types.ts` 和 `ids.ts`。被 `Step.ts`（apply 读取父/子）、`invert.ts`（`indexOf`、`parentOf`、`requireBlock` 以反转步骤）、`Editor.ts`（`docFromData`、`docToData`、`flatten`、`getBlock`）和 `primitiveCommands.ts`（遍历以支持 Enter/Backspace/导航）使用。
@@ -121,11 +121,11 @@ type Step =
   | { op: 'replaceBlock'; id: BlockId; type: BlockType; attrs: Attrs }
   | { op: 'moveBlock'; id: BlockId; toParent: BlockId | null; toIndex: number }
   | { op: 'setText'; id: BlockId; content: InlineSeq }
-  | { op: 'setAttrs'; id: BlockId; attrs: Attrs }
+  | { op: 'setAttrs'; id: BlockId; attrs: Attrs };
 
 interface ApplyResult { readonly doc: DocState; readonly changed: ReadonlySet<BlockId>; readonly removed: ReadonlySet<BlockId> }
 
-function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult
+function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult;
 ```
 
 `removeBlock` 分离整个子树（递归删除后代）。`moveBlock` 同时处理兄弟内的重排和跨父的重挂。索引用 `Math.max(0, Math.min(index, len))` 做钳位。
@@ -142,31 +142,31 @@ function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult
 
 ```ts
 interface TransactionMeta {
-  readonly addToHistory?: boolean
-  readonly historyGroup?: string | null
-  readonly viewHints?: { readonly skipDomWrite?: readonly BlockId[] }
-  readonly source?: string
-  readonly [key: string]: unknown
+  readonly addToHistory?: boolean;
+  readonly historyGroup?: string | null;
+  readonly viewHints?: { readonly skipDomWrite?: readonly BlockId[] };
+  readonly source?: string;
+  readonly [key: string]: unknown;
 }
 interface Transaction { readonly steps: readonly Step[]; readonly selectionAfter?: Selection; readonly meta: TransactionMeta }
 interface InsertBlockParams { parent: BlockId | null; index: number; type: BlockType; attrs?: Attrs; content?: InlineSeq; id?: BlockId }
 
 class TransactionBuilder {
-  insertBlock(params: InsertBlockParams): BlockId   // 返回(生成的或显式的)id
-  removeBlock(id: BlockId): this
-  replaceBlock(id: BlockId, type: BlockType, attrs: Attrs): this
-  moveBlock(id: BlockId, toParent: BlockId | null, toIndex: number): this
-  setText(id: BlockId, content: InlineSeq): this
-  setAttrs(id: BlockId, attrs: Attrs): this
-  appendSteps(steps: readonly Step[]): this          // 用于历史撤销/重做
-  setSelection(selection: Selection): this
-  setMeta(meta: Partial<TransactionMeta>): this
-  addToHistory(value: boolean): this
-  historyGroup(key: string | null): this
-  skipDomWrite(ids: readonly BlockId[]): this
-  build(): Transaction
+  insertBlock(params: InsertBlockParams): BlockId;   // 返回(生成的或显式的)id
+  removeBlock(id: BlockId): this;
+  replaceBlock(id: BlockId, type: BlockType, attrs: Attrs): this;
+  moveBlock(id: BlockId, toParent: BlockId | null, toIndex: number): this;
+  setText(id: BlockId, content: InlineSeq): this;
+  setAttrs(id: BlockId, attrs: Attrs): this;
+  appendSteps(steps: readonly Step[]): this;          // 用于历史撤销/重做
+  setSelection(selection: Selection): this;
+  setMeta(meta: Partial<TransactionMeta>): this;
+  addToHistory(value: boolean): this;
+  historyGroup(key: string | null): this;
+  skipDomWrite(ids: readonly BlockId[]): this;
+  build(): Transaction;
 }
-function createTransaction(): TransactionBuilder
+function createTransaction(): TransactionBuilder;
 ```
 
 当省略 `params.id` 时，`insertBlock` 通过 `createBlockId()` 生成一个 id；显式形式用于撤销/重做和粘贴。
@@ -183,15 +183,15 @@ function createTransaction(): TransactionBuilder
 
 ```ts
 interface EditorState {
-  readonly doc: DocState
-  readonly selection: Selection
-  readonly pluginState: Readonly<Record<string, PluginState>>
-  readonly version: number
+  readonly doc: DocState;
+  readonly selection: Selection;
+  readonly pluginState: Readonly<Record<string, PluginState>>;
+  readonly version: number;
 }
 interface ApplyTransactionResult extends ApplyResult { readonly state: EditorState }
 
-function applyTransaction(state: EditorState, tr: Transaction, plugins: readonly TransactionApplier[]): ApplyTransactionResult
-function createState(doc: DocState, selection: Selection, pluginState?: Readonly<Record<string, PluginState>>): EditorState
+function applyTransaction(state: EditorState, tr: Transaction, plugins: readonly TransactionApplier[]): ApplyTransactionResult;
+function createState(doc: DocState, selection: Selection, pluginState?: Readonly<Record<string, PluginState>>): EditorState;
 ```
 
 `applyTransaction` 运行 `applySteps`，继承 `selectionAfter`（回退到先前选择），调用每个插件的 `applyTransaction` 钩子以更新其状态切片，并递增 `version`。插件作为一个最小的 `TransactionApplier` 视图（`{ name, applyTransaction? }`）传入，以避免与 `Plugin` 模块产生运行时耦合。
@@ -207,7 +207,7 @@ function createState(doc: DocState, selection: Selection, pluginState?: Readonly
 **公共 API。**
 
 ```ts
-function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[]
+function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[];
 ```
 
 逐操作反转：`insertBlock` → `removeBlock`；`removeBlock` → 重造子树的前序 `insertBlock` 序列（`reinsertSubtree`）；`replaceBlock`/`setText`/`setAttrs` → 从 `prevDoc` 恢复先前值；`moveBlock` → 移回先前的父和索引。
@@ -227,23 +227,23 @@ function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[]
 ```ts
 interface AttrSpec { readonly default: JSONValue; readonly validate?: (value: unknown) => boolean }
 interface BlockSchemaSpec {
-  readonly type: BlockType
-  readonly attrs?: Readonly<Record<string, AttrSpec>>
-  readonly content?: 'text' | 'none'
-  readonly nestable?: boolean
-  readonly allowedChildren?: readonly BlockType[] | '*'
-  readonly isolating?: boolean
-  readonly empty?: (block: Block) => boolean
+  readonly type: BlockType;
+  readonly attrs?: Readonly<Record<string, AttrSpec>>;
+  readonly content?: 'text' | 'none';
+  readonly nestable?: boolean;
+  readonly allowedChildren?: readonly BlockType[] | '*';
+  readonly isolating?: boolean;
+  readonly empty?: (block: Block) => boolean;
 }
 interface BlockSchema { /* 相同字段,全部必填,已规范化 */ }
 
-function defineSchema(spec: BlockSchemaSpec): BlockSchema
-function defaultAttrs(schema: BlockSchema): Attrs
-function coerceAttrs(schema: BlockSchema, raw: Readonly<Record<string, unknown>>): Attrs
-function canContain(parent: BlockSchema, childType: BlockType): boolean
-function hasText(schema: BlockSchema): boolean
-function isIsolating(schema: BlockSchema): boolean
-function isEmpty(schema: BlockSchema, block: Block): boolean
+function defineSchema(spec: BlockSchemaSpec): BlockSchema;
+function defaultAttrs(schema: BlockSchema): Attrs;
+function coerceAttrs(schema: BlockSchema, raw: Readonly<Record<string, unknown>>): Attrs;
+function canContain(parent: BlockSchema, childType: BlockType): boolean;
+function hasText(schema: BlockSchema): boolean;
+function isIsolating(schema: BlockSchema): boolean;
+function isEmpty(schema: BlockSchema, block: Block): boolean;
 ```
 
 默认 schema（字段被省略时）是 `content: 'text'`、`nestable: false`、`allowedChildren: '*'`、`isolating: false`，以及一个将无内容或全空文本段视为空的 `empty` 谓词。
@@ -260,15 +260,15 @@ function isEmpty(schema: BlockSchema, block: Block): boolean
 
 ```ts
 class SchemaRegistry {
-  constructor(schemas: ReadonlyMap<BlockType, BlockSchema>, fallback: BlockSchema)
-  get(type: BlockType): BlockSchema          // 回退到类 paragraph 的默认值
-  has(type: BlockType): boolean
-  defaultAttrsFor(type: BlockType): Attrs
-  coerceAttrsFor(type: BlockType, raw: Readonly<Record<string, unknown>>): Attrs
-  canContain(parentType: BlockType, childType: BlockType): boolean
-  hasText(type: BlockType): boolean
-  isIsolating(type: BlockType): boolean
-  isEmpty(block: Block): boolean
+  constructor(schemas: ReadonlyMap<BlockType, BlockSchema>, fallback: BlockSchema);
+  get(type: BlockType): BlockSchema;          // 回退到类 paragraph 的默认值
+  has(type: BlockType): boolean;
+  defaultAttrsFor(type: BlockType): Attrs;
+  coerceAttrsFor(type: BlockType, raw: Readonly<Record<string, unknown>>): Attrs;
+  canContain(parentType: BlockType, childType: BlockType): boolean;
+  hasText(type: BlockType): boolean;
+  isIsolating(type: BlockType): boolean;
+  isEmpty(block: Block): boolean;
 }
 ```
 
@@ -285,19 +285,19 @@ class SchemaRegistry {
 **公共 API。**
 
 ```ts
-type Dispatch = (tr: Transaction) => void
-type CommandFn<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean
+type Dispatch = (tr: Transaction) => void;
+type CommandFn<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean;
 interface CommandEntry<TArgs = void> { readonly name: string; readonly run: CommandFn<TArgs> }
-type CommandSpec<TArgs = void> = CommandEntry<TArgs>
-type AnyCommandEntry = CommandEntry<any>      // 为异构注册表擦除类型
-type CommandDispatcher = (name: string, args: unknown) => boolean
+type CommandSpec<TArgs = void> = CommandEntry<TArgs>;
+type AnyCommandEntry = CommandEntry<any>;      // 为异构注册表擦除类型
+type CommandDispatcher = (name: string, args: unknown) => boolean;
 
 class CommandRegistry {
-  register(spec: AnyCommandEntry): void       // 同名时抛出
-  override(spec: AnyCommandEntry): void       // 替换(扩展覆盖原语)
-  has(name: string): boolean
-  get(name: string): AnyCommandEntry | undefined
-  createProxy(dispatch: CommandDispatcher): Record<string, (...args: unknown[]) => boolean>
+  register(spec: AnyCommandEntry): void;       // 同名时抛出
+  override(spec: AnyCommandEntry): void;       // 替换(扩展覆盖原语)
+  has(name: string): boolean;
+  get(name: string): AnyCommandEntry | undefined;
+  createProxy(dispatch: CommandDispatcher): Record<string, (...args: unknown[]) => boolean>;
 }
 ```
 
@@ -322,7 +322,7 @@ interface MoveCaretArgs { offset?: number }
 interface SetLinkArgs { readonly id: BlockId; readonly href: string; readonly from: number; readonly to: number; readonly text?: string }
 interface UnsetLinkArgs { readonly id: BlockId; readonly from: number; readonly to: number }
 
-function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[]
+function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[];
 ```
 
 `createPrimitiveCommands` 返回以下条目的数组：`insertBlock`、`removeBlock`、`replaceBlock`、`setText`（携带 `historyGroup('type')` + `skipDomWrite` + `source: 'input'`）、`setAttrs`、`splitBlock`（在偏移处拆分文本，之后插入 `defaultBlockType`）、`mergeBlock`（与文档序中的前一块合并）、`enter`（拆分，或插入默认块以退出，或在非文本/isolating 块后插入）、`backspace`（在偏移 0 处合并、删除块内范围、或移除 blocks 选择；尊重 `isolating`）、`moveToPreviousBlock`、`moveToNextBlock`、`setSelection`、`selectBlock`、`moveBlock`，**`setLink`**（对块 `id` 的 `[from,to)` 范围应用 `{type:'link', attrs:{ href: sanitizeUrl(href) }}` mark；若提供 `text`，则在同一事务中把范围的字面文本替换为 `text`，以便统一改写链接文本；如果范围内含 `code` mark 则跳过，因为 code 与 link 互斥），和 **`unsetLink`**（去掉 `[from,to)` 范围上的 `link` mark）。
@@ -339,14 +339,14 @@ function createPrimitiveCommands(registries: EditorRegistries): AnyCommandEntry[
 
 ```ts
 interface KeymapBinding { readonly key: string; readonly command: string; readonly args?: unknown; readonly priority?: number }
-type KeymapSpec = readonly KeymapBinding[]
+type KeymapSpec = readonly KeymapBinding[];
 
-function keyNameFromEvent(event: KeyboardEvent): string   // 例如 "Cmd-Shift-Z";裸修饰键为 ""
-function keyMatches(bindingKey: string, eventKey: string): boolean  // 解析 Mod,不区分大小写
+function keyNameFromEvent(event: KeyboardEvent): string;   // 例如 "Cmd-Shift-Z";裸修饰键为 ""
+function keyMatches(bindingKey: string, eventKey: string): boolean;  // 解析 Mod,不区分大小写
 
 class KeymapRegistry {
-  register(spec: KeymapSpec): void          // 按优先级重新排序(数字小者靠前)
-  resolve(eventKey: string): KeymapBinding | undefined
+  register(spec: KeymapSpec): void;          // 按优先级重新排序(数字小者靠前)
+  resolve(eventKey: string): KeymapBinding | undefined;
 }
 ```
 
@@ -365,16 +365,16 @@ class KeymapRegistry {
 ```ts
 interface InputRuleContext { readonly blockId: BlockId; readonly textBeforeCaret: string }
 interface InputRuleSpec {
-  readonly name: string
-  readonly pattern: RegExp                  // 必须锚定,例如 /^# $/
-  readonly command: string
-  readonly args?: (match: RegExpExecArray) => unknown
+  readonly name: string;
+  readonly pattern: RegExp;                  // 必须锚定,例如 /^# $/
+  readonly command: string;
+  readonly args?: (match: RegExpExecArray) => unknown;
 }
 interface InputRule extends InputRuleSpec {}
 
 class InputRuleRegistry {
-  register(spec: InputRuleSpec): void
-  get all(): readonly InputRule[]
+  register(spec: InputRuleSpec): void;
+  get all(): readonly InputRule[];
 }
 ```
 
@@ -390,21 +390,21 @@ class InputRuleRegistry {
 
 ```ts
 interface SlashCommandSpec {
-  readonly id: string
-  readonly title: string
-  readonly keywords?: readonly string[]
-  readonly description?: string
-  readonly icon?: unknown
-  readonly command: string
-  readonly args?: unknown
-  readonly applicableTo?: readonly BlockType[]   // 限定到当前的块类型
+  readonly id: string;
+  readonly title: string;
+  readonly keywords?: readonly string[];
+  readonly description?: string;
+  readonly icon?: unknown;
+  readonly command: string;
+  readonly args?: unknown;
+  readonly applicableTo?: readonly BlockType[];   // 限定到当前的块类型
 }
-type SlashCommand = SlashCommandSpec
+type SlashCommand = SlashCommandSpec;
 
 class SlashCommandRegistry {
-  register(spec: SlashCommandSpec): void        // 重复 id 时抛出
-  get all(): readonly SlashCommand[]
-  search(query: string): readonly SlashCommand[]  // 对 title+keywords 的朴素子串匹配
+  register(spec: SlashCommandSpec): void;        // 重复 id 时抛出
+  get all(): readonly SlashCommand[];
+  search(query: string): readonly SlashCommand[];  // 对 title+keywords 的朴素子串匹配
 }
 ```
 
@@ -425,21 +425,21 @@ interface BlockRendererSpec { readonly component: unknown; readonly editable?: b
 interface ToolbarActionSpec { readonly id: string; readonly label: string; readonly command: string; readonly args?: unknown; readonly icon?: unknown }
 
 interface Extension {
-  readonly name: string
-  readonly uses?: readonly Extension[]            // 捆绑的扩展；摊平，按名去重
-  readonly schema?: BlockSchemaSpec
-  readonly renderer?: BlockRendererSpec
-  readonly commands?: readonly AnyCommandEntry[]
-  readonly keymap?: KeymapSpec
-  readonly inputRules?: readonly InputRuleSpec[]
-  readonly slashCommands?: readonly SlashCommandSpec[]
-  readonly toolbar?: readonly ToolbarActionSpec[]
-  readonly serialize?: SerializerSpec
-  readonly deserialize?: DeserializerSpec
-  readonly plugins?: readonly Plugin[]
+  readonly name: string;
+  readonly uses?: readonly Extension[];            // 捆绑的扩展；摊平，按名去重
+  readonly schema?: BlockSchemaSpec;
+  readonly renderer?: BlockRendererSpec;
+  readonly commands?: readonly AnyCommandEntry[];
+  readonly keymap?: KeymapSpec;
+  readonly inputRules?: readonly InputRuleSpec[];
+  readonly slashCommands?: readonly SlashCommandSpec[];
+  readonly toolbar?: readonly ToolbarActionSpec[];
+  readonly serialize?: SerializerSpec;
+  readonly deserialize?: DeserializerSpec;
+  readonly plugins?: readonly Plugin[];
 }
 
-function extensionBlockType(ext: Extension): BlockType | null   // 便捷：所声明的类型(若有)
+function extensionBlockType(ext: Extension): BlockType | null;   // 便捷：所声明的类型(若有)
 ```
 
 `BlockRendererSpec.component` 被类型为 `unknown`，以便核心保持框架无关；`BlockHost.vue` 在唯一的视图层边界把它转换为 Vue 组件。
@@ -456,32 +456,32 @@ function extensionBlockType(ext: Extension): BlockType | null   // 便捷：所�
 
 ```ts
 class RendererRegistry {
-  register(type: BlockType, spec: BlockRendererSpec): void  // 重复时抛出
-  get(type: BlockType): BlockRendererSpec | undefined
+  register(type: BlockType, spec: BlockRendererSpec): void;  // 重复时抛出
+  get(type: BlockType): BlockRendererSpec | undefined;
 }
 class ToolbarRegistry {
-  register(type: BlockType, actions: readonly ToolbarActionSpec[]): void  // 追加
-  get(type: BlockType): readonly ToolbarActionSpec[]
+  register(type: BlockType, actions: readonly ToolbarActionSpec[]): void;  // 追加
+  get(type: BlockType): readonly ToolbarActionSpec[];
 }
 
 interface EditorRegistries {
-  readonly schema: SchemaRegistry
-  readonly renderers: RendererRegistry
-  readonly commands: CommandRegistry
-  readonly keymap: KeymapRegistry
-  readonly inputRules: InputRuleRegistry
-  readonly slash: SlashCommandRegistry
-  readonly toolbar: ToolbarRegistry
-  readonly serializers: SerializerRegistry
-  readonly deserializers: DeserializerRegistry
-  readonly plugins: readonly Plugin[]
-  readonly extensionCommands: readonly AnyCommandEntry[]
-  readonly defaultBlockType: BlockType
+  readonly schema: SchemaRegistry;
+  readonly renderers: RendererRegistry;
+  readonly commands: CommandRegistry;
+  readonly keymap: KeymapRegistry;
+  readonly inputRules: InputRuleRegistry;
+  readonly slash: SlashCommandRegistry;
+  readonly toolbar: ToolbarRegistry;
+  readonly serializers: SerializerRegistry;
+  readonly deserializers: DeserializerRegistry;
+  readonly plugins: readonly Plugin[];
+  readonly extensionCommands: readonly AnyCommandEntry[];
+  readonly defaultBlockType: BlockType;
 }
 interface BuildRegistriesOptions { readonly defaultBlockType?: BlockType }
 
-function flattenExtensions(extensions: readonly Extension[]): Extension[]  // 按名后者胜出
-function buildRegistries(extensions: readonly Extension[], options?: BuildRegistriesOptions): EditorRegistries
+function flattenExtensions(extensions: readonly Extension[]): Extension[];  // 按名后者胜出
+function buildRegistries(extensions: readonly Extension[], options?: BuildRegistriesOptions): EditorRegistries;
 ```
 
 `buildRegistries` 遍历摊平后的列表，通过 `defineSchema` 规范化每个 schema，注册 renderers/keymaps/input rules/slash commands/toolbar actions/serializers/deserializers/plugins，并单独收集扩展命令(它们在原语之后注册，因此可以覆盖)。回退 schema 是 `type: '__fallback__'`。`defaultBlockType` 默认为 `'paragraph'`。
@@ -499,17 +499,17 @@ function buildRegistries(extensions: readonly Extension[], options?: BuildRegist
 **公共 API。**
 
 ```ts
-type PluginState = unknown
+type PluginState = unknown;
 
 interface EventContext {
-  readonly state: EditorState
-  readonly dispatch: (tr: Transaction) => void
-  readonly focusBlockId: () => string | null
+  readonly state: EditorState;
+  readonly dispatch: (tr: Transaction) => void;
+  readonly focusBlockId: () => string | null;
 }
 
 interface Plugin {
-  readonly name: string
-  init?(state: EditorState): PluginState
+  readonly name: string;
+  init?(state: EditorState): PluginState;
   applyTransaction?(tr: Transaction, prevState: EditorState, nextDoc: EditorState['doc'], nextSelection: EditorState['selection']): PluginState
   onKeyDown?(event: KeyboardEvent, ctx: EventContext): boolean
   onInput?(event: InputEvent, ctx: EventContext): boolean
@@ -532,16 +532,16 @@ interface Plugin {
 **公共 API。**
 
 ```ts
-function caretSelection(blockId: BlockId, offset: number): Selection
-function textSelection(anchor: Anchor, focus: Anchor): Selection
-function blocksSelection(blockIds: readonly BlockId[]): Selection
-function isCaret(sel: Selection): sel is Extract<Selection, { kind: 'caret' }>
-function isText(sel: Selection): sel is Extract<Selection, { kind: 'text' }>
-function isBlocks(sel: Selection): sel is Extract<Selection, { kind: 'blocks' }>
-function isCollapsed(sel: Selection): boolean
-function primaryBlock(sel: Selection): BlockId | null       // Enter 等命令作用的地方
-function focusOffset(sel: Selection): number
-function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => number): readonly [Anchor, Anchor] | null
+function caretSelection(blockId: BlockId, offset: number): Selection;
+function textSelection(anchor: Anchor, focus: Anchor): Selection;
+function blocksSelection(blockIds: readonly BlockId[]): Selection;
+function isCaret(sel: Selection): sel is Extract<Selection, { kind: 'caret' }>;
+function isText(sel: Selection): sel is Extract<Selection, { kind: 'text' }>;
+function isBlocks(sel: Selection): sel is Extract<Selection, { kind: 'blocks' }>;
+function isCollapsed(sel: Selection): boolean;
+function primaryBlock(sel: Selection): BlockId | null;       // Enter 等命令作用的地方
+function focusOffset(sel: Selection): number;
+function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => number): readonly [Anchor, Anchor] | null;
 ```
 
 `primaryBlock` 返回光标的块、文本选择的焦点块,或第一个被选的块。`orderedAnchors` 规范化文本选择,使 anchor 在文档序中先于(或等于)focus,使用调用方提供的比较器。
@@ -560,13 +560,13 @@ function orderedAnchors(sel: Selection, compare: (a: Anchor, b: Anchor) => numbe
 
 ```ts
 class HistoryManager {
-  constructor(limit?: number)                 // 默认 500 个条目
-  record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void
-  canUndo(): boolean
-  canRedo(): boolean
-  reset(): void                               // 清空两个栈(用于文档替换)
-  undo(): Transaction | null                  // 构建逆事务；压入 redo
-  redo(): Transaction | null                  // 重新应用原事务；压回 undo
+  constructor(limit?: number);                 // 默认 500 个条目
+  record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  reset(): void;                               // 清空两个栈(用于文档替换)
+  undo(): Transaction | null;                  // 构建逆事务；压入 redo
+  redo(): Transaction | null;                  // 重新应用原事务；压回 undo
 }
 ```
 
@@ -587,23 +587,23 @@ class HistoryManager {
 ```ts
 interface SerializeResult { readonly type: BlockType; readonly attrs?: Attrs; readonly content?: InlineSeq }
 interface SerializerSpec {
-  readonly toMarkdown?: (block: Block) => string
-  readonly toHTML?: (block: Block) => string
+  readonly toMarkdown?: (block: Block) => string;
+  readonly toHTML?: (block: Block) => string;
 }
 interface DeserializerSpec {
-  readonly fromMarkdown?: (line: string) => SerializeResult | null
-  readonly fromHTML?: (node: HTMLElement, inlines: InlineSeq) => SerializeResult | null
+  readonly fromMarkdown?: (line: string) => SerializeResult | null;
+  readonly fromHTML?: (node: HTMLElement, inlines: InlineSeq) => SerializeResult | null;
 }
 
 class SerializerRegistry {
-  register(type: BlockType, spec: SerializerSpec): void
-  markdownFor(block: Block): string | undefined
-  htmlFor(block: Block): string | undefined
+  register(type: BlockType, spec: SerializerSpec): void;
+  markdownFor(block: Block): string | undefined;
+  htmlFor(block: Block): string | undefined;
 }
 class DeserializerRegistry {
-  register(spec: DeserializerSpec): void
-  parseMarkdownLine(line: string): SerializeResult | null   // 首个匹配胜出
-  parseHtmlElement(node: HTMLElement, inlines: InlineSeq): SerializeResult | null
+  register(spec: DeserializerSpec): void;
+  parseMarkdownLine(line: string): SerializeResult | null;   // 首个匹配胜出
+  parseHtmlElement(node: HTMLElement, inlines: InlineSeq): SerializeResult | null;
 }
 ```
 
@@ -623,41 +623,41 @@ class DeserializerRegistry {
 
 ```ts
 interface EditorConfig {
-  readonly extensions: readonly Extension[]
-  readonly defaultBlockType?: string
-  readonly initialDocument?: DocumentData
-  readonly initialSelection?: Selection
-  readonly editable?: boolean
-  readonly historyLimit?: number
+  readonly extensions: readonly Extension[];
+  readonly defaultBlockType?: string;
+  readonly initialDocument?: DocumentData;
+  readonly initialSelection?: Selection;
+  readonly editable?: boolean;
+  readonly historyLimit?: number;
 }
 interface StateUpdate { readonly state: EditorState; readonly changed: ReadonlySet<BlockId>; readonly removed: ReadonlySet<BlockId> }
-type EditorListener = (update: StateUpdate) => void
+type EditorListener = (update: StateUpdate) => void;
 
 class Editor {
-  readonly registries: EditorRegistries
-  readonly commands: Record<string, (...args: unknown[]) => boolean>
-  editable: boolean
-  focusBlockId: BlockId | null               // 由视图层设置（聚焦的 contenteditable）
-  constructor(config: EditorConfig)
-  getState(): EditorState
-  toData(): DocumentData
-  setDocument(json: DocumentData): void      // 整体替换；重置历史；重新初始化插件
-  toMarkdown(): string                       // 把当前文档导出为 Markdown 字符串
-  setDocFromMarkdown(markdown: string): void // 用 Markdown 解析结果整体替换文档；重置历史
-  dispatch(tr: Transaction): void            // 唯一的变更路径；记录历史；通知
-  undo(): boolean
-  redo(): boolean
-  canUndo(): boolean
-  canRedo(): boolean
-  subscribe(listener: EditorListener): () => void
-  handleKeyDown(event: KeyboardEvent): boolean
-  handleInput(event: InputEvent): boolean
-  handleCompositionStart(event: CompositionEvent): void
-  handleCompositionEnd(event: CompositionEvent): void
-  destroy(): void
+  readonly registries: EditorRegistries;
+  readonly commands: Record<string, (...args: unknown[]) => boolean>;
+  editable: boolean;
+  focusBlockId: BlockId | null;               // 由视图层设置（聚焦的 contenteditable）
+  constructor(config: EditorConfig);
+  getState(): EditorState;
+  toData(): DocumentData;
+  setDocument(json: DocumentData): void;      // 整体替换；重置历史；重新初始化插件
+  toMarkdown(): string;                       // 把当前文档导出为 Markdown 字符串
+  setDocFromMarkdown(markdown: string): void; // 用 Markdown 解析结果整体替换文档；重置历史
+  dispatch(tr: Transaction): void;            // 唯一的变更路径；记录历史；通知
+  undo(): boolean;
+  redo(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  subscribe(listener: EditorListener): () => void;
+  handleKeyDown(event: KeyboardEvent): boolean;
+  handleInput(event: InputEvent): boolean;
+  handleCompositionStart(event: CompositionEvent): void;
+  handleCompositionEnd(event: CompositionEvent): void;
+  destroy(): void;
 }
 
-function hasBlock(editor: Editor, id: BlockId): boolean  // 调试辅助
+function hasBlock(editor: Editor, id: BlockId): boolean;  // 调试辅助
 ```
 
 构造：运行 `buildRegistries`，注册原语命令，让扩展命令按名 `override`，构建文档(若根为空则播种一个空默认块)，初始化插件(`init`)，注册核心 `undo`/`redo` 命令(委托给 `HistoryManager`)，并构建命令代理。`dispatch` 运行 `applyTransaction`，把事务记录到历史，并通过差异通知订阅者。`setDocument` 重建状态并调用 `history.reset()`。
@@ -685,9 +685,9 @@ function hasBlock(editor: Editor, id: BlockId): boolean  // 调试辅助
 **公共 API。**
 
 ```ts
-const editorKey: InjectionKey<Editor>
+const editorKey: InjectionKey<Editor>;
 interface BlockRenderItem { readonly id: BlockId; readonly block: Block }
-function useEditor(): Editor  // 在 <BlockEditor> 树之外调用时抛出
+function useEditor(): Editor;  // 在 <BlockEditor> 树之外调用时抛出
 ```
 
 `BlockRenderItem` 把 id 与 `block` 分开携带，以便 `BlockList` 能把它用作 `:key` 而无需深入 block 对象。该类型位于这里(而非 `.vue` 文件中)，因为 TypeScript 的 `*.vue` 模块垫片只声明默认导出，无法从 `.vue` 文件再导出具名类型。
@@ -704,25 +704,25 @@ function useEditor(): Editor  // 在 <BlockEditor> 树之外调用时抛出
 
 ```ts
 props: {
-  extensions?: readonly Extension[]        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
-  modelValue?: DocumentData                // 默认 { blocks: [] }
-  editable?: boolean                       // 默认 true
-  placeholder?: string                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
-  theme?: 'light' | 'dark'                 // 默认 'light'
-  locale?: 'zh-CN' | 'en-US'               // 默认 'zh-CN'；任何非空非 'zh-CN' 值 ⇒ 'en-US'
+  extensions?: readonly Extension[];        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
+  modelValue?: DocumentData;                // 默认 { blocks: [] }
+  editable?: boolean;                       // 默认 true
+  placeholder?: string;                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
+  theme?: 'light' | 'dark';                 // 默认 'light'
+  locale?: 'zh-CN' | 'en-US';               // 默认 'zh-CN'；任何非空非 'zh-CN' 值 ⇒ 'en-US'
   // —— 尺寸约束(可选)：数字按 CSS 像素解析；字符串原样使用 ——
-  width?: string | number                  // 默认 undefined（填满容器）
-  height?: string | number                 // 默认 undefined（随内容生长，宿主页面滚动）
+  width?: string | number;                  // 默认 undefined（填满容器）
+  height?: string | number;                 // 默认 undefined（随内容生长，宿主页面滚动）
   // —— 工具栏位置(FixedToolbar)：'auto' = 桌面端顶栏/移动端底栏。
   //    'float'（仅桌面端）隐藏 FixedToolbar，改用跟随文本选区的浮动 HoverToolbar；
   //    移动端回退为 'auto' ——
-  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // 默认 'auto'
+  toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';    // 默认 'auto'
   // 注意：没有 `uploadImage` prop。把 `createImageExtension({ upload, onFileCleanup })`
   // 放到 `:extensions` 中 `BuiltinExtensions` 之后即可替换默认 mock 上传 +
   // 接入清理回调。详见 `src/extensions/Image.ts`。
 }
 emits: {
-  'update:modelValue': [DocumentData]
+  'update:modelValue': [DocumentData];
   // 注意：没有 `cleanup:image-file` 事件。`ImageExtension` 在它的
   // `image-upload` 插件的 `applyTransaction` 钩子里自行调用
   // `onFileCleanup(fileId)`。
@@ -732,7 +732,7 @@ expose: { editor: Editor }
 
 `suppressSelectionSync` 标志防止反馈循环：当 DOM 选择被读取并分发到状态时，订阅回调绝不能把它写回 DOM。`renderItems` 是一个把 `doc.root` → `BlockRenderItem[]` 映射的 `computed`。`onKeyDown` 调用 `syncSelectionFromDom()`(把原生选择读入状态，带 `addToHistory: false`)，然后 `dispatchKeymap`；若已处理，则 `preventDefault()`。`Mod+K` 在 `BlockEditor.vue` 自身内部处理(而不走 keymap 注册表)，因为它需要桥接选择状态、link mark 和浮动 UI——纯 keymap 命令无法打开浮层。
 
-**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、**`view/imageUpload`**(订阅/取消订阅瞬时上传状态、持有 `fileId → 引用计数` map、调用 `uploadImage` prop 或 mock)、**`view/urlUtils`**(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、**`LinkPopover`**)。订阅编辑器；卸载时取消订阅、从 `imageUpload` 撤销所有未完成的临时对象 URL，并调用 `editor.destroy()`。
+**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、`view/imageUpload`(瞬时态响应式订阅 / 取消订阅、占位 URL 注册)、`view/urlUtils`(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`)。**`<BlockEditor>` 不再持有 fileId 引用计数，也不再发出 `cleanup:image-file` 事件**——这两件事都由 `ImageExtension` 自带的 `image-upload` 插件在 `applyTransaction` 钩子里完成：当 fileId 引用归零时它通过 `createImageExtension({ onFileCleanup })` 注入的回调通知宿主；本组件只负责在挂载时查询扩展方法 `startImageUpload` 并 forward 到原有的 `useBeginImageUpload()` Vue 注入口（slash / paste / drop / 文件选择都通过这条路径下发），卸载时取消订阅、撤销未完成的临时对象 URL、调用 `editor.destroy()`。
 
 **扩展点。** 此组件是唯一的响应式边界(设计的 `ViewBridge` 被并入其中——§13.1)。若视图层增长，可以在不改核心的情况下抽取桥接。虚拟化列表替换只替换 `BlockList`。`theme`/`locale` props 通过 provide/inject 流转，使所有子组件(包括通过 `<Teleport>` 渲染的弹出层)都能响应式地访问 `t(key)`。
 
@@ -744,17 +744,17 @@ expose: { editor: Editor }
 
 ```ts
 props: {
-  items: readonly BlockRenderItem[]
-  blocksMap: ReadonlyMap<BlockId, Block>   // 完整块视图；嵌套列表据此解析子块快照
-  firstBlockPlaceholder?: string           // 只在第一个(根)块上显示
-  isNested?: boolean                       // 为 true 表示为递归渲染的子列表
-  hoveredBlockId: BlockId | null           // 转发，使手柄正确显示/隐藏
-  focusedBlockId: BlockId | null
-  hasTextSelection?: boolean
-  draggingBlockId?: BlockId | null
-  dropTargetBlockId?: BlockId | null
-  dropPosition?: 'before' | 'after' | 'first' | 'last' | 'into'
-  menuOpenBlockId?: BlockId | null
+  items: readonly BlockRenderItem[];
+  blocksMap: ReadonlyMap<BlockId, Block>;   // 完整块视图；嵌套列表据此解析子块快照
+  firstBlockPlaceholder?: string;           // 只在第一个(根)块上显示
+  isNested?: boolean;                       // 为 true 表示为递归渲染的子列表
+  hoveredBlockId: BlockId | null;           // 转发，使手柄正确显示/隐藏
+  focusedBlockId: BlockId | null;
+  hasTextSelection?: boolean;
+  draggingBlockId?: BlockId | null;
+  dropTargetBlockId?: BlockId | null;
+  dropPosition?: 'before' | 'after' | 'first' | 'last' | 'into';
+  menuOpenBlockId?: BlockId | null;
 }
 ```
 
@@ -771,8 +771,8 @@ props: {
 **公共 API(Props/Emits)。**
 
 ```ts
-props: { block: Block; placeholder?: string }
-emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] }
+props: { block: Block; placeholder?: string };
+emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] };
 ```
 
 `resolvedComponent` 是一个 `computed`，它读取 `editor.registries.renderers.get(block.type)` 并把不透明的 `component` 转换为 Vue `Component`——视图层解释框架无关 spec 的唯一边界。宿主把渲染器包裹在一个带 `data-block-type` 的 `.block-host` div 中。
@@ -788,7 +788,7 @@ emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: numbe
 **公共 API(Props/事件)。**
 
 ```ts
-props: { block: Block; placeholder?: string }
+props: { block: Block; placeholder?: string };
 // DOM: contenteditable="true", data-block-id, data-empty, data-placeholder
 // 事件： @input， @compositionstart， @compositionend， @focus， @blur
 // emits: 'linkClick' ({ blockId, href, from, to, clientRect })
@@ -807,9 +807,9 @@ props: { block: Block; placeholder?: string }
 **公共 API。**
 
 ```ts
-function findBlockEl(root: HTMLElement, id: BlockId): HTMLElement | null
-function readDomSelection(root: HTMLElement, doc: DocState): Selection | null
-function applySelectionToDom(root: HTMLElement, selection: Selection): void
+function findBlockEl(root: HTMLElement, id: BlockId): HTMLElement | null;
+function readDomSelection(root: HTMLElement, doc: DocState): Selection | null;
+function applySelectionToDom(root: HTMLElement, selection: Selection): void;
 ```
 
 `readDomSelection` 从选择的末端节点向上走，找到最近的 `[data-block-id]` 祖先，通过把一个 range 克隆到元素起点来计算光标偏移，把它钳位到块的文本长度，并返回一个 `caret`(或在单块内非折叠时返回单块 `text` 选择)。`applySelectionToDom` 聚焦目标块的元素，并通过 `setCaretInElement`(遍历文本节点找到偏移，回退到内容末尾)放置光标。块选择尚未处理(阶段五)。
@@ -825,8 +825,8 @@ function applySelectionToDom(root: HTMLElement, selection: Selection): void
 **公共 API。**
 
 ```ts
-function inlineToHtml(content: InlineSeq): string
-function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq
+function inlineToHtml(content: InlineSeq): string;
+function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq;
 ```
 
 `inlineToHtml` 把每个 mark 类型映射为其语义 HTML 标签(`<b>`、`<i>`、`<u>`、`<s>`、`<code>`、**`<a href=sanitizeUrl(attrs.href)>` 用于 link**),并应用颜色/背景色 class。`inlineFromDom` 遍历 DOM 文本节点和元素子节点,重建带 marks 的 `InlineSeq` 片段。
@@ -841,21 +841,21 @@ function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq
 
 ```ts
 interface ParsedBlock {
-  type: BlockType
-  attrs?: Attrs
-  content: InlineSeq
+  type: BlockType;
+  attrs?: Attrs;
+  content: InlineSeq;
   // —— 阶段 6 瞬时字段，绝不写入 DocState ——
-  readonly _pendingFile?: File          // 剪贴板图片文件(走 imageUpload 管线上传)
+  readonly _pendingFile?: File;          // 剪贴板图片文件(走 imageUpload 管线上传)
 }
 interface PasteDecision {
-  blocks?: ParsedBlock[]
-  wrapSelectionInLink?: { href: string } // 非空选择 + URL 文本粘贴
+  blocks?: ParsedBlock[];
+  wrapSelectionInLink?: { href: string }; // 非空选择 + URL 文本粘贴
 }
 
-function parseClipboardHtml(html: string): ParsedBlock[]
-function parseClipboardText(text: string): ParsedBlock[]
-function blocksToClipboardHtml(blocks: readonly Block[]): string
-function blocksToClipboardText(blocks: readonly Block[]): string
+function parseClipboardHtml(html: string): ParsedBlock[];
+function parseClipboardText(text: string): ParsedBlock[];
+function blocksToClipboardHtml(blocks: readonly Block[]): string;
+function blocksToClipboardText(blocks: readonly Block[]): string;
 ```
 
 **交互。** 依赖 `core/types`(`Block`、`InlineSeq`)、`view/inlineDom`(`inlineFromDom`、`inlineToHtml`)、**`view/urlUtils`(`looksLikeUrl`、`autoLinkInlineSeq`)**。被 `BlockEditor.vue` 的 `onCopy`/`onCut`/`onPaste` 处理器使用，后者拦截剪贴板事件、写入干净的数据模型 HTML/文本，并对上述阶段 6 的特殊情况分发图片块插入或 link mark 设置。
@@ -869,29 +869,29 @@ function blocksToClipboardText(blocks: readonly Block[]): string
 **公共 API。**
 
 ```ts
-type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
+type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 interface ImageUploadState {
-  readonly status: UploadStatus
-  readonly progress: number        // 0..100
-  readonly error?: string
-  readonly tempSrc?: string       // URL.createObjectURL(file); done/error 时 revoke
+  readonly status: UploadStatus;
+  readonly progress: number;        // 0..100
+  readonly error?: string;
+  readonly tempSrc?: string;       // URL.createObjectURL(file); done/error 时 revoke
 }
 
 interface ImageUploadStore {
-  readonly state: Readonly<Record<string, ImageUploadState>> // key = blockId
-  subscribe(blockId: BlockId, cb: (s: ImageUploadState) => void): () => void
+  readonly state: Readonly<Record<string, ImageUploadState>>; // key = blockId
+  subscribe(blockId: BlockId, cb: (s: ImageUploadState) => void): () => void;
   beginUpload(blockId: BlockId, file: File, handlers: {
-    onProgress(pct: number): void
-    resolve(result: { src: string; fileId?: string; alt?: string; title?: string; caption?: string; width?: number; height?: number }): void
-    reject(err: Error): void
-  }): void
-  retry(blockId: BlockId): void        // 重试缓存的 file;若无缓存则拒绝
-  cancel(blockId: BlockId): void       // revoke temp URL, 清状态
-  clearBlock(blockId: BlockId): void   // 块被移除/替换时调用
+    onProgress(pct: number): void;
+    resolve(result: { src: string; fileId?: string; alt?: string; title?: string; caption?: string; width?: number; height?: number }): void;
+    reject(err: Error): void;
+  }): void;
+  retry(blockId: BlockId): void;        // 重试缓存的 file;若无缓存则拒绝
+  cancel(blockId: BlockId): void;       // revoke temp URL, 清状态
+  clearBlock(blockId: BlockId): void;   // 块被移除/替换时调用
 }
 
-export const imageUploadStore: ImageUploadStore
-export function setUploadHook(hook: UploadImageHandler | null): void
+export const imageUploadStore: ImageUploadStore;
+export function setUploadHook(hook: UploadImageHandler | null): void;
 ```
 
 默认行为使用内置 mock 上传器（**`<BlockEditor>` 上从未存在过 `uploadImage` prop**——上传函数通过 `createImageExtension({ upload })` 注入）：mock 等待 800–2500 ms，发出假进度 tick，约 30% 概率 reject——这样重试/错误 UI 可以在无后端的情况下开发测试。在 `beginUpload` 时创建 `tempSrc` 对象 URL 并推入状态，使 `Image.ts` 能立即显示；`resolve` 时调用者分发 `setAttrs` 以写入真实的 `src`/`fileId`，然后调用 `cancel(blockId)` 回收。`reject` 时保留错误字符串 + 缓存的 `File`，以便用户点击图片遮罩上的 **Retry** 按钮。
@@ -907,14 +907,14 @@ export function setUploadHook(hook: UploadImageHandler | null): void
 **公共 API。**
 
 ```ts
-function looksLikeUrl(text: string): boolean
-function normalizeUrl(text: string): string
-function sanitizeUrl(raw: string): string  // 不安全/缺失 scheme 返回 ""
+function looksLikeUrl(text: string): boolean;
+function normalizeUrl(text: string): string;
+function sanitizeUrl(raw: string): string;  // 不安全/缺失 scheme 返回 ""
 
 // InlineSeq 变换器： 不带 'link' / 'code' mark 的文本 run → 在 URL 边界拆分
 // 并把 URL 片段包在 {type:'link', attrs:{ href: sanitizeUrl(match) }} mark 中。
 // 若无匹配则原样返回。
-function autoLinkInlineSeq(seq: InlineSeq): InlineSeq
+function autoLinkInlineSeq(seq: InlineSeq): InlineSeq;
 ```
 
 `looksLikeUrl` 匹配：绝对 schemes `https?://`、`mailto:`、`tel:`;裸 `www.` 前缀(→ 规范化为 `https://www.`);匹配 `user@domain.tld` 的邮箱(→ 规范化为 `mailto:user@domain.tld`)。它刻意避免在 `code` mark 内部匹配任何东西。`sanitizeUrl` 只把 `http https mailto tel` 加入白名单、移除 URL 中段的 `\t\n\r`、拒绝含有非 ASCII 字母的 scheme、去除空白——结果要么为空，要么保证拥有白名单 scheme 且没有显见的混淆。调用者守则:**如果 `sanitizeUrl` 返回 `""`，就当作链接没有 href**(不要写 `href` 到 DOM)。
@@ -929,21 +929,21 @@ function autoLinkInlineSeq(seq: InlineSeq): InlineSeq
 
 ```ts
 props: {
-  visible: boolean
-  mode: 'view' | 'edit'
-  href: string                    // 当前已净化的 href
-  text: string                    // 当前可见链接文本(供编辑副本使用)
-  anchor: { left: number; top: number; right: number; bottom: number } | null
+  visible: boolean;
+  mode: 'view' | 'edit';
+  href: string;                    // 当前已净化的 href
+  text: string;                    // 当前可见链接文本(供编辑副本使用)
+  anchor: { left: number; top: number; right: number; bottom: number } | null;
 }
 emits: {
-  'open-link': [string]           // 打开外部 URL。浮层也渲染自己的安全
+  'open-link': [string];           // 打开外部 URL。浮层也渲染自己的安全
                                   // <a target="_blank" rel="noopener noreferrer">，中键/右键都能工作；
                                   // 该 emit 用于统计。
-  'copy-link': [string]           // → BlockEditor 把 href 写入剪贴板 + 显示 toast
-  'edit': []                      // 切到 'edit' 模式
-  'remove': []                    // → editor.commands.unsetLink
-  'save': [{ href: string; text?: string }]
-  'cancel': []
+  'copy-link': [string];           // → BlockEditor 把 href 写入剪贴板 + 显示 toast
+  'edit': [];                      // 切到 'edit' 模式
+  'remove': [];                    // → editor.commands.unsetLink
+  'save': [{ href: string; text?: string }];
+  'cancel': [];
 }
 ```
 
@@ -976,7 +976,7 @@ emits: {
 **公共 API。**
 
 ```ts
-function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean
+function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean;
 ```
 
 若绑定匹配且命令返回 `true`(已处理)，则返回 `true`；调用方应在此时 `preventDefault()`。流程：`keyNameFromEvent(event)` → `editor.registries.keymap.resolve(key)` → `editor.commands[binding.command](binding.args)`。
@@ -994,7 +994,7 @@ function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean
 **公共 API。**
 
 ```ts
-export const ParagraphExtension: Extension
+export const ParagraphExtension: Extension;
 // schema: { type: 'paragraph', content: 'text', nestable: true }
 // renderer: { component: ParagraphBlock }
 ```
@@ -1012,7 +1012,7 @@ export const ParagraphExtension: Extension
 **公共 API。**
 
 ```ts
-export const HeadingExtension: Extension
+export const HeadingExtension: Extension;
 // schema: { type: 'heading', content: 'text', nestable: true,
 //   attrs: { level: { default: 1, validate: v => typeof v === 'number' && v >= 1 && v <= 6 } } }
 // renderer: { component: HeadingBlock }
@@ -1031,7 +1031,7 @@ export const HeadingExtension: Extension
 **公共 API。**
 
 ```ts
-export const BulletListExtension: Extension
+export const BulletListExtension: Extension;
 // schema: { type: 'bulletList', content: 'text', nestable: true,
 //   attrs: COMMON_ATTRS }
 // renderer: { component: BulletListBlock }
@@ -1046,7 +1046,7 @@ export const BulletListExtension: Extension
 **公共 API。**
 
 ```ts
-export const OrderedListExtension: Extension
+export const OrderedListExtension: Extension;
 // schema: { type: 'orderedList', content: 'text', nestable: true,
 //   attrs: { ...COMMON_ATTRS, startNumber: { default: null, validate: v => v == null || (Number.isInteger(v) && v >= 1) } } }
 // renderer: { component: OrderedListBlock }
@@ -1063,7 +1063,7 @@ export const OrderedListExtension: Extension
 **公共 API。**
 
 ```ts
-export const TodoListExtension: Extension
+export const TodoListExtension: Extension;
 // schema: { type: 'todoList', content: 'text', nestable: true,
 //   attrs: { ...COMMON_ATTRS, checked: { default: false, validate: v => typeof v === 'boolean' } } }
 // renderer: { component: TodoListBlock }
@@ -1080,7 +1080,7 @@ export const TodoListExtension: Extension
 **公共 API。**
 
 ```ts
-export const QuoteExtension: Extension
+export const QuoteExtension: Extension;
 // schema: { type: 'quote', content: 'text', nestable: false,
 //   attrs: COMMON_ATTRS_NO_INDENT, disallowedMarks: ['italic'] }
 // renderer: { component: QuoteBlock }
@@ -1095,7 +1095,7 @@ export const QuoteExtension: Extension
 **公共 API。**
 
 ```ts
-export const CodeBlockExtension: Extension
+export const CodeBlockExtension: Extension;
 // schema: { type: 'codeBlock', content: 'text', isolating: true,
 //   attrs: { language: { default: 'plain', validate: v => typeof v === 'string' } } }
 // renderer: { component: CodeBlock, editable: true }
@@ -1112,7 +1112,7 @@ export const CodeBlockExtension: Extension
 **公共 API。**
 
 ```ts
-export const ImageExtension: Extension
+export const ImageExtension: Extension;
 // schema: {
 //   type: 'image',
 //   content: 'none',
@@ -1143,9 +1143,9 @@ export const ImageExtension: Extension
 // slash: [{ name: 'image', label: t('slash.image'), icon: ICON_IMAGE, command: insertImageBlock }]
 ```
 
-Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位的遮罩(上传中/错误时可见)叠在 `<img>` 上方，进度条 100–0%，错误时红色重试按钮。`fileId` attr 是可选的**外部存储标识**(S3 key、OSS object id 等)——`BlockEditor.vue` 维护每个 `fileId` 的引用计数，当一个 block 从文档中被删除/替换(事务 diff)且该 `fileId` 的引用从 ≥1 降到 0 时，emit `cleanup:image-file`，以便宿主应用删除存储对象。
+Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位的遮罩(上传中/错误时可见)叠在 `<img>` 上方，进度条 100–0%，错误时红色重试按钮。`fileId` attr 是可选的**外部存储标识**(S3 key、OSS object id 等)——`fileId` 的引用计数与 `onFileCleanup` 触发**完全由 `createImageExtension({ onFileCleanup })` 自带的 `image-upload` 插件**通过 `Editor.applyTransaction` 钩子持有；当一个 block 从文档中被删除/替换(事务 diff)且该 `fileId` 的引用从 ≥1 降到 0 时调用 `onFileCleanup(fileId)`，以便宿主应用删除存储对象。`<BlockEditor>` 不再维护这个计数，也不再有 `cleanup:image-file` 事件。
 
-**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/context`(`useEditor`)、`view/BlockContent.vue`(用于可选 caption)、`view/imageUpload`(订阅瞬时状态 `imageUploadStore`)、`view/ui/icons`(`ICON_IMAGE`)和 `extensions/_commonAttrs`(`IMAGE_ATTRS`)。捆绑于 `builtin.ts`；默认 `BuiltinExtensions` 为 14 个扩展。粘贴路径：剪贴板文件 → `clipboard.ts` 返回 `_pendingFile` → `BlockEditor.vue` 分发 `insertBlock`(Image) → `imageUploadStore.beginUpload`(创建 `tempSrc` → 进度 tick → resolve/reject → `setAttrs({ src, fileId, alt, ... })` 或 `retry` 重新 begin)。
+**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/context`(`useEditor`)、`view/BlockContent.vue`(用于可选 caption)、`view/imageUpload`(订阅瞬时状态 `imageUploadStore`)、`view/ui/icons`(`ICON_IMAGE`)和 `extensions/_commonAttrs`(`IMAGE_ATTRS`)。捆绑于 `builtin.ts`；默认 `BuiltinExtensions` 为 14 个扩展。上传路径：剪贴板文件 → 触发扩展方法 `Editor.getExtensionMethod('startImageUpload')`（由 `ImageExtension` 的 `image-upload` 插件 `init` 阶段注册）→ 流程：插入占位 `image` 块 → 创建 `tempSrc` → 进度 tick → resolve 写入真实 `src`/`fileId`/`alt` 或 reject 保留 `tempSrc` + 缓存 `File` 支持重试。
 
 ### `src/extensions/Table.ts`
 
@@ -1154,7 +1154,7 @@ Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位�
 **公共 API。**
 
 ```ts
-export const TableExtension: Extension
+export const TableExtension: Extension;
 // name: 'table'
 // schema: { content: 'none', nestable: false, attrs: TABLE_ATTRS_SCHEMA }
 //   attrs 校验：rows>=1 / cols>=1 / colWidths.length===cols / cells 规整(默认值填充、covered 一致)
@@ -1162,21 +1162,21 @@ export const TableExtension: Extension
 // commands: 通过 createTableCommands() 注册到 editor.commands（name 前缀 table*）
 
 export function createTableCommands(editor: Editor): {
-  tableInsert(args: { rows?: number; cols?: number; insertAfterBlockId?: BlockId }): BlockId
-  tableInsertRow(args: { id: BlockId; index: number; count?: number }): void
-  tableRemoveRow(args: { id: BlockId; index: number }): void
-  tableInsertCol(args: { id: BlockId; index: number; count?: number }): void
-  tableRemoveCol(args: { id: BlockId; index: number }): void
-  tableMergeRect(args: { id: BlockId; rect: TableSelectionRect }): void
-  tableSplitCell(args: { id: BlockId; row: number; col: number }): void
-  tableSplitCellsInRect(args: { id: BlockId; rect: TableSelectionRect }): void
-  tableToggleHeaderRow(args: { id: BlockId }): void
-  tableSetColWidth(args: { id: BlockId; col: number; width: number }): void
-  tableSetCellAttrs<A extends Record<string, unknown>>(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; attrs: A }): void
-  tableSetCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; mark: Mark }): void
-  tableToggleCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; markType: MarkType }): void
-  tableTransformCellType(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; targetType: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock' }): void
-}
+  tableInsert(args: { rows?: number; cols?: number; insertAfterBlockId?: BlockId }): BlockId;
+  tableInsertRow(args: { id: BlockId; index: number; count?: number }): void;
+  tableRemoveRow(args: { id: BlockId; index: number }): void;
+  tableInsertCol(args: { id: BlockId; index: number; count?: number }): void;
+  tableRemoveCol(args: { id: BlockId; index: number }): void;
+  tableMergeRect(args: { id: BlockId; rect: TableSelectionRect }): void;
+  tableSplitCell(args: { id: BlockId; row: number; col: number }): void;
+  tableSplitCellsInRect(args: { id: BlockId; rect: TableSelectionRect }): void;
+  tableToggleHeaderRow(args: { id: BlockId }): void;
+  tableSetColWidth(args: { id: BlockId; col: number; width: number }): void;
+  tableSetCellAttrs<A extends Record<string, unknown>>(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; attrs: A }): void;
+  tableSetCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; mark: Mark }): void;
+  tableToggleCellMark(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; markType: MarkType }): void;
+  tableTransformCellType(args: { id: BlockId; cells: ReadonlyArray<{ row: number; col: number }>; targetType: 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock' }): void;
+};
 ```
 
 `TableBlock` 组件行为要点：
@@ -1193,9 +1193,9 @@ export function createTableCommands(editor: Editor): {
 
 ### `src/extensions/Equation.ts`
 
-**职责。** 公式（LaTeX 数学公式）块类型扩展——一个 `content: 'none'`、**isolated** 块，只保存 `attrs.expression`（原始 LaTeX 源码）。渲染器是独立的 Vue 组件（`EquationBlock`）：查看态调用 `katex.renderToString` 即时渲染居中展示公式（渲染出的 DOM 永不持久化，只序列化 `attrs.expression`）；编辑态显示绑定 `attrs.expression` 的 textarea 并带 KaTeX 实时预览，外加一个浮动 ✎ 按钮用于（重新）打开编辑器。空块在插入时自动进入编辑态。选中与嵌套遵循编辑器的通用非文本块约定：根元素携带 `block-focus-root`，因此块手柄/选中环完全由 `focusedBlockId` 驱动（组件内不做 `isSelected` 订阅）；`classesFromAttrs(attrs)` 注入 `be-indent-N` 类，使块作为子块嵌套时按深度正确缩进（`attrs.indent` 即为深度镜像）。Markdown 导出序列化为 `$$$ … $$$` 围栏块；HTML 导出输出 `<div class="equation-block-rendered">`。非法 LaTeX 会渲染为 `katex-error-block` 兜底而非抛错。
+**职责。** 公式（LaTeX 数学公式）块类型扩展——一个 `content: 'none'`、**isolated** 块，只保存 `attrs.expression`（原始 LaTeX 源码）。渲染器是独立的 Vue 组件 `EquationBlock`；**默认走零依赖的内置数学渲染器** `src/extensions/math/`（tokenizer → parser → Math AST → render tree → DOM），支持轻量 LaTeX 数学子集：数字/标识符、运算符（`\pm \times \div \cdot \le \ge \neq` 等）、上下标（合并为单一 `scripts` 节点）、`\frac`、`\sqrt` / `\sqrt[n]`、希腊字母、函数名（`\sin \cos \tan \log \ln \exp \lim \min \max`）、大型运算符（`\sum \prod \int` 在 display 模式上限位于符号上下方）、`\begin{matrix}` 和 `\begin{aligned}`（CSS Grid 布局）。未知命令降级为字面量 `\foo` 节点，语法错误显示 ⚠ 徽章和带位置的 `diagnostics`——**解析永不抛错，只把错误信号传给视图层**。查看态即时计算居中展示公式（输出永不持久化，只序列化 `attrs.expression`）；编辑态显示绑定 `attrs.expression` 的 textarea 并带**内置实时预览**，外加浮动 ✎ 按钮用于（重新）打开编辑器。空块在插入时自动进入编辑态。选中与嵌套遵循编辑器的通用非文本块约定：根元素携带 `block-focus-root`，因此块手柄 / 选中环完全由 `focusedBlockId` 驱动（组件内不做 `isSelected` 订阅）；`classesFromAttrs(attrs)` 注入 `be-indent-N` 类，使块作为子块嵌套时按深度正确缩进（`attrs.indent` 即为深度镜像）。Markdown 导出序列化为 `$$$ … $$$` 围栏块；HTML 导出输出 `<div class="equation-block-rendered">`。非法 LaTeX 渲染为 `math-error-block` 兜底而非抛错。**渲染器完全可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 等替代实现——`<BlockEditor>` 不再暴露 `equationRenderer` prop。
 
-**交互。** 导入 `vue`、`core/types`、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/ui/SafeHtml.vue`、`view/ui/icons`（`ICON_EQUATION`、`ICON_EDIT`）、`extensions/_commonAttrs`（`COMMON_ATTRS`、`classesFromAttrs`）、`view/context`（`useEditor` / `useEditable`）、`i18n`（`useI18n`）以及 `katex`（外加 `katex/dist/katex.min.css`）。`BuiltinExtensions` 默认包含。与 Image/Table 一样，Equation 是 `content: 'none'` 的 attrs 存储块——零核心改动。空公式块按 Enter 退出到默认块类型；编辑按钮在进入编辑态前调用 `editor.commands.selectBlock({ id })`，确保编辑时块始终处于选中态。
+**交互。** 导入 `vue`（`h` 仅用于 VNode 后端）、`core/types`、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/ui/SafeHtml.vue`、`view/ui/icons`（`ICON_EQUATION`、`ICON_EDIT`）、`extensions/_commonAttrs`（`COMMON_ATTRS`、`classesFromAttrs`）、`view/context`（`useEditor` / `useEditable`）、`i18n`（`useI18n`）。**不导入任何第三方数学库**（无 KaTeX/MathJax 依赖）。`extensions/math/`（`ast.ts`、`tokens.ts`、`symbols.ts`、`parser.ts`、`renderTree.ts`、`renderVNode.ts`、`renderHtml.ts`）是自洽的引擎，只依赖 `vue` 的 `h`（仅 VNode 后端用到）。默认通过 `EquationExtension = createEquationExtension()` 含在 `BuiltinExtensions` 中。与 Image/Table 一样，Equation 是 `content: 'none'` 的 attrs 存储块——零核心改动。空公式块按 Enter 退出到默认块类型；编辑按钮在进入编辑态前调用 `editor.commands.selectBlock({ id })`，确保编辑时块始终处于选中态。
 
 ### `src/extensions/tableModel.ts`
 
@@ -1204,43 +1204,43 @@ export function createTableCommands(editor: Editor): {
 **公共 API。**
 
 ```ts
-export const TABLE_ATTRS_SCHEMA: BlockSchemaSpec['attrs']
+export const TABLE_ATTRS_SCHEMA: BlockSchemaSpec['attrs'];
 // → rows>=1, cols>=1, colWidths?.length===cols, cells 整体由 validateTableAttrs 规整
 
-export function validateTableAttrs(attrs: Attrs): Attrs          // 规范：缺行/列/cells/colWidths/headerRow 用默认补齐；cells 缺 rowspan/colspan/covered/content 填默认；covered 与 rowspan/colspan 重新对齐
+export function validateTableAttrs(attrs: Attrs): Attrs;          // 规范：缺行/列/cells/colWidths/headerRow 用默认补齐；cells 缺 rowspan/colspan/covered/content 填默认；covered 与 rowspan/colspan 重新对齐
 
-export function createEmptyTableAttrs(rows: number, cols: number, opts?: { defaultColWidth?: number; headerRow?: boolean }): TableAttrs
+export function createEmptyTableAttrs(rows: number, cols: number, opts?: { defaultColWidth?: number; headerRow?: boolean }): TableAttrs;
 
-export function insertRows(attrs: TableAttrs, index: number, count?: number): TableAttrs
-export function removeRow(attrs: TableAttrs, index: number): TableAttrs
-export function insertCols(attrs: TableAttrs, index: number, count?: number, newColWidth?: number): TableAttrs
-export function removeCol(attrs: TableAttrs, index: number): TableAttrs
-export function setColWidth(attrs: TableAttrs, col: number, width: number): TableAttrs
+export function insertRows(attrs: TableAttrs, index: number, count?: number): TableAttrs;
+export function removeRow(attrs: TableAttrs, index: number): TableAttrs;
+export function insertCols(attrs: TableAttrs, index: number, count?: number, newColWidth?: number): TableAttrs;
+export function removeCol(attrs: TableAttrs, index: number): TableAttrs;
+export function setColWidth(attrs: TableAttrs, col: number, width: number): TableAttrs;
 
-export function isRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): boolean
-export function expandSelectionToFullRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): TableSelectionRect
-export function mergeCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs
-export function splitCell(attrs: TableAttrs, row: number, col: number): TableAttrs
-export function splitCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs
+export function isRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): boolean;
+export function expandSelectionToFullRect(attrs: TableAttrs, cells: readonly { row: number; col: number }[]): TableSelectionRect;
+export function mergeCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs;
+export function splitCell(attrs: TableAttrs, row: number, col: number): TableAttrs;
+export function splitCellsInRect(attrs: TableAttrs, rect: TableSelectionRect): TableAttrs;
 
-export function toggleHeaderRow(attrs: TableAttrs): TableAttrs
-export function setCellsAttrs<A extends Record<string, unknown>>(attrs: TableAttrs, cells: readonly { row: number; col: number }[], patch: A): TableAttrs
-export function setCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], mark: Mark): TableAttrs
-export function toggleCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], markType: MarkType): TableAttrs
-export function transformCellsToType(attrs: TableAttrs, cells: readonly { row: number; col: number }[], targetType: CellType): TableAttrs
+export function toggleHeaderRow(attrs: TableAttrs): TableAttrs;
+export function setCellsAttrs<A extends Record<string, unknown>>(attrs: TableAttrs, cells: readonly { row: number; col: number }[], patch: A): TableAttrs;
+export function setCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], mark: Mark): TableAttrs;
+export function toggleCellsMark(attrs: TableAttrs, cells: readonly { row: number; col: number }[], markType: MarkType): TableAttrs;
+export function transformCellsToType(attrs: TableAttrs, cells: readonly { row: number; col: number }[], targetType: CellType): TableAttrs;
 
-export function recomputeCovered(cells: TableCell[][], rows: number, cols: number): TableCell[][]
-export function getColWidthsSum(colWidths: readonly number[]): number
+export function recomputeCovered(cells: TableCell[][], rows: number, cols: number): TableCell[][];
+export function getColWidthsSum(colWidths: readonly number[]): number;
 
 // 序列化 / 反序列化（供扩展的 serializers/deserializers 调用）
-export function tableToHtml(attrs: Attrs, inlineToHtml: (inline: readonly InlineNode[]) => string): string
-export function tableFromHtml(html: string, inlineFromHtml: (html: string) => InlineNode[]): TableAttrs
-export function tableToMarkdown(attrs: Attrs, inlineToMd: (inline: readonly InlineNode[]) => string): string
-export function tableFromMarkdown(md: string, mdToInline: (md: string) => InlineNode[]): TableAttrs
+export function tableToHtml(attrs: Attrs, inlineToHtml: (inline: readonly InlineNode[]) => string): string;
+export function tableFromHtml(html: string, inlineFromHtml: (html: string) => InlineNode[]): TableAttrs;
+export function tableToMarkdown(attrs: Attrs, inlineToMd: (inline: readonly InlineNode[]) => string): string;
+export function tableFromMarkdown(md: string, mdToInline: (md: string) => InlineNode[]): TableAttrs;
 
 export interface TableAttrs { rows: number; cols: number; cells: TableCell[][]; colWidths: number[]; headerRow?: boolean }
 export interface TableCell { content: InlineNode[]; rowspan: number; colspan: number; covered: boolean; cellType?: CellType; align?: 'left'|'center'|'right'; bgColor?: string }
-export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock'
+export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'todo' | 'bullet' | 'ordered' | 'codeBlock';
 export interface TableSelectionRect { startRow: number; endRow: number; startCol: number; endCol: number }
 ```
 
@@ -1253,7 +1253,7 @@ export interface TableSelectionRect { startRow: number; endRow: number; startCol
 **公共 API。**
 
 ```ts
-export const DividerExtension: Extension
+export const DividerExtension: Extension;
 // name: 'divider'
 // schema: { content: 'none', nestable: false, isolation: true, attrs: {} }
 // renderer: { component: DividerBlock, editable: true }
@@ -1271,17 +1271,17 @@ export const DividerExtension: Extension
 
 ```ts
 export interface TocItem {
-  readonly id: BlockId
-  readonly level: number
-  readonly text: string
+  readonly id: BlockId;
+  readonly level: number;
+  readonly text: string;
 }
 
-export function collectHeadings(doc: DocState): readonly TocItem[]
+export function collectHeadings(doc: DocState): readonly TocItem[];
 // 通过 `flatten` 遍历块树，过滤 `type === 'heading'`，跳过空标题；
 // 按文档顺序返回 { id, level, text }。表格单元格内的标题自动排除
 // （单元格内容存在 Block.attrs 中，不在块树内）。
 
-export const TableOfContentsExtension: Extension
+export const TableOfContentsExtension: Extension;
 // name: 'tableOfContents'
 // schema: { type: 'tableOfContents', content: 'none', nestable: false,
 //           inlineMarks: false, attrs: {}, empty: () => false }
@@ -1305,17 +1305,17 @@ export const TableOfContentsExtension: Extension
 **公共 API。**
 
 ```ts
-export const COMMON_ATTRS: BlockSchemaSpec['attrs']             // align + color + bgColor + indent
-export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs']   // align + color + bgColor(quote)
-export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs'] // color + bgColor
-export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs']         // {}(codeBlock：无属性)
-export const IMAGE_ATTRS: BlockSchemaSpec['attrs']              // {}(image： 持久化 attrs 由 Image.schema 定义，不含文本/缩进/颜色)
-export const INDENT_TYPES: readonly string[]                     // 支持缩进的块类型
-export const MAX_INDENT = 10
-export function classesFromAttrs(attrs: Attrs): string[]         // → ['be-align-center', 'be-color-red', …]
+export const COMMON_ATTRS: BlockSchemaSpec['attrs'];             // align + color + bgColor + indent
+export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs'];   // align + color + bgColor(quote)
+export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs']; // color + bgColor
+export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // {}(codeBlock：无属性)
+export const IMAGE_ATTRS: BlockSchemaSpec['attrs'];              // {}(image： 持久化 attrs 由 Image.schema 定义，不含文本/缩进/颜色)
+export const INDENT_TYPES: readonly string[];                     // 支持缩进的块类型
+export const MAX_INDENT = 10;
+export function classesFromAttrs(attrs: Attrs): string[];         // → ['be-align-center', 'be-color-red', …]
 export interface ColorPreset { readonly key: string; readonly label: string; readonly cssValue: string; readonly opacity: number }
-export const TEXT_COLOR_PRESETS: readonly ColorPreset[]
-export const BG_COLOR_PRESETS: readonly ColorPreset[]
+export const TEXT_COLOR_PRESETS: readonly ColorPreset[];
+export const BG_COLOR_PRESETS: readonly ColorPreset[];
 ```
 
 颜色预设使用 CSS 变量（`var(--be-color-gray)`、`var(--be-swatch-bg-gray)`），因此能自动适配浅色/深色主题。背景色使用带 `opacity` 字段的半透明色。
@@ -1329,7 +1329,7 @@ export const BG_COLOR_PRESETS: readonly ColorPreset[]
 **公共 API。**
 
 ```ts
-export const KeymapExtension: Extension
+export const KeymapExtension: Extension;
 // name: 'default-keymap'
 // keymap: [
 //   { key: 'Enter', command: 'enter' },
@@ -1353,7 +1353,7 @@ export const KeymapExtension: Extension
 **公共 API。**
 
 ```ts
-export const HistoryExtension: Extension
+export const HistoryExtension: Extension;
 // name: 'history-keymap'
 // keymap: [
 //   { key: 'Mod-z', command: 'undo' },
@@ -1373,25 +1373,25 @@ export const HistoryExtension: Extension
 **公共 API。**
 
 ```ts
-export const BuiltinExtensions: readonly Extension[]
+export const BuiltinExtensions: readonly Extension[];
 // = [ ParagraphExtension, HeadingExtension, BulletListExtension,
 //     OrderedListExtension, TodoListExtension, QuoteExtension,
 //     CodeBlockExtension, ImageExtension, TableExtension, DividerExtension,
 //     TableOfContentsExtension, KeymapExtension, HistoryExtension ]
 
-export { ParagraphExtension } from './Paragraph'
-export { HeadingExtension } from './Heading'
-export { BulletListExtension } from './BulletList'
-export { OrderedListExtension } from './OrderedList'
-export { TodoListExtension } from './TodoList'
-export { QuoteExtension } from './Quote'
-export { CodeBlockExtension } from './CodeBlock'
-export { ImageExtension } from './Image'
-export { TableExtension, createTableCommands } from './Table'
-export { DividerExtension } from './Divider'
-export { TableOfContentsExtension } from './TableOfContents'
-export { KeymapExtension } from './Keymap'
-export { HistoryExtension } from './History'
+export { ParagraphExtension } from './Paragraph';
+export { HeadingExtension } from './Heading';
+export { BulletListExtension } from './BulletList';
+export { OrderedListExtension } from './OrderedList';
+export { TodoListExtension } from './TodoList';
+export { QuoteExtension } from './Quote';
+export { CodeBlockExtension } from './CodeBlock';
+export { ImageExtension } from './Image';
+export { TableExtension, createTableCommands } from './Table';
+export { DividerExtension } from './Divider';
+export { TableOfContentsExtension } from './TableOfContents';
+export { KeymapExtension } from './Keymap';
+export { HistoryExtension } from './History';
 ```
 
 **交互。** 导入 13 个内置扩展模块和 `core/extension/Extension`。由 `src/index.ts` 再导出。消费者组合 `[...BuiltinExtensions, ...userExtensions]`，或完全省略 `extensions`（`BlockEditor` prop 默认为 `BuiltinExtensions`）。
@@ -1416,15 +1416,15 @@ export { HistoryExtension } from './History'
 
 ```ts
 export interface BlockData {
-  readonly id?: string
-  readonly type: string
-  readonly attrs?: Attrs                    // 含 image 的 src/alt/title/width/height/caption/fileId
-  readonly content?: InlineSeq
-  readonly children?: readonly BlockData[]  // 真实嵌套的子块
+  readonly id?: string;
+  readonly type: string;
+  readonly attrs?: Attrs;                    // 含 image 的 src/alt/title/width/height/caption/fileId
+  readonly content?: InlineSeq;
+  readonly children?: readonly BlockData[];  // 真实嵌套的子块
 }
 export interface DocumentData {
-  readonly id?: string
-  readonly blocks: readonly BlockData[]
+  readonly id?: string;
+  readonly blocks: readonly BlockData[];
 }
 ```
 
@@ -1443,8 +1443,8 @@ export interface DocumentData {
 **公共 API**（`Editor` 方法，见上文 `src/core/Editor.ts`）：
 
 ```ts
-toMarkdown(): string                       // 导出：doc → markdown
-setDocFromMarkdown(markdown: string): void // 导入：markdown → doc（重置历史）
+toMarkdown(): string;                       // 导出：doc → markdown
+setDocFromMarkdown(markdown: string): void; // 导入：markdown → doc（重置历史）
 ```
 
 **序列化（toMarkdown）。** 对每个块调用 `serializers.markdownFor(block)`;回退是按块类型的通用格式。**阶段 6 的块级：** 图片块序列化为 `![alt](src "title")` 后跟可选的 caption 行。**阶段 6 的行内：** 行内级 `link` mark 序列化为 `[格式化文本](href)`——`href` 经 `normalizeUrl` 确保不丢失 scheme，而方括号内的文本**保留内部 marks 的 markdown 语法**(例如 `[**粗体链接**](https://…)`);`code` mark 内部**不套 link**(与编辑器内的 mark 互斥规则一致)。**支持嵌套：** 顶层块之间用恰好一个空行分隔；同一父级下同种类型的连续列表块(ul/ol/todo)之间不加空行，嵌套(不同缩进层级)的父子列表之间也不加空行；缩进前缀由 `depthOf` 计算，有序列表编号按**同一父级的兄弟列表**隔离。行内 code 块用反引号包裹；多个空行会被折叠为单个空行。
@@ -1460,16 +1460,16 @@ setDocFromMarkdown(markdown: string): void // 导入：markdown → doc（重置
 **公共 API。**
 
 ```ts
-export type Theme = 'light' | 'dark'
-export type Locale = 'zh-CN' | 'en-US'
+export type Theme = 'light' | 'dark';
+export type Locale = 'zh-CN' | 'en-US';
 
-export function normalizeLocale(raw: string | undefined | null): Locale  // '' / null / 'zh-CN' → 'zh-CN';否则 → 'en-US'
-export function normalizeTheme(raw: string | undefined | null): Theme    // 'dark' → 'dark';否则 → 'light'
+export function normalizeLocale(raw: string | undefined | null): Locale;  // '' / null / 'zh-CN' → 'zh-CN';否则 → 'en-US'
+export function normalizeTheme(raw: string | undefined | null): Theme;    // 'dark' → 'dark';否则 → 'light'
 
-export const localeKey: InjectionKey<Ref<Locale>>
-export const themeKey: InjectionKey<Ref<Theme>>
-export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void
-export function useI18n(): I18nBundle    // { locale, theme, t(key) }
+export const localeKey: InjectionKey<Ref<Locale>>;
+export const themeKey: InjectionKey<Ref<Theme>>;
+export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void;
+export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 ```
 
 `provideI18n` 直接提供原始的 locale/theme ref（不包装在对象中），使每个使用者的 `t()` 函数读取 `localeRef.value` —— 一个普通的 ref 读取，Vue 响应式系统能可靠地跨 `<Teleport>` 边界追踪。`useI18n()` 注入 ref 并构建新的 `t()`，在当前 locale 的字典中查找 key，找不到时回退到原始 key。
@@ -1509,34 +1509,34 @@ export function useI18n(): I18nBundle    // { locale, theme, t(key) }
 
 ```ts
 // 核心引擎(框架无关)— 再导出 core/index.ts
-export * from './core/index'
+export * from './core/index';
 
 // Vue 组件
-export { default as BlockEditor } from './view/BlockEditor.vue'
-export { default as BlockList } from './view/BlockList.vue'
-export { default as BlockHost } from './view/BlockHost.vue'
-export { default as BlockContent } from './view/BlockContent.vue'
-export { editorKey, useEditor } from './view/context'
-export type { BlockRenderItem } from './view/context'
+export { default as BlockEditor } from './view/BlockEditor.vue';
+export { default as BlockList } from './view/BlockList.vue';
+export { default as BlockHost } from './view/BlockHost.vue';
+export { default as BlockContent } from './view/BlockContent.vue';
+export { editorKey, useEditor } from './view/context';
+export type { BlockRenderItem } from './view/context';
 
 // 内置扩展
-export { BuiltinExtensions } from './extensions/builtin'
-export { ParagraphExtension } from './extensions/Paragraph'
-export { HeadingExtension } from './extensions/Heading'
-export { BulletListExtension } from './extensions/BulletList'
-export { OrderedListExtension } from './extensions/OrderedList'
-export { TodoListExtension } from './extensions/TodoList'
-export { QuoteExtension } from './extensions/Quote'
-export { CodeBlockExtension } from './extensions/CodeBlock'
-export { ImageExtension } from './extensions/Image'
-export { TableExtension, createTableCommands } from './extensions/Table'
-export { DividerExtension } from './extensions/Divider'
-export { KeymapExtension } from './extensions/Keymap'
-export { HistoryExtension } from './extensions/History'
+export { BuiltinExtensions } from './extensions/builtin';
+export { ParagraphExtension } from './extensions/Paragraph';
+export { HeadingExtension } from './extensions/Heading';
+export { BulletListExtension } from './extensions/BulletList';
+export { OrderedListExtension } from './extensions/OrderedList';
+export { TodoListExtension } from './extensions/TodoList';
+export { QuoteExtension } from './extensions/Quote';
+export { CodeBlockExtension } from './extensions/CodeBlock';
+export { ImageExtension } from './extensions/Image';
+export { TableExtension, createTableCommands } from './extensions/Table';
+export { DividerExtension } from './extensions/Divider';
+export { KeymapExtension } from './extensions/Keymap';
+export { HistoryExtension } from './extensions/History';
 
 // i18n + 主题
-export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n'
-export type { Theme, Locale, I18nBundle } from './i18n'
+export { useI18n, provideI18n, normalizeLocale, normalizeTheme } from './i18n';
+export type { Theme, Locale, I18nBundle } from './i18n';
 ```
 
 **交互。** 导入 `core/index`、四个 `.vue` 组件、`view/context`、`i18n.ts`、`view/urlUtils`、`view/imageUpload` 以及内置扩展捆绑（14 个扩展，含 `Equation`/`TableOfContents`）。这是包的 `main`/`module` 字段指向的文件；`playground/App.vue` 和外部消费者从这里导入。

@@ -127,11 +127,11 @@ Notion 的编辑器是自定义的。一切都是块；块拥有 `id`、`type`�
 
 ```ts
 interface Block {
-  id: BlockId            // 不透明、稳定、由核心生成(nanoid)
-  type: BlockType        // 已注册的类型 id,例如 "paragraph"、"heading"
-  attrs: Attrs           // 块级属性,例如 { level: 2 }
-  content: InlineSeq     // 该块的行内内容(无则空序列)
-  children: BlockId[]    // 有序的子块 id(嵌套)
+  id: BlockId;            // 不透明、稳定、由核心生成(nanoid)
+  type: BlockType;        // 已注册的类型 id,例如 "paragraph"、"heading"
+  attrs: Attrs;           // 块级属性,例如 { level: 2 }
+  content: InlineSeq;     // 该块的行内内容(无则空序列)
+  children: BlockId[];    // 有序的子块 id(嵌套)
 }
 ```
 
@@ -144,12 +144,12 @@ interface Block {
 ### 4.2 行内内容
 
 ```ts
-type InlineSeq = InlineNode[]
+type InlineSeq = InlineNode[];
 
 interface InlineNode {
-  type: 'text'            // 以后可扩展:'mention' | 'equation' | ...
-  text: string
-  marks?: Mark[]          // [{ type: 'bold' }, { type: 'link', attrs: { href } }]
+  type: 'text';            // 以后可扩展:'mention' | 'equation' | ...
+  text: string;
+  marks?: Mark[];          // [{ type: 'bold' }, { type: 'link', attrs: { href } }]
 }
 ```
 
@@ -159,8 +159,8 @@ interface InlineNode {
 
 ```ts
 interface Document {
-  id: string              // 文档 id
-  root: BlockId[]         // 有序的顶层块 id
+  id: string;              // 文档 id
+  root: BlockId[];         // 有序的顶层块 id
   // 块存于以 id 为键的规范化 store 中(见 §10)
 }
 ```
@@ -189,20 +189,20 @@ interface Document {
 
 ```ts
 interface Extension {
-  name: string
-  uses?: Extension[]
+  name: string;
+  uses?: Extension[];
 
-  schema?: BlockSchemaSpec          // 声明一个块类型(若有)
-  renderer?: BlockRendererSpec      // 该块的 Vue 组件
-  commands?: CommandSpec[]          // 该扩展贡献的命令
-  keymap?: KeymapSpec               // 快捷键 -> 命令
-  inputRules?: InputRuleSpec[]      // 文本模式 -> 变换
-  slashCommands?: SlashCommandSpec[]// 斜杠菜单中的条目
-  toolbar?: ToolbarActionSpec[]     // 悬停/插入工具栏动作
-  nodeView?: NodeViewFactory        // 用于完全自定义的交互块
-  serialize?: SerializerSpec        // 块 -> HTML / Markdown / JSON
-  deserialize?: DeserializerSpec    // Markdown / HTML / JSON -> 块
-  plugins?: PluginSpec[]            // 编辑器级插件(历史等)
+  schema?: BlockSchemaSpec;          // 声明一个块类型(若有)
+  renderer?: BlockRendererSpec;      // 该块的 Vue 组件
+  commands?: CommandSpec[];          // 该扩展贡献的命令
+  keymap?: KeymapSpec;               // 快捷键 -> 命令
+  inputRules?: InputRuleSpec[];      // 文本模式 -> 变换
+  slashCommands?: SlashCommandSpec[];// 斜杠菜单中的条目
+  toolbar?: ToolbarActionSpec[];     // 悬停/插入工具栏动作
+  nodeView?: NodeViewFactory;        // 用于完全自定义的交互块
+  serialize?: SerializerSpec;        // 块 -> HTML / Markdown / JSON
+  deserialize?: DeserializerSpec;    // Markdown / HTML / JSON -> 块
+  plugins?: PluginSpec[];            // 编辑器级插件(历史等)
 }
 ```
 
@@ -231,13 +231,13 @@ interface Extension {
 
 ```ts
 interface BlockSchema {
-  type: BlockType
-  attrs: AttrsSpec                   // { name: { default, validate? } }
-  content: 'text' | 'none' | 'inline*'   // 该块是否编辑行内文本?
-  nestable: boolean                  // 是否可以拥有子块?
-  allowedChildren?: BlockType[] | '*'   // 子类型白名单
-  isolating?: boolean                // 删除/合并的边界(例如代码块)
-  empty?: (block) => boolean         // 该块是否"为空"?(占位符、合并)
+  type: BlockType;
+  attrs: AttrsSpec;                   // { name: { default, validate? } }
+  content: 'text' | 'none' | 'inline*';   // 该块是否编辑行内文本?
+  nestable: boolean;                  // 是否可以拥有子块?
+  allowedChildren?: BlockType[] | '*';   // 子类型白名单
+  isolating?: boolean;                // 删除/合并的边界(例如代码块)
+  empty?: (block) => boolean;         // 该块是否"为空"?(占位符、合并)
 }
 ```
 
@@ -287,7 +287,7 @@ schema 让核心无需知道类型就能回答结构性问题："块 A 能包含
 采纳 ProseMirror 被证明的形式：
 
 ```ts
-type Command<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean
+type Command<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Dispatch) => boolean;
 ```
 
 - 命令检查 `state`，若适用，则构建一个**事务**并调用 `dispatch(tr)`。若它处理了该输入则返回 `true`（这样键位映射可以回退/穿透）。
@@ -297,9 +297,9 @@ type Command<TArgs = void> = (args: TArgs) => (state: EditorState, dispatch?: Di
 
 ```ts
 interface Transaction {
-  steps: Step[]            // 有序的结构性操作
-  selectionAfter?: Selection
-  meta: Record<string, unknown>   // 例如 { history: 'ignore' }
+  steps: Step[];            // 有序的结构性操作
+  selectionAfter?: Selection;
+  meta: Record<string, unknown>;   // 例如 { history: 'ignore' }
 }
 ```
 
@@ -323,7 +323,7 @@ interface Transaction {
 type Selection =
   | { kind: 'caret'; blockId: BlockId; offset: number }
   | { kind: 'text'; anchor: Anchor; focus: Anchor }   // 块内或跨块
-  | { kind: 'blocks'; blockIds: BlockId[] }           // Notion 风格块选择
+  | { kind: 'blocks'; blockIds: BlockId[] };           // Notion 风格块选择
 
 interface Anchor { blockId: BlockId; offset: number }
 ```
@@ -345,15 +345,15 @@ interface Anchor { blockId: BlockId; offset: number }
 
 ```ts
 interface Plugin {
-  name: string
-  init?(state: EditorState, editor: Editor): PluginState
-  applyTransaction?(tr: Transaction, prevState: EditorState): PluginState
-  apply?(state: EditorState): EditorState        // 读/更新状态(装饰)
-  onKeyDown?(event: KeyboardEvent, ctx: EventContext): boolean
-  onInput?(event: InputEvent, ctx: EventContext): boolean
-  onCompositionStart?(event, ctx): void
-  onCompositionEnd?(event, ctx): void
-  onDestroy?(): void
+  name: string;
+  init?(state: EditorState, editor: Editor): PluginState;
+  applyTransaction?(tr: Transaction, prevState: EditorState): PluginState;
+  apply?(state: EditorState): EditorState;        // 读/更新状态(装饰)
+  onKeyDown?(event: KeyboardEvent, ctx: EventContext): boolean;
+  onInput?(event: InputEvent, ctx: EventContext): boolean;
+  onCompositionStart?(event, ctx): void;
+  onCompositionEnd?(event, ctx): void;
+  onDestroy?(): void;
 }
 ```
 
@@ -375,10 +375,10 @@ interface Plugin {
 
 ```ts
 interface EditorState {
-  doc: Document               // 规范化森林 + Map<BlockId, Block>
-  selection: Selection
-  pluginState: Readonly<Record<string, PluginState>>
-  version: number             // 单调递增;每应用一个事务就加一
+  doc: Document;               // 规范化森林 + Map<BlockId, Block>
+  selection: Selection;
+  pluginState: Readonly<Record<string, PluginState>>;
+  version: number;             // 单调递增;每应用一个事务就加一
 }
 ```
 
@@ -713,7 +713,7 @@ Callout、Toggle、Columns、Database、Mention、Math、Mermaid、MindMap、Att
 - [x] 模块小而单一职责；无 `utils.ts`。
 - [x] 未来特性（Table、Database、Columns、AI……）无需核心改动。
 - [x] **阶段一至五已实现**：7 个内置块类型、行内标记、块级属性、slash 菜单、输入规则、悬停工具栏、拖拽手柄、剪贴板、国际化、主题。
-- [x] **阶段六已实现**：ImageExtension（含 `content:none` schema、替换/删除遮罩、caption、拖拽缩放、HTML/MD 序列化、`uploadImage` 钩子）+ 链接 mark（`setLink`/`unsetLink` 命令、`Mod+K`、链接浮层查看/编辑/复制/删除、粘贴/键入 URL 自动加链、HTML/MD 兼容、Undo/Redo、选区/mark 继承校验）。
+- [x] **阶段六已实现**：ImageExtension（含 `content: none` schema、替换/删除遮罩、caption、拖拽缩放、HTML/MD 序列化、图片上传流水线——`createImageExtension({ upload, onFileCleanup })` 在 `:extensions` 中后写注入）+ 链接 mark（`setLink` / `unsetLink` 命令、`Mod+K`、链接浮层查看 / 编辑 / 复制 / 删除、粘贴 / 键入 URL 自动加链、HTML/MD 兼容、Undo / Redo、选区 / mark 继承校验）。
 - [x] **阶段七已实现**：TableExtension（`attrs` storage 网格、行/列选择条 + 角部全选手柄、浮动操作栏合并/拆分/切换标题行、插入点、完整矩形选区扩展、代码块单元格 Enter 插入换行、HTML/MD 序列化）+ DividerExtension（`---`/`***`/`___` 输入规则）。
 - [x] **阶段八已实现**：TableOfContentsExtension（不可编辑的 `content: 'none'` 动态视图块，实时收集所有 `heading` 块并渲染层级列表；点击条目跳转到标题；序列化输出空字符串；斜杠 `/目录` 入口）。
 - [x] **安全不变量**：所有 `<a href>` 的生成路径必须经过 `sanitizeUrl`（协议白名单 + 净化），禁止把未净化的用户字符串写入 `href`；禁止 mark 属性携带非字符串标量。

@@ -111,12 +111,12 @@ npm install xiaodao-editor
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
-import { BlockEditor } from 'xiaodao-editor'
-import type { DocumentData } from 'xiaodao-editor'
-import 'xiaodao-editor/style.css'
+import { ref } from 'vue';
+import { BlockEditor } from 'xiaodao-editor';
+import type { DocumentData } from 'xiaodao-editor';
+import 'xiaodao-editor/style.css';
 
-const doc = ref<DocumentData>({ blocks: [] })
+const doc = ref<DocumentData>({ blocks: [] });
 </script>
 
 <template>
@@ -163,32 +163,56 @@ TeX engine; for that, inject an external renderer via the
 
 ```vue
 <script setup lang="ts">
-import katex from 'katex' // your own dependency, not bundled with xiaodao-editor
-import { createEquationExtension, type EquationRenderer } from 'xiaodao-editor'
-import { BuiltinExtensions } from 'xiaodao-editor'
+// KaTeX itself is NOT a dependency of xiaodao-editor — install it yourself:
+//   pnpm add katex
+import katex from 'katex';
+// ★ KaTeX's CSS MUST be imported. KaTeX produces a flat HTML tree whose
+//   positioning (superscripts, subscripts, integral limits, fraction bars,
+//   combined glyphs like ∫ with upper/lower limit, etc.) is done entirely
+//   by the `.katex` / `.strut` / `<sup>` / `<sub>` / `.mord` … classes. If
+//   the CSS is missing, every span lays out inline and "garbled" output
+//   like `∫ab`, `αx3`, `e−λx` (and any upper/lower limit, fraction) is the
+//   symptom you'll see. Load it once, in your app entry — putting it next
+//   to the renderer keeps the demo self-contained.
+import 'katex/dist/katex.min.css';
+import { createEquationExtension, BuiltinExtensions, type EquationRenderer } from 'xiaodao-editor';
 
 const katexRenderer: EquationRenderer = {
-  render(expression: string, options?: { displayMode?: boolean }) {
+  render(expression, options) {
+    const src = expression ?? '';
     try {
-      const html = katex.renderToString(expression, {
+      // `output: 'htmlAndMathml'` matches the project's pre-`built-in math
+      // engine` version (KaTeX v0.16 default): visually identical to HTML,
+      // and the inline `<math>` helps a11y / SSR consumers. `'html'` would
+      // work too but loses the MathML branch.
+      const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
-        throwOnError: false,
-        trust: false,
-        strict: false,
+        throwOnError: false,   // never throw — KaTeX wraps the bad fragment
+                               // in `<span class="katex-error">…</span>` instead
+        trust: false,          // REQUIRED: `trust: true` allows `\href` /
+                               // `\url` to inject raw HTML (XSS). Keep off.
+        strict: false,         // lenient: unknown commands warn but still render
+        output: 'htmlAndMathml',
       });
-      return { html, vnode: null, error: false, diagnostics: [] };
+      // KaTeX's error sentinel class is `katex-error` (not `merror` — that
+      // one is from later KaTeX versions). Surface it as `error: true` so
+      // the equation block shows the ⚠ badge.
+      const error = /class="katex-error"/.test(html);
+      return { html, vnode: null, error, diagnostics: [] };
     } catch {
       return { html: '', vnode: null, error: true, diagnostics: [] };
     }
   },
 };
 
-// Append your renderer-bearing extension AFTER BuiltinExtensions so the
-// name-based deduplication picks it up (last one wins).
+// Append your renderer-bearing extension AFTER `BuiltinExtensions`. The
+// extension registry is name-based deduplicated (last entry wins), so the
+// appended `createEquationExtension({ renderer })` replaces the built-in's
+// `EquationExtension`. Do NOT add both — pick one.
 const extensions = [
   ...BuiltinExtensions,
   createEquationExtension({ renderer: katexRenderer }),
-]
+];
 </script>
 
 <template>
@@ -197,9 +221,12 @@ const extensions = [
 ```
 
 `createEquationExtension({ renderer })` is the only supported way to override
-the equation renderer — there is no component-level prop. You can also import
-the built-in engine pieces (`parseMath`, `renderMathToHtml`, …) from
-`xiaodao-editor` to build custom renderers on top of the AST.
+the equation renderer — there is no component-level prop for this. The
+registry deduplicates by extension `name` so the override extension must
+appear **after** `BuiltinExtensions` (or anywhere later in the array) to
+take effect. You can also import the built-in engine pieces (`parseMath`,
+`renderMathToHtml`, …) from `xiaodao-editor` to build custom renderers on
+top of the AST.
 
 ## Props
 
@@ -227,17 +254,17 @@ import {
   BuiltinExtensions,
   createImageExtension,
   type UploadImageHandler,
-} from 'xiaodao-editor'
+} from 'xiaodao-editor';
 
 const upload: UploadImageHandler = async (name, file, controller, onProgress) => {
   // 1. request a signed URL from your backend
-  const { url, fields } = await api.presign(name)
+  const { url, fields } = await api.presign(name);
 
   // 2. PUT the file (with abort signal + progress)
-  const xhr = new XMLHttpRequest()
+  const xhr = new XMLHttpRequest();
   xhr.upload.addEventListener('progress', (e) => {
-    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
-  })
+    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+  });
   // ...wire controller.signal.abort into xhr.abort()...
 
   // 3. resolve with the public URL + a stable fileId so cleanup can fire
@@ -245,8 +272,8 @@ const upload: UploadImageHandler = async (name, file, controller, onProgress) =>
     url: `${CDN}/${name}`,
     width: 0, height: 0,
     fileId: hashOf(name + size), // host-chosen stable id; 0 disables cleanup
-  }
-}
+  };
+};
 
 const extensions = [
   ...BuiltinExtensions.filter((e) => e.name !== 'image'),
@@ -254,7 +281,7 @@ const extensions = [
     upload,
     onFileCleanup: (fileId) => api.deleteCloudFile(fileId),
   }),
-]
+];
 ```
 
 The default extension bundled with `BuiltinExtensions` uses an in-memory mock
@@ -324,31 +351,31 @@ To use a **custom subset**, pass `extensions` explicitly:
 import {
   ParagraphExtension, HeadingExtension,
   KeymapExtension, HistoryExtension,
-} from 'xiaodao-editor'
+} from 'xiaodao-editor';
 
 const extensions = [
   ParagraphExtension, HeadingExtension,
   KeymapExtension, HistoryExtension,
-]
+];
 ```
 
 ## Document model
 
 ```ts
 interface Block {
-  id: BlockId
-  type: BlockType
-  attrs: Attrs              // e.g. { level: 2, align: 'center', color: 'red' }
-  content: InlineSeq        // text runs with optional marks
-  children: BlockId[]       // child block ids — real nesting:
+  id: BlockId;
+  type: BlockType;
+  attrs: Attrs;             // e.g. { level: 2, align: 'center', color: 'red' }
+  content: InlineSeq;       // text runs with optional marks
+  children: BlockId[];      // child block ids — real nesting:
                             // paragraph/heading + the 3 list kinds can be parents;
                             // any block type can be a child. `attrs.indent` is a
                             // derived mirror of the nesting depth.
 }
 
 interface DocumentData {
-  id?: string
-  blocks: BlockData[]       // nested JSON; normalized on import
+  id?: string;
+  blocks: BlockData[];      // nested JSON; normalized on import
 }
 ```
 
@@ -386,7 +413,7 @@ const doc: DocumentData = {
       }, content: [] },
     { type: 'equation', attrs: { expression: 'E = mc^2' }, content: [] },
   ],
-}
+};
 ```
 
 ## Custom extensions
@@ -399,9 +426,9 @@ serialization. A minimal block-type extension provides a schema and a Vue
 renderer:
 
 ```ts
-import { defineComponent, h } from 'vue'
-import type { Extension } from 'xiaodao-editor'
-import { BlockContent } from 'xiaodao-editor'
+import { defineComponent, h } from 'vue';
+import type { Extension } from 'xiaodao-editor';
+import { BlockContent } from 'xiaodao-editor';
 
 const CalloutBlock = defineComponent({
   props: ['block', 'placeholder'],
@@ -410,9 +437,9 @@ const CalloutBlock = defineComponent({
       block: props.block,
       placeholder: props.placeholder,
       class: 'block-callout',
-    })
+    });
   },
-})
+});
 
 export const CalloutExtension: Extension = {
   name: 'callout',
@@ -425,16 +452,16 @@ export const CalloutExtension: Extension = {
     },
   },
   renderer: { component: CalloutBlock },
-}
+};
 ```
 
 Register it alongside the built-ins:
 
 ```ts
-import { BuiltinExtensions, BlockEditor } from 'xiaodao-editor'
-import { CalloutExtension } from './callout'
+import { BuiltinExtensions, BlockEditor } from 'xiaodao-editor';
+import { CalloutExtension } from './callout';
 
-const extensions = [...BuiltinExtensions, CalloutExtension]
+const extensions = [...BuiltinExtensions, CalloutExtension];
 ```
 
 ## Architecture

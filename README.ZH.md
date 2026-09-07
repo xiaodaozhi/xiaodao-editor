@@ -15,7 +15,7 @@
 ## 功能特性
 
 - **12 种内置块类型** — 段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**公式**（LaTeX 数学公式）、**分割线**、**表格**、**目录**（共 **14 个扩展**，另含 Keymap 与 History 两个行为扩展）
-- **公式（LaTeX 数学）块** — 通过**内置零依赖数学渲染器**渲染居中的展示型公式（轻量 LaTeX 数学子集：分数、根号、上下标、希腊字母、常用函数、大型运算符、矩阵、aligned 多行对齐）。文档中**只保存原始 `expression` 字符串**——渲染输出在渲染时即时计算、永不持久化，因此序列化保持精简。渲染器**可插拔**：向 `<BlockEditor>` 传入 `equationRenderer`（或使用 `createEquationExtension`）即可换用 KaTeX、MathJax 或任何自定义引擎获得完整 LaTeX 支持。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
+- **公式（LaTeX 数学）块** — 通过**内置零依赖数学渲染器**渲染居中的展示型公式（轻量 LaTeX 数学子集：分数、根号、上下标、希腊字母、常用函数、大型运算符、矩阵、aligned 多行对齐）。文档中**只保存原始 `expression` 字符串**——渲染输出在渲染时即时计算、永不持久化，因此序列化保持精简。渲染器**可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可注入 KaTeX、MathJax 或任何自定义引擎获得完整 LaTeX 支持；**`<BlockEditor>` 没有 `equationRenderer` 这个 prop**。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
 - **表格块** — 基于 `attrs` 的 N×M 网格；新建表格默认列宽 120 px、默认启用标题行；行/列选择条 + 左上角角部全选手柄；行/列之间插入点；浮动操作栏提供合并/拆分单元格、**切换标题行**（设置 `attrs.headerRow`）、删除行/列/整个表；单元格使用独立的 `contenteditable`，支持段落/标题/代码块类型、富行内标记、单元格背景色与对齐；Tab 在单元格间导航，Enter 退出编辑（代码块单元格按 Enter 插入换行），Escape 失焦；仿 Arco Design 的内部水平滚动条；矩形选区遇到合并单元格时会自动扩展以保证永远不会只选中合并单元格的一半。
 - **行内样式标记** — 粗体、斜体、下划线、删除线、行内代码、**链接**（`Mod-K` 快捷键、粘贴 URL、自动识别、浮层查看/编辑/复制/删除、href 净化阻断 `javascript:` / XSS），以及按选区设置的文字颜色与背景色
 - **块级属性** — 对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
@@ -41,12 +41,12 @@ npm install xiaodao-editor
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
-import { BlockEditor } from 'xiaodao-editor'
-import type { DocumentData } from 'xiaodao-editor'
-import 'xiaodao-editor/style.css'
+import { ref } from 'vue';
+import { BlockEditor } from 'xiaodao-editor';
+import type { DocumentData } from 'xiaodao-editor';
+import 'xiaodao-editor/style.css';
 
-const doc = ref<DocumentData>({ blocks: [] })
+const doc = ref<DocumentData>({ blocks: [] });
 </script>
 
 <template>
@@ -86,34 +86,56 @@ interface EquationRenderResult {
 
 ```vue
 <script setup lang="ts">
-import katex from 'katex' // 你自己的依赖，xiaodao-editor 不内置
-import type { EquationRenderer } from 'xiaodao-editor'
+// KaTeX 本身不是 xiaodao-editor 的依赖 —— 自行安装：
+//   pnpm add katex
+import katex from 'katex';
+// ★ KaTeX 的 CSS 必须显式引入 ★
+//   KaTeX 渲染出的是平铺的 HTML 树，「上下标、积分限、分式、∫ 上下限」等
+//   一切排版都由 .katex / .strut / <sup> / <sub> 等类名驱动。没引 CSS 时，
+//   所有 span 会按行内文本平铺——「∫ab」「αx3」「e−λx」之类错位就是这症状。
+//   在 app 入口加载一次即可；这里引入只是让 demo 自洽。
+import 'katex/dist/katex.min.css';
+import { createEquationExtension, BuiltinExtensions, type EquationRenderer } from 'xiaodao-editor';
 
 const katexRenderer: EquationRenderer = {
-  render(expression: string, options?: { displayMode?: boolean }) {
+  render(expression, options) {
+    const src = expression ?? '';
     try {
-      const html = katex.renderToString(expression, {
+      // `output: 'htmlAndMathml'` 与项目 449885a 之前的版本一致：视觉上
+      // 与 HTML 无异，同时内联一段 <math>，对读屏 / SSR 友好。改 `html`
+      // 也可以，但会丢掉 MathML 分支。
+      const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
-        throwOnError: false,
-        trust: false,
-        strict: false,
+        throwOnError: false,   // 不抛错 —— 出错片段包成 <span class="katex-error">…</span>
+        trust: false,          // 必选：trust: true 会放开 \href / \url 的原始 HTML 注入（XSS）
+        strict: false,         // 宽松：未知命令不报警
+        output: 'htmlAndMathml',
       });
-      return { html, vnode: null, error: false, diagnostics: [] };
+      // KaTeX 标记错误的 class 是 `katex-error`（不是 merror —— merror 是更新版）。
+      // 命中后让 Equation 块显示 ⚠ 徽章。
+      const error = /class="katex-error"/.test(html);
+      return { html, vnode: null, error, diagnostics: [] };
     } catch {
       return { html: '', vnode: null, error: true, diagnostics: [] };
     }
   },
 };
+
+// 把带自定义渲染器的扩展 append 到 BuiltinExtensions 之后，
+// 注册器按 name 去重（后写赢），所以最终生效的是这个。
+// 不要并列塞两个 createEquationExtension —— 二选一。
+const extensions = [
+  ...BuiltinExtensions,
+  createEquationExtension({ renderer: katexRenderer }),
+];
 </script>
 
 <template>
-  <BlockEditor v-model="doc" :equation-renderer="katexRenderer" />
+  <BlockEditor v-model="doc" :extensions="extensions" />
 </template>
 ```
 
-进阶：`createEquationExtension({ renderer })` 可以构建带指定渲染器的公式扩展，
-追加到你的 `extensions` 数组即可覆盖内置版本。也可以从 `xiaodao-editor` 导入
-内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
+`createEquationExtension({ renderer })` 把带自定义渲染器的公式扩展追加到 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可覆盖内置版本——`<BlockEditor>` 没有 `equationRenderer` prop。也可以从 `xiaodao-editor` 导入内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
 
 ## Props 属性
 
@@ -140,17 +162,17 @@ import {
   BuiltinExtensions,
   createImageExtension,
   type UploadImageHandler,
-} from 'xiaodao-editor'
+} from 'xiaodao-editor';
 
 const upload: UploadImageHandler = async (name, file, controller, onProgress) => {
   // 1. 向你的后端请求签名 URL
-  const { url, fields } = await api.presign(name)
+  const { url, fields } = await api.presign(name);
 
   // 2. PUT 文件（带 abort + 进度上报）
-  const xhr = new XMLHttpRequest()
+  const xhr = new XMLHttpRequest();
   xhr.upload.addEventListener('progress', (e) => {
-    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
-  })
+    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+  });
   // ...把 controller.signal.abort 接到 xhr.abort() ...
 
   // 3. resolve 出公开 URL + 一个稳定的 fileId，便于清理回调触发
@@ -158,8 +180,8 @@ const upload: UploadImageHandler = async (name, file, controller, onProgress) =>
     url: `${CDN}/${name}`,
     width: 0, height: 0,
     fileId: hashOf(name + size), // 宿主自选的稳定 id；传 0 会禁掉清理回调
-  }
-}
+  };
+};
 
 const extensions = [
   ...BuiltinExtensions.filter((e) => e.name !== 'image'),
@@ -167,7 +189,7 @@ const extensions = [
     upload,
     onFileCleanup: (fileId) => api.deleteCloudFile(fileId),
   }),
-]
+];
 ```
 
 `BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（带随机
@@ -219,7 +241,7 @@ const extensions = [
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
 | `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式 — Enter 插入换行。                 |
 | `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传侧信道，详见「可插拔图片上传」。`BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（`blob:` URL 无法跨刷新存活），不会触发任何 `onFileCleanup` 回调。 |
-| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。可插拔渲染器在渲染时即时计算居中展示公式（输出永不持久化）；默认为零依赖的**内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），可通过 `equationRenderer` prop 或 `createEquationExtension` 注入 KaTeX/MathJax。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
+| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。**默认使用零依赖的内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 即可覆盖。**`<BlockEditor>` 没有 `equationRenderer` prop**。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |
 | `DividerExtension`     | `divider`      | 隔离型水平分割线。                                                     |
 | `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`；空 attrs — 标题列表是每次渲染时从编辑器状态计算的**动态视图**。不可编辑块（`editable: false`）；按文档顺序收集所有 `heading` 块（表格单元格内的标题自动排除）；点击条目滚动到对应标题。序列化输出空字符串（真正的标题由各自的块导出）。 |
@@ -232,30 +254,30 @@ const extensions = [
 import {
   ParagraphExtension, HeadingExtension,
   KeymapExtension, HistoryExtension,
-} from 'xiaodao-editor'
+} from 'xiaodao-editor';
 
 const extensions = [
   ParagraphExtension, HeadingExtension,
   KeymapExtension, HistoryExtension,
-]
+];
 ```
 
 ## 文档模型
 
 ```ts
 interface Block {
-  id: BlockId
-  type: BlockType
-  attrs: Attrs              // 例如 { level: 2, align: 'center', color: 'red' }
-  content: InlineSeq        // 带可选标记的文本片段
-  children: BlockId[]       // 子块 id — 真实嵌套：paragraph/heading +
+  id: BlockId;
+  type: BlockType;
+  attrs: Attrs;             // 例如 { level: 2, align: 'center', color: 'red' }
+  content: InlineSeq;       // 带可选标记的文本片段
+  children: BlockId[];      // 子块 id — 真实嵌套：paragraph/heading +
                             // 3 种列表块可以做父；任何块类型都能做子。`attrs.indent`
                             // 是嵌套深度的衍生镜像。
 }
 
 interface DocumentData {
-  id?: string
-  blocks: BlockData[]       // 嵌套 JSON；导入时会做规范化
+  id?: string;
+  blocks: BlockData[];      // 嵌套 JSON；导入时会做规范化
 }
 ```
 
@@ -293,7 +315,7 @@ const doc: DocumentData = {
       }, content: [] },
     { type: 'equation', attrs: { expression: 'E = mc^2' }, content: [] },
   ],
-}
+};
 ```
 
 ## 自定义扩展
@@ -301,9 +323,9 @@ const doc: DocumentData = {
 一个块类型扩展需要提供 `name`（名称）、`schema`（块类型、内容类型、带默认值与校验器的属性）和 `renderer`（接收 `block` 与 `placeholder` props 的 Vue 组件）。扩展还可以贡献输入规则、斜杠命令、键位映射绑定以及 Markdown/HTML 序列化。最小化的块类型扩展只需提供 schema 和 Vue 渲染器：
 
 ```ts
-import { defineComponent, h } from 'vue'
-import type { Extension } from 'xiaodao-editor'
-import { BlockContent } from 'xiaodao-editor'
+import { defineComponent, h } from 'vue';
+import type { Extension } from 'xiaodao-editor';
+import { BlockContent } from 'xiaodao-editor';
 
 const CalloutBlock = defineComponent({
   props: ['block', 'placeholder'],
@@ -312,9 +334,9 @@ const CalloutBlock = defineComponent({
       block: props.block,
       placeholder: props.placeholder,
       class: 'block-callout',
-    })
+    });
   },
-})
+});
 
 export const CalloutExtension: Extension = {
   name: 'callout',
@@ -327,16 +349,16 @@ export const CalloutExtension: Extension = {
     },
   },
   renderer: { component: CalloutBlock },
-}
+};
 ```
 
 将其与内置扩展一起注册：
 
 ```ts
-import { BuiltinExtensions, BlockEditor } from 'xiaodao-editor'
-import { CalloutExtension } from './callout'
+import { BuiltinExtensions, BlockEditor } from 'xiaodao-editor';
+import { CalloutExtension } from './callout';
 
-const extensions = [...BuiltinExtensions, CalloutExtension]
+const extensions = [...BuiltinExtensions, CalloutExtension];
 ```
 
 ## 架构
