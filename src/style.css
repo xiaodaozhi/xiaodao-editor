@@ -3949,20 +3949,27 @@ body.theme-dark .equation-error-badge {
 }
 
 /* --- Superscript / subscript -------------------------------------------- */
+/* Plain inline wrapper: the base and the script(s) flow on the text baseline,
+   so a lone <sup>/<sub> is raised/lowered by the browser (vertical-align:
+   super/sub). Making this a flex container would turn the script into a flex
+   item and silently kill that vertical shift. */
 .math-script {
-  display: inline-flex;
-  align-items: baseline;
-  vertical-align: middle;
+  display: inline;
 }
 
 .math-base {
   display: inline-block;
 }
 
+/* Both scripts at once (x_1^2): stack them in a vertical column next to the
+   base, centered on the base's midline (flex items ignore vertical-align, so
+   the stack must be shifted as a whole). */
 .math-scripts {
   display: inline-flex;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-start;
+  vertical-align: middle;
   margin-left: 0.06em;
 }
 
@@ -3971,6 +3978,17 @@ body.theme-dark .equation-error-badge {
   font-size: 0.7em;
   line-height: 1.05;
   font-style: normal;
+}
+
+/* Explicit shift for lone scripts (also hardens against host-page resets of
+   sup/sub). Inside the .math-scripts column this is ignored (flex items),
+   so it is safe to declare unconditionally. */
+.math-sup {
+  vertical-align: super;
+}
+
+.math-sub {
+  vertical-align: sub;
 }
 
 /* --- Root --------------------------------------------------------------- */
@@ -4003,6 +4021,13 @@ body.theme-dark .equation-error-badge {
   align-items: center;
   vertical-align: middle;
   margin: 0 0.12em;
+}
+
+/* Inline mode (displayMode: false): the operator sits on the text baseline
+   and lone scripts shift via native sup/sub vertical-align. */
+.math-large-operator.math-op-inline {
+  display: inline;
+  vertical-align: baseline;
 }
 
 .math-op-symbol {

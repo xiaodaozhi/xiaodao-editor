@@ -46,6 +46,19 @@ describe('math renderer - HTML output', () => {
     expect(out).not.toContain('math-sub');
   });
 
+  it('raises a lone superscript via a native <sup> outside the stacked group (regression: flex column killed vertical-align)', () => {
+    const out = html('x^2');
+    // The <sup> must NOT sit inside the .math-scripts flex column, where
+    // vertical-align: super is ignored and the digit sticks to the baseline.
+    expect(out).not.toContain('math-scripts');
+    expect(out).toMatch(/<sup class="math-sup"/);
+  });
+
+  it('lowers a lone subscript via a native <sub>', () => {
+    const out = html('x_1');
+    expect(out).toMatch(/<sub class="math-sub"/);
+  });
+
   it('renders a subscript with base + sub', () => {
     const out = html('x_1');
     expect(out).toContain('math-base');
@@ -83,6 +96,9 @@ describe('math renderer - HTML output', () => {
     const out = html('\\sum_{i=1}^{n} i', false);
     expect(out).toContain('math-op-symbol');
     expect(out).not.toContain('math-op-limits');
+    // Inline mode keeps native sup/sub shifting (no flex container).
+    expect(out).toContain('math-op-inline');
+    expect(out).toMatch(/<sup class="math-sup"/);
   });
 
   it('renders a matrix with grid columns and per-row cells', () => {

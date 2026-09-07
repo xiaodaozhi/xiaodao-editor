@@ -130,11 +130,22 @@ function renderNode(node: MathNode, ctx: RenderContext): MathElement[] {
         ];
       }
       const parts: MathElement[] = [el('span', 'math-base', renderNode(node.base, ctx))];
-      if (node.sup || node.sub) {
-        const stack: MathElement[] = [];
-        if (node.sup) stack.push(el('sup', 'math-sup', renderNodes(node.sup, ctx)));
-        if (node.sub) stack.push(el('sub', 'math-sub', renderNodes(node.sub, ctx)));
-        parts.push(el('span', 'math-scripts', stack));
+      if (node.sup && node.sub) {
+        // Both scripts present: stack them in a vertical column next to the
+        // base (x_1^2 style). Flex items ignore vertical-align, so this stack
+        // is positioned as a whole via CSS (.math-scripts).
+        parts.push(
+          el('span', 'math-scripts', [
+            el('sup', 'math-sup', renderNodes(node.sup, ctx)),
+            el('sub', 'math-sub', renderNodes(node.sub, ctx)),
+          ]),
+        );
+      } else if (node.sup) {
+        // Lone superscript: use the native <sup> semantics so the browser
+        // raises it above the baseline (vertical-align: super).
+        parts.push(el('sup', 'math-sup', renderNodes(node.sup, ctx)));
+      } else if (node.sub) {
+        parts.push(el('sub', 'math-sub', renderNodes(node.sub, ctx)));
       }
       return [el('span', 'math-script', parts)];
     }
@@ -150,10 +161,12 @@ function renderNode(node: MathNode, ctx: RenderContext): MathElement[] {
           ]),
         ];
       }
+      // Inline mode: keep the operator on the text baseline and let native
+      // <sup>/<sub> do the shifting (a flex container would kill it).
       const parts: MathElement[] = [leaf('span', 'math-op-symbol', node.symbol)];
       if (node.sup) parts.push(el('sup', 'math-sup', renderNodes(node.sup, ctx)));
       if (node.sub) parts.push(el('sub', 'math-sub', renderNodes(node.sub, ctx)));
-      return [el('span', 'math-large-operator', parts)];
+      return [el('span', 'math-large-operator math-op-inline', parts)];
     }
     case 'matrix':
       return node.env === 'aligned'
