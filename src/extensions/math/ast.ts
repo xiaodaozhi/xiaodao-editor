@@ -55,6 +55,11 @@ export interface MathOperatorNode extends MathSpan {
   readonly value: string;
   /** The originating command name (without backslash) when it came from one. */
   readonly command: string | null;
+  /**
+   * True for a unary (sign) usage such as `-b` or `x = -1`, where the minus
+   * hugs the operand that follows it. Absent/false for the binary minus.
+   */
+  readonly unary?: boolean;
 }
 
 /** A delimited group: `{...}`, `(...)`, `[...]`, or `\left(...\right)`. */

@@ -60,6 +60,17 @@ describe('math renderer - HTML output', () => {
     expect(html('-b')).toContain('\u2212');
   });
 
+  it('hugs the operand after a unary minus but keeps binary-minus margins', () => {
+    // Unary: carries the math-op-unary class (CSS drops its right margin).
+    expect(html('-b')).toContain('math-op-unary');
+    expect(html('x = -1')).toContain('math-op-unary');
+    expect(html('e^{-x^2}')).toContain('math-op-unary');
+
+    // Binary subtraction does not.
+    expect(html('x - 1')).not.toContain('math-op-unary');
+    expect(html('b^2 - 4ac')).not.toContain('math-op-unary');
+  });
+
   it('renders a superscript with base + sup', () => {
     const out = html('x^2');
     expect(out).toContain('math-base');

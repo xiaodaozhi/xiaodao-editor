@@ -20,7 +20,7 @@ import type {
   MathRow,
   ParseResult,
 } from './ast';
-import { tokenize, type Token } from './tokens';
+import { tokenize, type Token, type TokenKind } from './tokens';
 import {
   FUNCTION_COMMANDS,
   GREEK_LETTERS,
@@ -58,6 +58,38 @@ function take(st: ParserState): Token | undefined {
 function endOfPrev(st: ParserState, fallback: number): number {
   const prev = st.tokens[st.index - 1];
   return prev ? prev.end : fallback;
+}
+
+/**
+ * Token kinds after which a `-` acts as a sign (unary minus) rather than a
+ * subtraction: start of input, after another operator (`x = -1`), a script
+ * marker (`x^-2`), an opening delimiter (`(-b)`), `&` or `\\` (row/cell
+ * start in aligned/matrix). Everything else (number, identifier, symbol,
+ * closing delimiter, atom command) makes it a binary minus.
+ */
+const UNARY_MINUS_PRECEDING: ReadonlySet<TokenKind> = new Set([
+  'operator',
+  'sup',
+  'sub',
+  'lbrace',
+  'lparen',
+  'lbracket',
+  'amp',
+  'newline',
+]);
+
+function isUnaryMinusContext(st: ParserState): boolean {
+  // Called right after `take(st)` consumed the minus itself, so the token
+  // before it sits at index - 2. (Space tokens are filtered out before
+  // parsing, so a plain lookback is enough.)
+  const prev = st.tokens[st.index - 2];
+  if (!prev) return true; // start of expression
+  if (prev.kind === 'command') {
+    // A command is usually an atom (`\alpha - b` is subtraction), but an
+    // operator-valued command (`2 \cdot -3`) still makes the minus a sign.
+    return Object.prototype.hasOwnProperty.call(OPERATOR_COMMANDS, prev.value);
+  }
+  return UNARY_MINUS_PRECEDING.has(prev.kind);
 }
 
 function isClosingToken(t: Token | undefined): boolean {
@@ -224,7 +256,17 @@ function parseAtom(st: ParserState): MathNode | null {
     }
     case 'operator': {
       take(st);
-      return { type: 'operator', value: t.value, command: null, start: t.start, end: t.end };
+      const node: MathNode = {
+        type: 'operator',
+        value: t.value,
+        command: null,
+        start: t.start,
+        end: t.end,
+      };
+      if (t.value === '-' && isUnaryMinusContext(st)) {
+        (node as { unary?: boolean }).unary = true;
+      }
+      return node;
     }
     case 'command':
       return parseCommand(st);

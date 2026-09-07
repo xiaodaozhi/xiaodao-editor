@@ -3916,6 +3916,12 @@ body.theme-dark .equation-error-badge {
   margin: 0 0.18em;
 }
 
+/* Unary minus (negative sign): no gap between the sign and the operand that
+   follows it. The left margin is kept so "x = −1" still breathes. */
+.math-operator.math-op-unary {
+  margin-right: 0;
+}
+
 .math-function {
   margin-right: 0.16em;
 }

@@ -51,6 +51,36 @@ describe('parseMath - ordinary characters and operators', () => {
     expect(list.filter((n) => n.type === 'operator').map((n: any) => n.value))
       .toEqual(['\u2264', '\u2265', '\u2260']);
   });
+
+  it('marks a minus as unary when it acts as a sign, binary when it subtracts', () => {
+    const unaryOf = (src: string): boolean[] => {
+      const found: boolean[] = [];
+      const walk = (list: any[]): void => {
+        for (const n of list) {
+          if (n.type === 'operator' && n.value === '-') found.push(n.unary === true);
+          // Recurse into containers (groups, scripts, fractions, ...).
+          for (const key of ['body', 'numerator', 'denominator', 'sup', 'sub', 'base', 'radicand', 'index']) {
+            if (Array.isArray(n[key])) walk(n[key]);
+            else if (n[key] && typeof n[key] === 'object') walk([n[key]]);
+          }
+          if (Array.isArray(n.cells)) n.cells.forEach((row: any[]) => walk(row));
+        }
+      };
+      walk(nodes(src));
+      return found;
+    };
+
+    // Sign usages: start of input, after '=', '(', '^', another operator.
+    expect(unaryOf('-b + x')).toEqual([true]);
+    expect(unaryOf('x = -1')).toEqual([true]);
+    expect(unaryOf('(-b)')).toEqual([true]);
+    expect(unaryOf('e^{-x^2}')).toEqual([true]);
+    expect(unaryOf('2 \\cdot -3')).toEqual([true]);
+
+    // Subtraction keeps the binary form.
+    expect(unaryOf('x - 1')).toEqual([false]);
+    expect(unaryOf('b^2 - 4ac')).toEqual([false]);
+  });
 });
 
 describe('parseMath - scripts', () => {

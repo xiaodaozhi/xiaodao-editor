@@ -102,7 +102,14 @@ function renderNode(node: MathNode, ctx: RenderContext): MathElement[] {
     case 'identifier':
       return [leaf('span', 'math-identifier', node.value)];
     case 'operator':
-      return [leaf('span', 'math-operator', operatorGlyph(node.value))];
+      // A unary minus (sign) hugs the operand after it: no right margin.
+      return [
+        leaf(
+          'span',
+          node.unary ? 'math-operator math-op-unary' : 'math-operator',
+          operatorGlyph(node.value),
+        ),
+      ];
     case 'symbol':
       return [leaf('span', 'math-symbol', node.char)];
     case 'function':
