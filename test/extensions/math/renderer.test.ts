@@ -39,6 +39,27 @@ describe('math renderer - HTML output', () => {
     expect(out).toContain('math-fraction-denominator');
   });
 
+  it('displays minus / negative signs as a true minus sign (U+2212), while the AST keeps the raw ASCII hyphen', () => {
+    // AST is display-agnostic: the stored expression keeps the ASCII `-`.
+    const { nodes } = parseMath('x - 1');
+    const ops = (function collect(list: any[]): string[] {
+      return list.flatMap((n: any) =>
+        n.type === 'operator' ? [n.value] : [],
+      );
+    })(nodes as any);
+    expect(ops).toEqual(['-']);
+
+    // Both backends render the TeX-style minus glyph.
+    const out = html('x - 1');
+    expect(out).toContain('\u2212');
+    expect(out).not.toMatch(/math-operator[^<]*-</);
+    const vnodeOut = JSON.stringify(rootVNode('x - 1'));
+    expect(vnodeOut).toContain('\u2212');
+
+    // Unary minus (negative term) is mapped too.
+    expect(html('-b')).toContain('\u2212');
+  });
+
   it('renders a superscript with base + sup', () => {
     const out = html('x^2');
     expect(out).toContain('math-base');

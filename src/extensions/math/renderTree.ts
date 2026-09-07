@@ -71,6 +71,20 @@ export function buildRenderTree(nodes: MathContent, ctx: RenderContext): MathEle
   );
 }
 
+/**
+ * Display glyphs for ASCII operators. TeX typographic convention: a hyphen
+ * used as a minus/negative sign renders as a true minus (U+2212), which is
+ * wider and vertically centered on the digit line. The AST keeps the raw
+ * ASCII `-` so the stored expression never changes.
+ */
+const OPERATOR_GLYPHS: Readonly<Record<string, string>> = {
+  '-': '\u2212', // minus sign
+};
+
+function operatorGlyph(value: string): string {
+  return OPERATOR_GLYPHS[value] ?? value;
+}
+
 function renderNodes(nodes: MathContent, ctx: RenderContext): MathElement[] {
   const out: MathElement[] = [];
   for (const node of nodes) {
@@ -88,7 +102,7 @@ function renderNode(node: MathNode, ctx: RenderContext): MathElement[] {
     case 'identifier':
       return [leaf('span', 'math-identifier', node.value)];
     case 'operator':
-      return [leaf('span', 'math-operator', node.value)];
+      return [leaf('span', 'math-operator', operatorGlyph(node.value))];
     case 'symbol':
       return [leaf('span', 'math-symbol', node.char)];
     case 'function':
