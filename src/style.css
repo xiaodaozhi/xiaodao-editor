@@ -4000,7 +4000,10 @@ body.theme-dark .equation-error-badge {
 /* --- Root --------------------------------------------------------------- */
 .math-root {
   display: inline-flex;
-  align-items: stretch;
+  /* Top-align both parts: the radicand's border-top (the vinculum) and the
+     radical glyph's ink top then share the same row top, so the bar meets
+     the glyph's peak — for tall radicands too. */
+  align-items: flex-start;
   vertical-align: middle;
 }
 
@@ -4012,13 +4015,23 @@ body.theme-dark .equation-error-badge {
 
 .math-root-sign {
   display: inline-block;
+  /* Lock the glyph to a 1em line box: its ink top then sits ~0.04em below the
+     box top (row top), i.e. flush with the vinculum. With the inherited
+     line-height (1.5) the glyph would hang far below the bar. */
+  line-height: 1;
+  /* The radical glyph's ink ends ~0.2em short of its advance width; pull the
+     radicand left so the vinculum starts right at the glyph's tip. */
+  margin-right: -0.21em;
 }
 
 .math-root-radicand {
   display: inline-block;
-  margin-top: 0.14em;
-  padding: 0.06em 0.2em 0 0.15em;
+  /* Tiny push-down so the bar overlaps the glyph's peak; line-height: 1 keeps
+     the content compact and centred under the bar. */
+  margin: 0.05em 0 0;
+  padding: 0.1em 0.3em 0.08em 0.05em;
   border-top: 1px solid currentColor;
+  line-height: 1;
 }
 
 /* --- Large operators (sum / prod / int) --------------------------------- */
