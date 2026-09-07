@@ -4019,7 +4019,9 @@ body.theme-dark .equation-error-badge {
 .math-root-sign {
   position: relative;
   flex: none;
-  width: 0.75em;
+  /* 0.75em shape + 0.14em headroom on the left for the tick's terminal
+     serif (the short horizontal line at the hook's tip). */
+  width: 0.89em;
 }
 
 .math-root-sign::before {
@@ -4030,27 +4032,49 @@ body.theme-dark .equation-error-badge {
   top: 0;
   bottom: -0.1em; /* the foot dips slightly below the baseline */
   background: currentColor;
-  /* Bar from the diagonal's top (0.45em) rightwards, then the diagonal down
-     to the bottom-left. 100% = the sign box's right edge, where the
-     radicand's border-top picks the bar up. */
+  /* Bar across the top, then the diagonal down to the bottom-left: a small
+     foot cut, a long thin up-flicked tick, and a short horizontal serif at
+     the tick's tip (geometry from the reference checkmark SVG). The shape
+     sits 0.14em right of the box's left edge so the serif can extend LEFT
+     from the tick's tip at y = 100% - 0.56em, flush with the tick's top
+     cut. 100% = the sign box's right edge, where the radicand's strip picks
+     the bar up. */
   clip-path: polygon(
-    0.45em 0,
+    0.59em 0,
     100% 0,
-    100% 0.07em,
-    0.52em 0.07em,
-    0.09em 100%,
-    0.02em 100%
+    100% 0.08em,
+    0.66em 0.08em,
+    0.40em 100%,
+    0.33em 100%,
+    0.14em calc(100% - 0.56em),
+    0 calc(100% - 0.56em),
+    0 calc(100% - 0.63em),
+    0.20em calc(100% - 0.63em),
+    0.22em calc(100% - 0.56em),
+    0.36em calc(100% - 0.12em)
   );
 }
 
 .math-root-radicand {
   display: inline-block;
-  /* border-top continues the vinculum from the sign's polygon (same
-     thickness, same row top), so the bar is unbroken across the whole
-     root. */
-  padding: 0.1em 0.3em 0.05em 0.12em;
-  border-top: 0.07em solid currentColor;
+  position: relative;
+  padding: 0.12em 0.3em 0.05em 0.12em;
   line-height: 1;
+}
+
+/* The vinculum over the radicand: a background strip, NOT border-top.
+   Borders snap to whole device pixels while clip-path edges antialias, so
+   at text sizes the border bar rendered hairline-thin next to a fat-looking
+   slanted stroke. Drawing both strokes through the same subpixel pipeline
+   keeps their weights matching at every size and zoom level. */
+.math-root-radicand::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0.08em;
+  background: currentColor;
 }
 
 /* --- Large operators (sum / prod / int) --------------------------------- */
