@@ -4000,10 +4000,7 @@ body.theme-dark .equation-error-badge {
 /* --- Root --------------------------------------------------------------- */
 .math-root {
   display: inline-flex;
-  /* Top-align both parts: the radicand's border-top (the vinculum) and the
-     radical glyph's ink top then share the same row top, so the bar meets
-     the glyph's peak — for tall radicands too. */
-  align-items: flex-start;
+  align-items: stretch;
   vertical-align: middle;
 }
 
@@ -4013,24 +4010,40 @@ body.theme-dark .equation-error-badge {
   transform: translateY(-0.35em);
 }
 
+/* --- Radical sign, drawn in CSS ------------------------------------------ */
+/* The whole radical (diagonal + vinculum) is drawn with borders instead of a
+   "√" text glyph: glyph metrics differ per font stack and can never be
+   aligned with the bar reliably. The sign box stretches to the radicand's
+   height, so the shape scales for tall content (fractions under the root). */
 .math-root-sign {
-  display: inline-block;
-  /* Lock the glyph to a 1em line box: its ink top then sits ~0.04em below the
-     box top (row top), i.e. flush with the vinculum. With the inherited
-     line-height (1.5) the glyph would hang far below the bar. */
-  line-height: 1;
-  /* The radical glyph's ink ends ~0.2em short of its advance width; pull the
-     radicand left so the vinculum starts right at the glyph's tip. */
-  margin-right: -0.21em;
+  position: relative;
+  flex: none;
+  width: 0.62em;
+  /* The vinculum starts over the sign box and continues on the radicand,
+     forming one continuous bar at the shared row top. */
+  border-top: 0.07em solid currentColor;
+}
+
+/* Long diagonal stroke: a skewed left border anchored at the bottom. The
+   top edge tucks under the bar (which spans the full row top), so the two
+   always connect regardless of the radicand's height. */
+.math-root-sign::before {
+  content: "";
+  position: absolute;
+  left: 0.06em;
+  top: -0.04em;
+  bottom: -0.12em; /* the foot dips slightly below the baseline */
+  border-left: 0.07em solid currentColor;
+  transform: skewX(-20deg);
+  transform-origin: bottom left;
 }
 
 .math-root-radicand {
   display: inline-block;
-  /* Tiny push-down so the bar overlaps the glyph's peak; line-height: 1 keeps
-     the content compact and centred under the bar. */
-  margin: 0.05em 0 0;
-  padding: 0.1em 0.3em 0.08em 0.05em;
-  border-top: 1px solid currentColor;
+  /* border-top continues the vinculum from .math-root-sign (same thickness,
+     same row top), so the bar is unbroken across the whole root. */
+  padding: 0.1em 0.3em 0.05em 0.12em;
+  border-top: 0.07em solid currentColor;
   line-height: 1;
 }
 

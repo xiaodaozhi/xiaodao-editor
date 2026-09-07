@@ -136,7 +136,10 @@ function renderNode(node: MathNode, ctx: RenderContext): MathElement[] {
     case 'root': {
       const parts: MathElement[] = [];
       if (node.index) parts.push(el('span', 'math-root-index', renderNodes(node.index, ctx)));
-      parts.push(leaf('span', 'math-root-sign', '\u221A'));
+      // The radical is drawn in CSS (skewed border + border-top), not as a
+      // text "√" glyph: glyph metrics vary wildly across math font stacks and
+      // can never be reliably aligned with the vinculum.
+      parts.push(leaf('span', 'math-root-sign', ''));
       parts.push(el('span', 'math-root-radicand', renderNodes(node.radicand, ctx)));
       return [el('span', 'math-root', parts)];
     }
