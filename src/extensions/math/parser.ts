@@ -26,6 +26,8 @@ import {
   GREEK_LETTERS,
   LARGE_OPERATORS,
   OPERATOR_COMMANDS,
+  SPACING_COMMANDS,
+  SPACING_ESCAPES,
 } from './symbols';
 
 interface ParserState {
@@ -210,6 +212,14 @@ function parseAtom(st: ParserState): MathNode | null {
     }
     case 'char': {
       take(st);
+      // Escaped TeX spacing commands (`\,` `\:` `\;` `\!` `\ `) — a bare
+      // version of these characters would have been tokenized as an operator
+      // or whitespace, so a `char` token with one of these values can only
+      // come from a backslash escape.
+      const spacing = SPACING_ESCAPES[t.value];
+      if (spacing !== undefined) {
+        return { type: 'symbol', char: spacing, command: t.value, start: t.start, end: t.end };
+      }
       return { type: 'identifier', value: t.value, start: t.start, end: t.end };
     }
     case 'operator': {
@@ -292,6 +302,10 @@ function parseSimpleCommand(st: ParserState, t: Token): MathNode {
   const greek = GREEK_LETTERS[name];
   if (greek !== undefined) {
     return { type: 'symbol', char: greek, command: name, start: t.start, end: t.end };
+  }
+  const spacing = SPACING_COMMANDS[name];
+  if (spacing !== undefined) {
+    return { type: 'symbol', char: spacing, command: name, start: t.start, end: t.end };
   }
   const op = OPERATOR_COMMANDS[name];
   if (op !== undefined) {

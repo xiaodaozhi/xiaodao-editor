@@ -281,6 +281,36 @@ describe('parseMath - error handling', () => {
     expect(result.diagnostics.some((d) => d.severity === 'error')).toBe(false);
   });
 
+  it('parses TeX spacing commands as space symbols, NOT as punctuation (regression: \\, showed a stray comma before dx)', () => {
+    // \, used to fall through as an escaped literal comma -> identifier ','.
+    const result = parseMath('e^{-x^2}\\,dx');
+    const kinds = result.nodes.map((n: any) => n.type);
+    expect(kinds).not.toContain('unknown');
+    const sym: any = result.nodes.find((n: any) => n.type === 'symbol');
+    expect(sym.char).toBe('\u2009'); // thin space
+    expect(result.diagnostics).toEqual([]);
+
+    // The whole spacing family maps to space characters (no punctuation).
+    const expected: Record<string, string> = {
+      ',': '\u2009',
+      ':': '\u205F',
+      ';': '\u2005',
+      ' ': '\u00A0',
+    };
+    for (const [src, ch] of Object.entries(expected)) {
+      const r = parseMath(`a\\${src}b`);
+      const s = r.nodes.find((n: any) => n.type === 'symbol') as any;
+      expect(s?.char, `\\${src}`).toBe(ch);
+    }
+  });
+
+  it('parses \\quad and \\qquad as em-space symbols', () => {
+    const r = parseMath('a\\quad b');
+    const s = r.nodes.find((n: any) => n.type === 'symbol') as any;
+    expect(s?.char).toBe('\u2003');
+    expect(r.diagnostics).toEqual([]);
+  });
+
   it('does NOT throw on an empty expression', () => {
     expect(() => parseMath('')).not.toThrow();
     expect(parseMath('').nodes).toEqual([]);

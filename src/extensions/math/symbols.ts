@@ -150,6 +150,29 @@ export const STRUCTURAL_COMMANDS: readonly string[] = [
 ];
 
 /**
+ * Spacing commands spelled as letter commands: `\quad` (1 em) and `\qquad`
+ * (2 em), mapped to Unicode em spaces.
+ */
+export const SPACING_COMMANDS: Readonly<Record<string, string>> = {
+  quad: '\u2003',
+  qquad: '\u2003\u2003',
+};
+
+/**
+ * TeX spacing commands that arrive from the tokenizer as escaped literal
+ * characters (`\,` `\:` `\;` `\!` `\ `), mapped to Unicode spaces:
+ * thin / medium math / thick / zero-width / no-break. (A negative space has
+ * no Unicode glyph; `\!` degrades to a zero-width, visually neutral space.)
+ */
+export const SPACING_ESCAPES: Readonly<Record<string, string>> = {
+  ',': '\u2009',
+  ':': '\u205F',
+  ';': '\u2005',
+  '!': '\u200B',
+  ' ': '\u00A0',
+};
+
+/**
  * Every command name the built-in renderer understands. Exported so docs and
  * tests can assert the supported surface without duplicating the tables.
  */
@@ -159,6 +182,8 @@ export const SUPPORTED_COMMANDS: readonly string[] = [
   ...Object.keys(OPERATOR_COMMANDS),
   ...Object.keys(FUNCTION_COMMANDS),
   ...Object.keys(LARGE_OPERATORS),
+  ...Object.keys(SPACING_COMMANDS),
+  ...Object.keys(SPACING_ESCAPES),
 ];
 
 export function isSupportedCommand(name: string): boolean {
@@ -168,5 +193,7 @@ export function isSupportedCommand(name: string): boolean {
     || Object.prototype.hasOwnProperty.call(OPERATOR_COMMANDS, name)
     || Object.prototype.hasOwnProperty.call(FUNCTION_COMMANDS, name)
     || Object.prototype.hasOwnProperty.call(LARGE_OPERATORS, name)
+    || Object.prototype.hasOwnProperty.call(SPACING_COMMANDS, name)
+    || Object.prototype.hasOwnProperty.call(SPACING_ESCAPES, name)
   );
 }
