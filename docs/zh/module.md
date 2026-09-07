@@ -698,7 +698,7 @@ function useEditor(): Editor  // 在 <BlockEditor> 树之外调用时抛出
 
 ### `src/view/BlockEditor.vue`
 
-**职责。** 公开的根编辑器组件。从扩展 + 初始文档构造 `Editor`，维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，emit `update:modelValue`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键——为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 暴露 `uploadImage` prop 作为可选的外部上传钩子(S3/OSS 等)；未提供时回退到 `imageUpload.ts` 中内置的 mock 上传器；**(4)** 在每次 `applyTransaction` 的订阅回调中扫描 diff 的 changed+removed 块，检查它们 `fileId` attr 的前后值、维护每个 `fileId` 的引用计数，在一个 `fileId` 的引用数从 ≥1 降到 0 时 emit `cleanup:image-file`(宿主可在此回收未引用的存储对象)。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
+**职责。** 公开的根编辑器组件。从扩展 + 初始文档构造 `Editor`，维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，emit `update:modelValue`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键——为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 对图片上传，仅把 `ImageExtension` 通过 `Editor.registerExtensionMethod('startImageUpload', …)` 注册的异步命令转发到原有的 `useBeginImageUpload()` Vue 注入口——所有上传编排、fileId 引用计数、`onFileCleanup` 触发现在都归 `extensions/Image.ts` 的 `image-upload` 插件负责。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
 
 **公共 API(Props/Emits/Expose)。**
 
@@ -717,24 +717,15 @@ props: {
   //    'float'（仅桌面端）隐藏 FixedToolbar，改用跟随文本选区的浮动 HoverToolbar；
   //    移动端回退为 'auto' ——
   toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // 默认 'auto'
-  // —— 图片上传钩子(可选；见 src/view/imageUpload.ts) ——
-  uploadImage?: (file: File, ctx: {
-    blockId: BlockId
-    onProgress(percent: number): void
-  }) => Promise<{
-    src: string
-    fileId?: string
-    alt?: string
-    title?: string
-    caption?: string
-    width?: number
-    height?: number
-  }>
+  // 注意：没有 `uploadImage` prop。把 `createImageExtension({ upload, onFileCleanup })`
+  // 放到 `:extensions` 中 `BuiltinExtensions` 之后即可替换默认 mock 上传 +
+  // 接入清理回调。详见 `src/extensions/Image.ts`。
 }
 emits: {
   'update:modelValue': [DocumentData]
-  // —— 阶段 6：fileId 清理(宿主应用删除未引用的存储对象) ——
-  'cleanup:image-file': [{ fileId: string }]
+  // 注意：没有 `cleanup:image-file` 事件。`ImageExtension` 在它的
+  // `image-upload` 插件的 `applyTransaction` 钩子里自行调用
+  // `onFileCleanup(fileId)`。
 }
 expose: { editor: Editor }
 ```
@@ -873,7 +864,7 @@ function blocksToClipboardText(blocks: readonly Block[]): string
 
 ### `src/view/imageUpload.ts`
 
-**职责。** 图片块上传状态的瞬时侧信道。块模型的 `attrs` 只存储应该在保存/撤销/重做之间持久化的字段(`src`、`fileId`、`alt`、`title`、`caption`、`width`、`height`)；每块的上传状态、进度百分比、错误、临时对象 URL(`tempSrc`)是**只在运行期存在**的，只活在这里。本模块同时是 `uploadImage` prop(外部)与内置 mock 上传的唯一解析地。
+**职责。** 图片块上传状态的瞬时侧信道。块模型的 `attrs` 只存储应该在保存/撤销/重做之间持久化的字段(`src`、`fileId`、`alt`、`title`、`caption`、`width`、`height`)；每块的上传状态、进度百分比、错误、临时对象 URL(`tempSrc`)是**只在运行期存在**的，只活在这里。本模块是真实上传函数(由 `createImageExtension({ upload })` 工厂注入)与内置 mock 上传的解析地；`BlockEditor.vue` 不再持有上传钩子。
 
 **公共 API。**
 
@@ -900,14 +891,14 @@ interface ImageUploadStore {
 }
 
 export const imageUploadStore: ImageUploadStore
-export function setUploadHook(hook: any): void  // 对应 BlockEditor 的 uploadImage prop
+export function setUploadHook(hook: UploadImageHandler | null): void
 ```
 
-若未提供 `uploadImage` prop，使用内置的 mock 上传器：等待 800–2500 ms，发出假进度 tick，约 30% 概率 reject——这样重试/错误 UI 可以在无后端的情况下开发测试。在 `beginUpload` 时创建 `tempSrc` 对象 URL 并推入状态，使 `Image.ts` 能立即显示；`resolve` 时调用者(BlockEditor)分发 `setAttrs` 以写入真实的 `src`/`fileId`，然后调用 `cancel(blockId)` 回收。`reject` 时保留错误字符串 + 缓存的 `File`，以便用户点击图片遮罩上的 **Retry** 按钮。
+默认行为使用内置 mock 上传器（**`<BlockEditor>` 上从未存在过 `uploadImage` prop**——上传函数通过 `createImageExtension({ upload })` 注入）：mock 等待 800–2500 ms，发出假进度 tick，约 30% 概率 reject——这样重试/错误 UI 可以在无后端的情况下开发测试。在 `beginUpload` 时创建 `tempSrc` 对象 URL 并推入状态，使 `Image.ts` 能立即显示；`resolve` 时调用者分发 `setAttrs` 以写入真实的 `src`/`fileId`，然后调用 `cancel(blockId)` 回收。`reject` 时保留错误字符串 + 缓存的 `File`，以便用户点击图片遮罩上的 **Retry** 按钮。
 
-**交互。** 只依赖 `core/types`(获取 `BlockId` 品牌)。被 `BlockEditor.vue` 使用(当 prop 改变时调用 `setUploadHook`)，并在每次图片块插入 + 附带文件时调用 `beginUpload`，resolve 后分发 attrs 事务；当 fileId 引用数归零时 emit `cleanup:image-file`。`extensions/Image.ts` 渲染器订阅 `state[blockId]` 以驱动进度条、错误横幅和重试按钮。
+**交互。** 只依赖 `core/types`(`BlockId` 品牌)。被 `extensions/Image.ts` 调用（其 `createImageUploadPlugin(...)` 在 `init` 中调用 `registerUploadHandler`，在 `onDestroy` 中通过返回值反注册，并通过 `Editor.registerExtensionMethod` 暴露异步 `startImageUpload` 编排器）。`extensions/Image.ts` 渲染器订阅 `state[blockId]` 以驱动进度条、错误横幅和重试按钮。`BlockEditor.vue` 不再涉及：它仅把该扩展方法转发到原有的 `useBeginImageUpload()` Vue 注入口，fileId 引用计数归零时由 `image-upload` 插件的 `applyTransaction` 钩子调用 `onFileCleanup(fileId)`（替代原 `@cleanup:image-file` Vue 事件）。
 
-**扩展点。** 外部宿主可以提供自己的 `uploadImage` prop(带签名 URL 的 S3 上传、OSS 等)而无需修改本模块。此处的瞬时状态模式可推广到其他需要异步副作用但绝不能持久化中间态的块类型(例如附件上传、Embed 的 oEmbed 元数据抓取)。
+**扩展点。** 外部宿主通过 `createImageExtension({ upload })` 工厂（在 `:extensions` 数组里放到 `BuiltinExtensions` 之后）注入自己的上传函数（带签名 URL 的 S3 上传、OSS 等）而无须修改本模块。此处的瞬时状态模式可推广到其他需要异步副作用但绝不能持久化中间态的块类型（例如附件上传、Embed 的 oEmbed 元数据抓取）。
 
 ### `src/view/urlUtils.ts`
 

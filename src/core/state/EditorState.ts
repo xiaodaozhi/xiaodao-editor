@@ -8,7 +8,7 @@
  */
 
 import type { DocState, Selection } from '../types';
-import type { Plugin, PluginState } from '../plugin/Plugin';
+import type { Plugin, PluginInitContext, PluginState } from '../plugin/Plugin';
 import type { Transaction } from './Transaction';
 import { applySteps, type ApplyResult } from './Step';
 
@@ -34,11 +34,15 @@ interface TransactionApplier {
 /**
  * Apply a transaction to a state, producing a new state plus a diff
  * (changed / removed) that the view bridge consumes.
+ *
+ * `ctx` is forwarded to every plugin's `applyTransaction` hook so plugins
+ * can register / look up extension methods on the editor.
  */
 export function applyTransaction(
   state: EditorState,
   tr: Transaction,
   plugins: readonly TransactionApplier[],
+  ctx: PluginInitContext,
 ): ApplyTransactionResult {
   const { doc, changed, removed } = applySteps(state.doc, tr.steps);
   const selection = tr.selectionAfter ?? state.selection;
@@ -46,7 +50,7 @@ export function applyTransaction(
   const pluginState: Record<string, PluginState> = { ...state.pluginState };
   for (const plugin of plugins) {
     if (plugin.applyTransaction) {
-      pluginState[plugin.name] = plugin.applyTransaction(tr, state, doc, selection);
+      pluginState[plugin.name] = plugin.applyTransaction(tr, state, doc, selection, ctx);
     }
   }
 

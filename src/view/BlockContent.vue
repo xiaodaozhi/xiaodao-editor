@@ -506,8 +506,8 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   // Priority 1: image files in clipboard — take these FIRST, because a
   // screenshot paste has BOTH an image/file and an html/text representation
   // (e.g. `<img src="blob:...">`). We prefer the File because it lets the
-  // upload pipeline handle it end-to-end (including the optional external
-  // `uploadImage` prop).
+  // upload pipeline handle it end-to-end (including the optional upload
+  // handler from `createImageExtension({ upload })`).
   if (beginImageUpload) {
     const imageFiles = collectImageFilesFromClipboard(data);
     if (imageFiles.length > 0) {
@@ -655,7 +655,8 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   // Image blocks: the <img src="..."> value is converted to a File via
   // srcToFile (fetch for http/blob URIs, base64-decode for data: URIs).
   // The File is then handed to beginImageUpload, which runs it through
-  // the normal upload pipeline (uploadImage prop or mock upload).
+  // the normal upload pipeline (the real handler from
+  // `createImageExtension({ upload })`, or the fallback mock).
 
   if (!beginImageUpload) {
     // No upload handler available — strip image blocks and treat as

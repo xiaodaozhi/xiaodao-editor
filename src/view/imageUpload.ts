@@ -17,18 +17,20 @@
  *      (empty string) via a normal transaction — so undo/redo can
  *      remove the *block itself*. It records the upload in the
  *      transient map as { status: 'pending', progress: 0 }.
- *   3. `beginUpload` asks BlockEditor (via the global emitter hook, see
- *      `registerUploadRequestHandler`) to run the actual upload. If the
- *      user provided an `uploadImage` prop function we hand off to them;
- *      otherwise we run a mock upload that returns a data-URL.
+ *   3. `beginUpload` runs the actual upload via the registered handler
+ *      (`registerUploadRequestHandler`). The real handler is supplied by
+ *      `ImageExtension.createImageExtension({ upload })` (consumer-side);
+ *      the default fallback is a mock that returns a blob URL.
  *   4. On progress: update the transient map → renderer re-renders.
  *   5. On success: dispatch a setAttrs transaction setting `src` to the
- *      FINAL URL, clear the transient entry (or mark 'success' briefly
- *      for a fade, currently we clear immediately).
+ *      FINAL URL, clear the transient entry.
  *   6. On error: mark transient entry as 'error' with error.message.
  *      User can click "Retry" → we re-run step 3.
- *   7. If the block is removed (undo / delete) the transient entry is
- *      cleaned up via a document-change subscription in BlockEditor.
+ *   7. If the block is removed (undo / delete / etc.) the transient entry
+ *      is cleaned up by the `image-upload` plugin's `applyTransaction`
+ *      hook in `extensions/Image.ts`. The same hook tracks fileId
+ *      reference counts and invokes `createImageExtension({ onFileCleanup })`
+ *      when the last referencing block is removed.
  */
 
 import type { BlockId } from '../core/types';
@@ -53,8 +55,9 @@ export interface UploadState {
   readonly controller?: AbortController;
 }
 
-/** UploadResult: the final outcome handed back from the upload handler (either
- *  external uploadImage prop or internal mockUpload). */
+/** UploadResult: the final outcome handed back from the upload handler
+ *  (either an external `UploadImageHandler` injected via
+ *  `createImageExtension({ upload })`, or the internal `mockUpload`). */
 export interface UploadResult {
   readonly url: string;
   readonly width?: number;
@@ -62,15 +65,17 @@ export interface UploadResult {
   readonly alt?: string;
   readonly title?: string;
   /** Optional server-managed file identifier (integer). When provided,
-   *  the editor tracks references and emits `cleanup:image-file` when
-   *  the last block referencing this fileId is removed. */
+   *  the `image-upload` plugin tracks references and invokes
+   *  `createImageExtension({ onFileCleanup })` when the last block
+   *  referencing this fileId is removed. */
   readonly fileId?: number;
 }
 
 /**
- * The public-facing result type returned by the `uploadImage` prop function.
- * Identical to UploadResult but exported under a separate name so consumers
- * have a clean public API type.
+ * The public-facing result type returned by the `UploadImageHandler`
+ * passed to `createImageExtension({ upload })`. Identical to
+ * `UploadResult` but exported under a separate name so consumers have
+ * a clean public API type.
  */
 export interface ImageUploadResult {
   readonly url: string;
@@ -79,14 +84,16 @@ export interface ImageUploadResult {
   readonly alt?: string;
   readonly title?: string;
   /** Optional server-managed file identifier (integer). When provided,
-   *  the editor tracks references and emits `cleanup:image-file` when
-   *  the last block referencing this fileId is removed. */
+   *  the `image-upload` plugin tracks references and invokes
+   *  `createImageExtension({ onFileCleanup })` when the last block
+   *  referencing this fileId is removed. */
   readonly fileId?: number;
 }
 
 /**
- * The `uploadImage` prop function signature. When provided, the editor delegates
- * image uploads to this function instead of using the built-in mock upload.
+ * The `UploadImageHandler` signature. Consumers inject an upload
+ * function via `createImageExtension({ upload })` — the editor no
+ * longer carries an `uploadImage` prop.
  *
  * The function receives:
  *   - name:      the original file name (file.name)
@@ -208,16 +215,18 @@ export function cleanupUploadState(removed: Iterable<BlockId>): void {
   cleanupRemovedBlockIds(removed);
 }
 
-// --- Upload request dispatch (between this module and BlockEditor) ------
+// --- Upload request dispatch (between this module and ImageExtension) ---
 //
-// The view bridge (BlockEditor) registers a handler here at mount time.
-// That handler:
+// The `ImageExtension` plugin registers a handler here at init time. That
+// handler:
 //   - Creates the image block via editor.commands (transactional)
-//   - Calls the `uploadImage` prop function so consumers can take over
-//   - Falls back to mock upload if no handler was provided
+//   - Calls the consumer-supplied `upload` function (from
+//     `createImageExtension({ upload })`), forwarding progress and the
+//     AbortController
+//   - Falls back to `mockUpload` if no handler was provided
 //
 // This avoids a direct import cycle: this module knows nothing about
-// Vue or the Editor class.
+// Vue, the Editor class, or any specific extension.
 
 export type UploadProgressFn = (progress01: number) => void;
 export interface UploadCallbacks {
@@ -268,7 +277,8 @@ export function dispatchUploadRequest(
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
 // ---------------------------------------------------------------------------
-// Mock upload (used when NO external `uploadImage` prop is provided)
+// Mock upload (default fallback in `createImageExtension` when no `upload`
+// option is supplied)
 // ---------------------------------------------------------------------------
 
 /**
@@ -276,8 +286,9 @@ type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
  * configured. Produces a blob: object URL in ~600 ms with fake progress.
  *
  * IMPORTANT: blob: object URLs are NOT serialisable across page reloads.
- * Consumers that intend to persist and reload documents MUST provide an
- * `uploadImage` prop. This mock exists purely so the editor still works
+ * Consumers that intend to persist and reload documents MUST compose
+ * `createImageExtension({ upload: ... })` with a real handler. This mock
+ * exists purely so the editor still works
  * out of the box in demos and tests.
  */
 export function mockUpload(

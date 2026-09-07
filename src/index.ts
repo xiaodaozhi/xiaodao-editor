@@ -26,7 +26,12 @@ export { HeadingExtension } from './extensions/Heading';
 export { KeymapExtension } from './extensions/Keymap';
 export { HistoryExtension } from './extensions/History';
 export { ImageExtension } from './extensions/Image';
-export type { ImageAttrs } from './extensions/Image';
+export {
+  createImageExtension,
+  CANCEL_IMAGE_UPLOAD_COMMAND,
+  START_IMAGE_UPLOAD_METHOD,
+} from './extensions/Image';
+export type { ImageAttrs, ImageExtensionOptions } from './extensions/Image';
 export {
   EquationExtension,
   createEquationExtension,

@@ -498,7 +498,7 @@ src/
     index.ts                    # core barrel(框架无关引擎的公共面)
   view/                         # Vue 专属桥接 + 组件
     context.ts                  # editorKey/useEditor (provide/inject) + BlockRenderItem 类型
-    BlockEditor.vue             # 公开根:构造 Editor、订阅、键位映射、选择同步、i18n/主题、uploadImage 钩子、链接浮层编排、fileId 引用计数 + cleanup 事件
+    BlockEditor.vue             # 公开根:构造 Editor、订阅、键位映射、选择同步、i18n/主题、链接浮层编排;通过 Editor.getExtensionMethod('startImageUpload') 转发 ImageExtension 的异步命令到 useBeginImageUpload() 注入口(零图片专属知识)
     BlockList.vue               # 扁平块列表(虚拟化接缝)
     BlockHost.vue               # 通过 RendererRegistry 把 type → renderer 解析；向上转发 linkClick
     BlockContent.vue            # 按块 contenteditable(IME 防护、输入同步、占位符、点击 <a> 链接检测、粘贴 URL 自动加链、空格触发自动链接)
@@ -565,7 +565,7 @@ src/
 | `history/` 作为一个插件 | `history/HistoryManager.ts`（由 Editor 持有）+ `extensions/History.ts`（仅键位映射） | 历史需要 Editor 的 dispatch 和 state；做成插件需要特权访问。键位映射是一个独立的扩展。 |
 | 设计中没有 `SchemaRegistry.ts` | 新增 | 设计描述了内联的 schema 查找；注册表集中了回退逻辑，让 `Editor.ts` 保持精简。 |
 | 设计中没有 `state/invert.ts` | 新增 | 步骤反转并不平凡，值得一个独立专注的模块。 |
-| 设计中没有图片上传侧信道 | `view/imageUpload.ts` + `BlockEditor.vue` props `uploadImage` + 引用计数 `cleanup:image-file` 事件 | 图片上传中的瞬时状态（进行中/进度/错误）不得进入持久化的 block attrs；用侧信道管理并支持未完成时的临时对象 URL、失败重试与文件引用清理。 |
+| 设计中没有图片上传侧信道 | `view/imageUpload.ts`(瞬时态) + `extensions/Image.ts` 工厂 `createImageExtension({ upload, onFileCleanup })` + 扩展方法 `Editor.registerExtensionMethod('startImageUpload', …)` | 图片上传中的瞬时状态（进行中/进度/错误）不得进入持久化的 block attrs；用侧信道管理并支持未完成时的临时对象 URL、失败重试与文件引用清理。`BlockEditor.vue` 不再携带 `uploadImage` prop 也不发出 `cleanup:image-file` 事件——上传编排与 fileId 引用计数全部由 `image-upload` 插件的 `applyTransaction` 完成。 |
 | 设计中没有 `view/urlUtils.ts` 与链接浮层 | `view/urlUtils.ts`（`sanitizeUrl` / `autoLinkInlineSeq`） + `view/ui/LinkPopover.vue` + `BlockEditor.vue` 编排 | 链接是"行内 mark + 属性（href）"，需要独立的安全净化层（阻止 `javascript:` 等）、自动识别（键入/粘贴 URL → 自动加链）、以及与选择浮层协作的编辑体验；这是一个 mark 级特性，不需要修改 `core/`。 |
 | 设计中 `mark` 未定义属性模型 | 在 `types.ts` 中 mark 为 `{ type, attrs? }`；`primitiveCommands.ts` 新增 `setLink` / `unsetLink` 命令；`inlineDom.ts` 在 `<a>` 序列化时强制经过 `sanitizeUrl` | 为了支持 link mark 保存 href、同时保持与 HTML/Markdown 的互操作性和 XSS 安全性，必须把 URL 作为 mark 属性并在所有出站路径上强制执行净化。 |
 | 设计中 **Table** 仅作为未来扩展提及 | `extensions/Table.ts` + `extensions/tableModel.ts`，并在 `BuiltinExtensions` 中注册 | 表格是高优先级内建特性；使用 `attrs` 存储网格（cells/colWidths/headerRow）的 "attrs storage" 模式与 Image 相同；渲染器为自包含 Vue 组件（行/列选择、浮动操作栏、合并/拆分、标题行、代码块单元格 Enter 插入换行），核心零修改。 |
@@ -605,9 +605,9 @@ Todo、Quote、Code Block、BulletList、OrderedList（每个都是自包含扩�
 - 入口：斜杠菜单 `/image`（可选本地文件 / 粘贴 URL），粘贴图片文件（`clipboardData.files[i].type.startsWith("image/")`）→ 插入图片块，粘贴 HTML `<img src>` → 写入 `src`。
 - 渲染：顶层是 `<div class="block-image-wrapper" draggable>`，内含 `<img class="block-image-content" draggable="false" alt src title width height>`、可编辑 `contenteditable` 的 `.block-image-caption`（无聚焦时隐藏占位符）、hover 时显示的遮罩工具栏（**替换图片 / 删除图片**两个按钮）、四角拖拽缩放手柄（支持最小 64px 宽度）。
 - 上传管线：插入本地文件时，先写入**瞬时** `tempSrc = URL.createObjectURL(file)` 立即显示，并通过侧信道 `view/imageUpload.ts` 注册 `{ status: 'uploading', progress, error }`；成功后事务写入 `{ src, fileId }` 并 `revokeObjectURL`；失败保留 `tempSrc` 并显示重试按钮。
-  - `BlockEditor.vue` 暴露 prop `uploadImage?: (file: File, ctx: { blockId: BlockId; onProgress(pct: number): void }) => Promise<{ src: string; fileId?: string; alt?: string; width?: number; height?: number; title?: string; caption?: string }>`；未提供时走内置 mock 上传（随机延迟 30% 返回错误，便于测试重试 UI）。
+  - `createImageExtension({ upload })` 工厂注入真实的 `UploadImageHandler`（签名 `(name, file, controller, onProgress) => Promise<ImageUploadResult>`，`onProgress` 接收 0–100 进度，支持 `AbortController` 取消）；未提供时走内置 mock 上传（随机延迟 30% 返回错误，便于测试重试 UI）。**`<BlockEditor>` 没有 `uploadImage` prop**——通过 `:extensions` 数组里把 `createImageExtension(...)` 放到 `BuiltinExtensions` 之后，由基于名字的去重策略赢出。
   - **持久化 vs 瞬时的硬边界**：`status/progress/error/tempSrc` **绝不**进入 `block.attrs`，因此 undo/redo 不会把上传中状态写进历史栈、不会被 JSON 持久化。所有瞬时状态只存在于 `imageUpload.ts` 的响应式 map。
-- fileId 引用计数与清理：`BlockEditor.vue` 在每次 `applyTransaction` 的 diff（changed + removed）里扫描受影响块的 `fileId` 前后值，计算每个 `fileId` 的**当前引用数**。引用数从 >0 → 0 时 `emit('cleanup:image-file', { fileId })`，宿主应用可在此删除对象存储。
+- fileId 引用计数与清理：`extensions/Image.ts` 的 `image-upload` 插件在每次 `applyTransaction` 之后扫描 `nextDoc.blocks` 中所有 `image` 块的 `fileId`，计算全文档的引用数。当某个 `fileId` 的计数从 >0 → 0 时调用 `createImageExtension({ onFileCleanup })` 提供的回调，宿主应用可据此删除对象存储。`BlockEditor.vue` 不再持有引用计数 map 也再不发出任何事件。
 - Serializer：
   - HTML：`<figure><img src alt title width height><figcaption>caption</figcaption></figure>`（反序列化 `figure > img` → 写入 attrs；忽略 `<figcaption>` 以外的 wrapper 结构）。
   - Markdown：`![alt](src "title")`（若有 `caption/width/height`，降级为 HTML 以保真）。
@@ -634,7 +634,7 @@ Todo、Quote、Code Block、BulletList、OrderedList（每个都是自包含扩�
 - **行内标记**：加粗、斜体、下划线、删除线、行内代码、按选区的文本色和背景色。
 - **块级属性**：对齐（left/center/right/justify）、文本色、背景色、缩进（0–10）。
 - **Link mark**：带 `href` 属性的行内 mark；`Mod+K` → 打开链接浮层；粘贴/键入 URL → 自动加链；支持修改链接文本；HTML/Markdown 序列化走 `<a>` / `[text](url)`；所有 `<a href>` 序列化强制经过 `sanitizeUrl` 安全协议白名单（http/https/mailto/tel，阻止 `javascript:` / `data:` / `vbscript:`）。
-- **图片上传管线**：斜杠 `/image` 或粘贴图片文件/HTML `<img>` 插入图片块；`BlockEditor.vue` 通过 `uploadImage?: (file: File, ctx) => Promise<ImageUploadResult>` 暴露上传钩子；内置 mock 上传（`imageUpload.ts`）作为回退；`cleanup:image-file` 事件在 `fileId` 引用计数归零时触发，用于外部存储清理。
+- **图片上传管线**：斜杠 `/image` 或粘贴图片文件/HTML `<img>` 插入图片块；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传钩子（在 `:extensions` 数组里放到 `BuiltinExtensions` 之后覆盖默认 mock）；内置 mock 上传（`imageUpload.ts`）作为回退；fileId 引用计数归零时由 `image-upload` 插件的 `applyTransaction` 调用 `onFileCleanup(fileId)`，用于外部存储清理。
 
 ### 阶段七 — 表格块 + 分割线 ✅
 **表格块（Table block）**

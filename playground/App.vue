@@ -116,10 +116,71 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { BlockEditor, BuiltinExtensions } from '../src'
-import type { DocumentData, Locale, Theme } from '../src'
+import {
+  BlockEditor,
+  BuiltinExtensions,
+  createImageExtension,
+  type DocumentData,
+  type Extension,
+  type Locale,
+  type Theme,
+  type UploadImageHandler,
+} from '../src'
 
-const extensions = BuiltinExtensions
+/**
+ * Demo compose: extend the default extension set without bypassing it.
+ *
+ *  - `createEquationExtension({ renderer })`: The built-in Equation
+ *    extension already ships a zero-dependency math renderer, so the
+ *    formula blocks below render as real math by default. To swap in
+ *    KaTeX / MathJax, build a custom extension via
+ *    `createEquationExtension({ renderer })` and append it AFTER
+ *    `BuiltinExtensions` — name-based de-duplication makes the later
+ *    entry win. (Not enabled here so the demo shows the built-in
+ *    renderer.)
+ *
+ *  - `createImageExtension({ upload, onFileCleanup })`: replaces the
+ *    default mock-upload Image extension with one that "uploads" via
+ *    console + simulated progress, and reports file-cleanup events so
+ *    we can show how a host reclaims cloud storage.
+ */
+const extensions: readonly Extension[] = [
+  ...BuiltinExtensions,
+  createImageExtension({
+    upload: ((name, file, controller, onProgress) => {
+      // Pretend to upload: simulate 0..100% progress over ~1s, then
+      // resolve to a blob URL. A real handler would call fetch() / OSS
+      // SDK here. fileId=0 means "no managed file" (no cleanup will fire).
+      return new Promise((resolve, reject) => {
+        let progress = 0
+        console.log('[pg:upload] start', name, file?.size, 'bytes')
+        const timer = setInterval(() => {
+          if (controller.signal.aborted) {
+            clearInterval(timer)
+            reject(new Error('aborted'))
+            return
+          }
+          progress = Math.min(100, progress + 20)
+          onProgress(progress)
+          if (progress >= 100) {
+            clearInterval(timer)
+            resolve({
+              url: URL.createObjectURL(file),
+              width: 320,
+              height: 200,
+              alt: name,
+              title: '',
+              fileId: 0,
+            })
+          }
+        }, 200)
+      })
+    }) satisfies UploadImageHandler,
+    onFileCleanup(fileId) {
+      console.log('[pg:cleanup] file removed:', fileId)
+    },
+  }),
+]
 
 const locale = ref<Locale>('zh-CN')
 const theme = ref<Theme>('light')

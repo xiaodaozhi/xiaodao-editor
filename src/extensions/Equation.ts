@@ -8,9 +8,12 @@
  *    of volatile render output.
  *  - Rendering goes through an injectable `EquationRenderer`. The default is
  *    the built-in, zero-dependency math engine (see `./math`), which supports
- *    a lightweight LaTeX subset. Consumers can swap in KaTeX / MathJax / any
- *    engine by passing `:equation-renderer` to <BlockEditor> or by creating a
- *    custom extension via `createEquationExtension({ renderer })`.
+ *    a lightweight LaTeX subset. Consumers swap in KaTeX / MathJax / any
+ *    engine by composing `createEquationExtension({ renderer })` AFTER the
+ *    built-in `EquationExtension` in `:extensions` — name-based deduplication
+ *    makes the later entry win. BlockEditor itself never carries an equation
+ *    renderer (it has no `equationRenderer` prop); the boundary is at the
+ *    extension layer.
  *  - The renderer is a pure view: it reads `block.attrs.expression` and only
  *    mutates document state through editor commands (setAttrs / removeBlock).
  */

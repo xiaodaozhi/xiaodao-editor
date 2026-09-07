@@ -694,7 +694,7 @@ function useEditor(): Editor  // throws if called outside a <BlockEditor> tree
 
 ### `src/view/BlockEditor.vue`
 
-**Responsibility.** The public root editor component. Constructs the `Editor` from extensions + initial document, maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `update:modelValue`, and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links — opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) exposes the `uploadImage` prop as an optional external upload hook (S3/OSS/…); when missing, falls back to the built-in mock uploader in `imageUpload.ts`; (4) in every `applyTransaction` subscription, scans the `changed + removed` diff blocks for before/after `fileId` attr values, maintains a per-`fileId` refcount, and emits `cleanup:image-file` when a `fileId`'s refcount drops from ≥1 to 0 (so hosts can purge unreferenced storage objects). See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
+**Responsibility.** The public root editor component. Constructs the `Editor` from extensions + initial document, maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `update:modelValue`, and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links — opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) for image upload, simply forwards the async `startImageUpload` extension method (registered by `ImageExtension` via `Editor.registerExtensionMethod`) to the existing `useBeginImageUpload()` Vue injection — all upload orchestration + fileId ref-count tracking + `onFileCleanup` wiring now lives on the `image-upload` plugin in `extensions/Image.ts`. See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
 
 **Public API (props/emits/expose).**
 
@@ -713,24 +713,18 @@ props: {
   //   'float' (desktop only) hides the FixedToolbar and renders a floating
   //   HoverToolbar that follows the text selection; falls back to 'auto' on mobile.
   toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float'    // default 'auto'
-  // — Image upload hook (optional; see src/view/imageUpload.ts) —
-  uploadImage?: (file: File, ctx: {
-    blockId: BlockId
-    onProgress(percent: number): void
-  }) => Promise<{
-    src: string
-    fileId?: string
-    alt?: string
-    title?: string
-    caption?: string
-    width?: number
-    height?: number
-  }>
+  // NOTE: there is NO `equationRenderer` prop. To use a custom renderer, compose
+  // `createEquationExtension({ renderer })` AFTER the built-in EquationExtension
+  // in `:extensions` — name-based de-duplication picks up the later entry.
+  // NOTE: there is NO `uploadImage` prop. Composing `createImageExtension({ upload,
+  // onFileCleanup })` replaces the default mock upload + wires the cleanup
+  // callback. See `src/extensions/Image.ts`.
 }
 emits: {
   'update:modelValue': [DocumentData]
-  // — Phase 6: fileId cleanup (host app deletes unreferenced storage objects) —
-  'cleanup:image-file': [{ fileId: string }]
+  // NOTE: there is NO `cleanup:image-file` emit. ImageExtension invokes
+  // `onFileCleanup(fileId)` itself from its `image-upload` plugin's
+  // `applyTransaction` hook.
 }
 expose: { editor: Editor }
 ```
@@ -899,14 +893,14 @@ interface ImageUploadStore {
 }
 
 export const imageUploadStore: ImageUploadStore
-export function setUploadHook(hook: BlockEditorProps['uploadImage']): void
+export function setUploadHook(hook: UploadImageHandler | null): void
 ```
 
-If no `uploadImage` prop is given, a built-in mock uploader is used: it waits 800–2500 ms, emits fake progress ticks, and ~30% of the time rejects — so retry/error UI can be developed and tested without a backend. On `beginUpload`, the `tempSrc` object URL is created and pushed to state so `Image.ts` can render it immediately; on `resolve` the caller (BlockEditor) dispatches `setAttrs` to write the real `src`/`fileId` and then calls `cancel(blockId)` to revoke. On `reject` the error string is kept in state plus the cached `File`, so the user can click **Retry** on the image overlay.
+The default behavior uses a built-in mock uploader (no `uploadImage` ever existed on `<BlockEditor>` — it is injected via `createImageExtension({ upload })`): the mock waits 800–2500 ms, emits fake progress ticks, and ~30% of the time rejects — so retry/error UI can be developed and tested without a backend. On `beginUpload`, the `tempSrc` object URL is created and pushed to state so `Image.ts` can render it immediately; on `resolve` the caller dispatches `setAttrs` to write the real `src`/`fileId` and then calls `cancel(blockId)` to revoke. On `reject` the error string is kept in state plus the cached `File`, so the user can click **Retry** on the image overlay.
 
-**Interactions.** Depends only on `core/types` (for the `BlockId` brand). Used by `BlockEditor.vue` (it calls `setUploadHook(props.uploadImage)` when the prop changes, and on every image-block insert with a file it calls `beginUpload` then on resolve dispatches the attrs transaction and on emit `cleanup:image-file` when fileId refcount drops). The `extensions/Image.ts` renderer subscribes to `state[blockId]` to drive the progress bar, error banner, and retry button.
+**Interactions.** Depends only on `core/types` (for the `BlockId` brand). Hooked by `extensions/Image.ts` (its `createImageUploadPlugin(...)` calls `registerUploadHandler` during `init`, registers an unregister function in `onDestroy`, and exposes the async `startImageUpload` orchestrator via `Editor.registerExtensionMethod`). The `extensions/Image.ts` renderer subscribes to `state[blockId]` to drive the progress bar, error banner, and retry button. `BlockEditor.vue` is no longer involved: it only forwards the extension method to the existing `useBeginImageUpload()` Vue injection, and the `image-upload` plugin's `applyTransaction` hook is what invokes `onFileCleanup(fileId)` when ref-counts drop (the modern replacement for the old `@cleanup:image-file` Vue emit).
 
-**Extension points.** External hosts can provide their own `uploadImage` prop (S3 upload via signed URL, OSS, etc.) without modifying this module. The transient-state pattern here is generalizable to other block types that require async side-effects but must not persist intermediate states (e.g. Attachment uploads, Embeds fetching oEmbed metadata).
+**Extension points.** External hosts provide their own upload function via `createImageExtension({ upload })` composed AFTER `BuiltinExtensions` (S3 upload via signed URL, OSS, etc.) without modifying this module. The transient-state pattern here is generalizable to other block types that require async side-effects but must not persist intermediate states (e.g. Attachment uploads, Embeds fetching oEmbed metadata).
 
 ### `src/view/urlUtils.ts`
 

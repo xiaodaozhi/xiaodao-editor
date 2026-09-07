@@ -19,7 +19,7 @@ import { buildRegistries, type EditorRegistries } from './extension/Registry';
 import type { Extension } from './extension/Extension';
 import { createPrimitiveCommands } from './command/primitiveCommands';
 import type { CommandDispatcher } from './command/Command';
-import type { EventContext } from './plugin/Plugin';
+import type { EventContext, PluginInitContext } from './plugin/Plugin';
 import { HistoryManager } from './history/HistoryManager';
 import { caretSelection } from './selection/Selection';
 import { createBlockId } from './ids';
@@ -68,10 +68,30 @@ export class Editor {
   /** The block id currently owning the focused contenteditable (set by the view). */
   focusBlockId: BlockId | null = null;
 
+  /**
+   * Extension-attached callables (e.g. async commands like
+   * `startImageUpload`). Plugins register these during `init` and look
+   * them up by name. Distinct from the synchronous `commands` proxy and
+   * from `Editor`'s own public API so extensions can advertise any
+   * callable without polluting the core surface.
+   *
+   * Invariant: every value stored here MUST be a callable. The map's
+   * value type is `unknown` (so we don't need a single vararg signature
+   * that every concrete function has to be assignable to); the
+   * `getExtensionMethod<T>` API is the only way to retrieve one, and
+   * it requires callers to assert the concrete function type at the
+   * use site (which is also where they actually know the signature).
+   */
+  private readonly extensionMethods = new Map<string, unknown>();
+
+  /** Context handed to plugin `init` and `applyTransaction` hooks. */
+  private readonly pluginCtx: PluginInitContext;
+
   /** Public history API: canUndo/canRedo plus grouping helpers. */
   readonly history: EditorHistory;
 
   constructor(config: EditorConfig) {
+    this.pluginCtx = { editor: this };
     this.registries = buildRegistries(config.extensions, {
       defaultBlockType: config.defaultBlockType,
     });
@@ -99,7 +119,7 @@ export class Editor {
       = config.initialSelection ?? (firstBlockId ? caretSelection(firstBlockId, 0) : { kind: 'blocks', blockIds: [] });
     const initialState = createState(docWithContent, selection, pluginState);
     for (const plugin of this.registries.plugins) {
-      if (plugin.init) pluginState[plugin.name] = plugin.init(initialState);
+      if (plugin.init) pluginState[plugin.name] = plugin.init(initialState, this.pluginCtx);
     }
     this.state = initialState;
 
@@ -191,19 +211,63 @@ export class Editor {
       : { kind: 'blocks', blockIds: [] };
     const pluginState: Record<string, unknown> = {};
     const next = createState(docWithContent, selection, pluginState);
+    // `adoptDoc` is a reset (think: load new doc from the server), so
+    // any extension methods that the previous doc's plugins registered
+    // must be torn down before we re-run `init` — otherwise we'd
+    // collide on names. Plugins' own `onDestroy` hooks get their chance
+    // to release resources first, just like `destroy()` does.
+    for (const plugin of this.registries.plugins) plugin.onDestroy?.();
+    this.extensionMethods.clear();
     for (const plugin of this.registries.plugins) {
-      if (plugin.init) pluginState[plugin.name] = plugin.init(next);
+      if (plugin.init) pluginState[plugin.name] = plugin.init(next, this.pluginCtx);
     }
     this.state = next;
     this._history.reset();
     this.notify({ state: next, changed: new Set(flatten(docWithContent)), removed: new Set() });
   }
 
+  // --- Extension method registry ------------------------------------------
+  //
+  // Plugins (via the `editor` handle they receive in `Plugin.init`) can
+  // attach any callable under a string key. The view layer reads these
+  // via `getExtensionMethod` so a generic extension can expose its own
+  // API without baking knowledge of that extension into the core.
+  // ImageExtension, for example, registers an async `startImageUpload`
+  // command here and the view layer calls it through this channel
+  // (wrapped by `useBeginImageUpload` for Vue components).
+
+  /**
+   * Register a callable under a string key. Throws if the key is already
+   * taken — there is no implicit override because extension authors
+   * should be explicit about who wins when two extensions want the same
+   * name. Returns an unregister function.
+   *
+   * `T` is inferred from the call site so concrete functions with
+   * specific parameter / return types — e.g. `(file: File) => Promise<…>`
+   * — are stored verbatim. The runtime map's value type is `unknown`
+   * (any value is structurally assignable to it); callers retrieve a
+   * typed function via `getExtensionMethod<T>(name)`.
+   */
+  registerExtensionMethod<T>(name: string, fn: T): () => void {
+    if (this.extensionMethods.has(name)) {
+      throw new Error(`Editor: extension method "${name}" already registered`);
+    }
+    this.extensionMethods.set(name, fn);
+    return () => {
+      this.extensionMethods.delete(name);
+    };
+  }
+
+  /** Look up a previously-registered extension method. */
+  getExtensionMethod<T = unknown>(name: string): T | undefined {
+    return this.extensionMethods.get(name) as T | undefined;
+  }
+
   // --- Mutation -----------------------------------------------------------
 
   dispatch(tr: Transaction): void {
     const prev = this.state;
-    const result = applyTransaction(prev, tr, this.registries.plugins);
+    const result = applyTransaction(prev, tr, this.registries.plugins, this.pluginCtx);
     this.state = result.state;
     this._history.record(tr, prev.selection, prev.doc);
     this.notify(result);
@@ -249,6 +313,7 @@ export class Editor {
       state: this.state,
       dispatch: (tr) => this.dispatch(tr),
       focusBlockId: () => this.focusBlockId,
+      editor: this,
     };
   }
 
@@ -281,6 +346,10 @@ export class Editor {
   destroy(): void {
     for (const plugin of this.registries.plugins) plugin.onDestroy?.();
     this.listeners.clear();
+    // Drop any extension-attached callables so a destroyed editor can be
+    // garbage-collected. `onDestroy` hooks should have already un-registered
+    // their own, this is just defence-in-depth.
+    this.extensionMethods.clear();
   }
 
   // --- Internal -----------------------------------------------------------

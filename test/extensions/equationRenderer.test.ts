@@ -109,7 +109,7 @@ describe('equation renderer injection', () => {
   });
 });
 
-describe('extension override mechanism (what <BlockEditor :equation-renderer> relies on)', () => {
+describe('extension override mechanism (what `createEquationExtension({ renderer })` relies on)', () => {
   it('built-in extensions register the default equation component', () => {
     const editor = new Editor({ extensions: BuiltinExtensions });
     const spec = editor.registries.renderers.get('equation');
@@ -130,8 +130,8 @@ describe('extension override mechanism (what <BlockEditor :equation-renderer> re
   });
 });
 
-describe('<BlockEditor :equation-renderer>', () => {
-  it('renders formulas through the injected renderer', () => {
+describe('<BlockEditor :extensions> with custom EquationExtension', () => {
+  it('renders formulas through the injected renderer passed via :extensions', () => {
     const wrapper = mount(BlockEditor as any, {
       props: {
         modelValue: {
@@ -139,7 +139,10 @@ describe('<BlockEditor :equation-renderer>', () => {
             { id: 'b1', type: 'equation', attrs: { expression: 'x^2' }, content: [], children: [] },
           ],
         },
-        equationRenderer: fakeRenderer('ZZ'),
+        // BlockEditor no longer accepts an `equationRenderer` prop; the
+        // contract is now: drop a `createEquationExtension({ renderer })`
+        // after the built-in extensions to override (name-based dedupe).
+        extensions: [...BuiltinExtensions, createEquationExtension({ renderer: fakeRenderer('ZZ') })],
       },
     });
     const html = wrapper.html();
@@ -147,7 +150,7 @@ describe('<BlockEditor :equation-renderer>', () => {
     expect(html).not.toContain('math-equation');
   });
 
-  it('renders formulas through the built-in renderer when no prop is given', () => {
+  it('renders formulas through the built-in renderer when :extensions is omitted', () => {
     const wrapper = mount(BlockEditor as any, {
       props: {
         modelValue: {

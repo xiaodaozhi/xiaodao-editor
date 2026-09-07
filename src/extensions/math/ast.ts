@@ -142,21 +142,21 @@ export interface MathErrorNode extends MathSpan {
   readonly message: string;
 }
 
-export type MathNode =
-  | MathTextNode
-  | MathNumberNode
-  | MathIdentifierNode
-  | MathOperatorNode
-  | MathGroupNode
-  | MathFractionNode
-  | MathRootNode
-  | MathScriptsNode
-  | MathFunctionNode
-  | MathSymbolNode
-  | MathLargeOperatorNode
-  | MathMatrixNode
-  | MathUnknownNode
-  | MathErrorNode;
+export type MathNode
+  = | MathTextNode
+    | MathNumberNode
+    | MathIdentifierNode
+    | MathOperatorNode
+    | MathGroupNode
+    | MathFractionNode
+    | MathRootNode
+    | MathScriptsNode
+    | MathFunctionNode
+    | MathSymbolNode
+    | MathLargeOperatorNode
+    | MathMatrixNode
+    | MathUnknownNode
+    | MathErrorNode;
 
 export type MathNodeType = MathNode['type'];
 

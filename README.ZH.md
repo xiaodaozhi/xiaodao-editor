@@ -117,26 +117,67 @@ const katexRenderer: EquationRenderer = {
 
 ## Props 属性
 
-| 属性名            | 类型                                   | 默认值                 | 说明                                                                          |
-| ----------------- | -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `modelValue`      | `DocumentData`                         | `{ blocks: [] }`       | 文档 JSON（通过 `v-model` 双向绑定）。                                         |
-| `extensions`      | `readonly Extension[]`                 | `BuiltinExtensions`    | 要注册的扩展。可覆盖此值以添加自定义块或移除内置块。                            |
-| `editable`        | `boolean`                              | `true`                 | 为 `false` 时进入只读模式。                                                    |
-| `placeholder`     | `string`                               | 跟随 locale            | 首个空块的占位符，默认使用本地化字符串。                                        |
-| `theme`           | `'light' \| 'dark'`                    | `'light'`              | 颜色主题。对应类名会应用到 `.block-editor` 并同步到 `<body>`。                   |
-| `locale`          | `'zh-CN' \| 'en-US'`                   | `'zh-CN'`              | UI 语言。非 `'zh-CN'` 的任何非空值都会落到 `'en-US'`。                         |
-| `uploadImage`     | `UploadImageHandler`                   | 内存内 mock            | 图片上传钩子；签名：`(name, file, controller, onProgress) => Promise<ImageUploadResult>`。要持久化文档**必须**提供此 prop（默认 mock 使用不可序列化的 `blob:` URL）。 |
-| `width`           | `string \| number`                     | `undefined`            | 可选：编辑器宽度。数字按 CSS px 解析；字符串直接使用（如 `'800px'`、`'100%'`）。未设置时默认撑满容器（`width: 100%`）。 |
-| `height`          | `string \| number`                     | `undefined`            | 可选：编辑器高度。设置后内容区域会在编辑器**内部**滚动，不再无限向下生长；未设置时编辑器随内容扩展，由宿主页面接管滚动。 |
+| 属性名            | 类型                                     | 默认值                 | 说明                                                                          |
+| ----------------- | ---------------------------------------- | ---------------------- | ----------------------------------------------------------------------------- |
+| `modelValue`      | `DocumentData`                           | `{ blocks: [] }`       | 文档 JSON（通过 `v-model` 双向绑定）。                                         |
+| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`    | 要注册的扩展。可覆盖此值以添加自定义块、覆盖公式渲染器（`createEquationExtension({ renderer })`）、或替换图片上传管线（`createImageExtension({ upload, onFileCleanup })`）。 |
+| `editable`        | `boolean`                                | `true`                 | 为 `false` 时进入只读模式。                                                    |
+| `placeholder`     | `string`                                 | 跟随 locale            | 首个空块的占位符，默认使用本地化字符串。                                        |
+| `theme`           | `'light' \| 'dark'`                      | `'light'`              | 颜色主题。对应类名会应用到 `.block-editor` 并同步到 `<body>`。                   |
+| `locale`          | `'zh-CN' \| 'en-US'`                     | `'zh-CN'`              | UI 语言。非 `'zh-CN'` 的任何非空值都会落到 `'en-US'`。                         |
+| `width`           | `string \| number`                       | `undefined`            | 可选：编辑器宽度。数字按 CSS px 解析；字符串直接使用（如 `'800px'`、`'100%'`）。未设置时默认撑满容器（`width: 100%`）。 |
+| `height`          | `string \| number`                       | `undefined`            | 可选：编辑器高度。设置后内容区域会在编辑器**内部**滚动，不再无限向下生长；未设置时编辑器随内容扩展，由宿主页面接管滚动。 |
 | `toolbarPosition` | `'auto' \| 'top' \| 'bottom' \| 'float'` | `'auto'`               | 工具栏 / 操作栏的位置。`'auto'` = 桌面端自动顶栏、移动端自动底栏（位于虚拟键盘上方）。`'float'`（仅桌面端）隐藏 `FixedToolbar`，改用跟随文本/表格选区的浮动工具栏（HoverToolbar）；移动端自动回退为 `FixedToolbar`。 |
-| `equationRenderer`| `EquationRenderer`                     | 内置渲染器             | 公式块的可插拔渲染器。默认为零依赖的内置数学渲染器；传入自定义实现即可使用 KaTeX、MathJax 或其他引擎。详见「可插拔公式渲染器」。 |
+
+### 可插拔图片上传
+
+图片上传由 `createImageExtension({ upload, onFileCleanup })` 在 `BuiltinExtensions`
+之后组成来注入。这会替换默认的 mock 上传（默认 mock 会产生 `blob:` URL，
+页面刷新后失效），由宿主完全控制上传管线。
+
+```ts
+import {
+  BuiltinExtensions,
+  createImageExtension,
+  type UploadImageHandler,
+} from 'xiaodao-editor'
+
+const upload: UploadImageHandler = async (name, file, controller, onProgress) => {
+  // 1. 向你的后端请求签名 URL
+  const { url, fields } = await api.presign(name)
+
+  // 2. PUT 文件（带 abort + 进度上报）
+  const xhr = new XMLHttpRequest()
+  xhr.upload.addEventListener('progress', (e) => {
+    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+  })
+  // ...把 controller.signal.abort 接到 xhr.abort() ...
+
+  // 3. resolve 出公开 URL + 一个稳定的 fileId，便于清理回调触发
+  return {
+    url: `${CDN}/${name}`,
+    width: 0, height: 0,
+    fileId: hashOf(name + size), // 宿主自选的稳定 id；传 0 会禁掉清理回调
+  }
+}
+
+const extensions = [
+  ...BuiltinExtensions.filter((e) => e.name !== 'image'),
+  createImageExtension({
+    upload,
+    onFileCleanup: (fileId) => api.deleteCloudFile(fileId),
+  }),
+]
+```
+
+`BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（带随机
+失败率），仅作为演示；**不可用于持久化文档**。
 
 ### Emits 事件
 
 | 事件名                    | 载荷           | 触发时机                                                                              |
 | ------------------------- | -------------- | ------------------------------------------------------------------------------------- |
 | `update:modelValue`       | `DocumentData` | 文档变更（失焦时做防抖处理）。                                                          |
-| `cleanup:image-file`      | `number`       | `fileId` 引用计数归零（最后引用该 fileId 的图片块被删除或 src 被替换）。载荷为该 `fileId`；0 不会触发。消费方可据此回收云存储。 |
 
 ### Expose 暴露成员
 
@@ -177,7 +218,7 @@ const katexRenderer: EquationRenderer = {
 | `TodoListExtension`    | `todoList`     | 通过 `attrs.checked` 控制复选框状态。                                  |
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
 | `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式 — Enter 插入换行。                 |
-| `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `uploadImage` prop 与 `cleanup:image-file` 事件走上传侧信道。 |
+| `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传侧信道，详见「可插拔图片上传」。`BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（`blob:` URL 无法跨刷新存活），不会触发任何 `onFileCleanup` 回调。 |
 | `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。可插拔渲染器在渲染时即时计算居中展示公式（输出永不持久化）；默认为零依赖的**内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），可通过 `equationRenderer` prop 或 `createEquationExtension` 注入 KaTeX/MathJax。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |
 | `DividerExtension`     | `divider`      | 隔离型水平分割线。                                                     |

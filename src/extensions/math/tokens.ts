@@ -8,22 +8,22 @@
  * Single pass, O(n), no backtracking.
  */
 
-export type TokenKind =
-  | 'command'
-  | 'char'
-  | 'number'
-  | 'operator'
-  | 'lbrace'
-  | 'rbrace'
-  | 'lbracket'
-  | 'rbracket'
-  | 'lparen'
-  | 'rparen'
-  | 'sup'
-  | 'sub'
-  | 'amp'
-  | 'newline'
-  | 'space';
+export type TokenKind
+  = | 'command'
+    | 'char'
+    | 'number'
+    | 'operator'
+    | 'lbrace'
+    | 'rbrace'
+    | 'lbracket'
+    | 'rbracket'
+    | 'lparen'
+    | 'rparen'
+    | 'sup'
+    | 'sub'
+    | 'amp'
+    | 'newline'
+    | 'space';
 
 export interface Token {
   readonly kind: TokenKind;
@@ -44,6 +44,25 @@ function isDigit(ch: string): boolean {
 function isSpace(ch: string): boolean {
   return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v';
 }
+
+/**
+ * Single-character structural punctuation. Each entry maps one LaTeX
+ * delimiter / grouping / script marker to its dedicated `TokenKind`
+ * branch so the parser can dispatch on `kind` directly instead of
+ * comparing string values. Anything not in this table falls through to
+ * the `operator` branch below.
+ */
+const STRUCTURAL_CHARS: Readonly<Record<string, TokenKind>> = {
+  '{': 'lbrace',
+  '}': 'rbrace',
+  '[': 'lbracket',
+  ']': 'rbracket',
+  '(': 'lparen',
+  ')': 'rparen',
+  '^': 'sup',
+  '_': 'sub',
+  '&': 'amp',
+};
 
 /**
  * Split a LaTeX-ish math expression into tokens. Never throws: any character
@@ -123,17 +142,7 @@ export function tokenize(source: string): Token[] {
     }
 
     // --- Structural punctuation ---------------------------------------------
-    const structural: TokenKind | null =
-      ch === '{' ? 'lbrace'
-      : ch === '}' ? 'rbrace'
-      : ch === '[' ? 'lbracket'
-      : ch === ']' ? 'rbracket'
-      : ch === '(' ? 'lparen'
-      : ch === ')' ? 'rparen'
-      : ch === '^' ? 'sup'
-      : ch === '_' ? 'sub'
-      : ch === '&' ? 'amp'
-      : null;
+    const structural: TokenKind | null = STRUCTURAL_CHARS[ch] ?? null;
 
     if (structural) {
       out.push({ kind: structural, value: ch, start: i, end: i + 1 });

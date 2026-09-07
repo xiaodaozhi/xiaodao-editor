@@ -766,7 +766,7 @@ because the design over-anticipated needs:
 | `view/clipboard.ts` + `view/inlineDom.ts` (Phase 5) | Added | Clipboard parsing (HTML/plain-text → blocks) and InlineSeq ↔ DOM conversion are view-layer concerns. |
 | `i18n.ts` + `theme` prop (cross-cutting) | Added | Zero-dep i18n module via provide/inject; theme synced to `<body>` for Teleport-ed popovers. |
 | `view/ui/SafeHtml.vue` | Added | Isolates `v-html` to a single component so the rest of the codebase satisfies `vue/no-v-html`. Only used for trusted internal SVG/HTML glyph strings. |
-| **`extensions/Image.ts` + `view/imageUpload.ts` (Phase 6)** | Added as a `content: 'none'` block extension plus a separate view-side upload side-channel map. Upload transient state (pending/progress/error) lives OUTSIDE `Block.attrs`; only the final `src` (and fileId/alt/title/width/height/caption) is persisted. Guarantees undo restores only blocks, no "blob:" URLs leak into JSON, and reload-from-persistence never revives temporary uploads. `BlockEditor.vue` runs a fileId reference counter and emits `cleanup:image-file` when the last block referencing a fileId is removed, so consumers can reclaim cloud storage. Drag-drop + image-file paste + HTML `<img>` paste all dispatch through the same upload pipeline. |
+| **`extensions/Image.ts` + `view/imageUpload.ts` (Phase 6)** | Added as a `content: 'none'` block extension plus a separate view-side upload side-channel map. Upload transient state (pending/progress/error) lives OUTSIDE `Block.attrs`; only the final `src` (and fileId/alt/title/width/height/caption) is persisted. Guarantees undo restores only blocks, no "blob:" URLs leak into JSON, and reload-from-persistence never revives temporary uploads. The extension owns its own **Plugin** (`image-upload`) that tracks fileId ref-counts across transactions and invokes `onFileCleanup(fileId)` when the last block referencing a fileId is removed, so consumers can reclaim cloud storage. Drag-drop + image-file paste + HTML `<img>` paste all dispatch through the same upload pipeline. `<BlockEditor>` itself has no `uploadImage` prop and no `cleanup:image-file` emit — composition goes through `createImageExtension({ upload, onFileCleanup })` in `:extensions`. |
 | **`view/urlUtils.ts` (Phase 6, link mark safety)** | Added. `sanitizeUrl` is the single trust boundary: it rejects `javascript:`, `vbscript:`, `data:`, `file:` schemes (plus protocol-relative `//…` when not http/https) and only allows an explicit whitelist (`http`, `https`, `mailto`, `tel`). `looksLikeUrl` + `normalizeUrl` drive the paste auto-link and typing auto-link. `autoLinkInlineSeq` walks a freshly-typed `InlineSeq` and applies link marks to detected URLs, skipping already-linked runs and inline-code runs. |
 | **`setLink`/`unsetLink` primitives + `<a>` round-trip in `inlineDom.ts` + `LinkPopover.vue` (Phase 6)** | Added. Link is a Mark (not an InlineNode), fully compatible with the existing mark system and incompatible with inline code via `CODE_INCOMPATIBLE`. HTML serialization always calls `sanitizeUrl` before writing `href` and always emits `target="_blank" rel="noopener noreferrer"`; deserialization reconstructs the link mark from any `<a>` element whose href passes `sanitizeUrl`. `BlockContent.vue` detects clicks on `<a>` and emits `linkClick`, forwarded up through `BlockHost` / `BlockList` to `BlockEditor.vue`, which opens `LinkPopover.vue` (positioned over the `<a>` rect). The popover provides open / copy / edit / remove (view mode) and href + text inputs with validation (edit mode). HoverToolbar has a link button, and `Mod-K` (`Ctrl/Cmd+K`) opens the editor for the current selection or the clicked link. Pasting a URL over a text selection calls `setLink` directly (no separate text change). Typing whitespace re-runs `autoLinkInlineSeq` so typed URLs link without user action. Ctrl/Cmd+click the anchor opens the page (browsers enforce `rel=noopener noreferrer`). |
 | **`Table` (Phase 7)** only noted as future extension in the design | `extensions/Table.ts` + `extensions/tableModel.ts`, registered in `BuiltinExtensions` | Table is a high-priority built-in feature. Uses the same **attrs storage** pattern as Image (grid data lives entirely in `attrs`, `Block.children=[]`), so the core never touches table internals and undo/redo is free via `setAttrs`. Self-contained Vue renderer: row/column/corner selectors, a floating toolbar with delete/merge/split/**header-row toggle** buttons, row/col insertion handles, code-cell Enter inserts newline with offset-based caret re-placement. Zero core changes. |
@@ -842,19 +842,25 @@ are suppressed during touch interaction.
   drop image files, paste of image files or HTML `<img>`, replace/remove
   overlay toolbar, corner resize handle (locked aspect ratio by default),
   editable caption as a separate contenteditable under the image.
-  `uploadImage?: UploadImageHandler` prop dispatches uploads with progress
-  and cancellation (`AbortController`); a safe in-memory mock is provided
+  `createImageExtension({ upload })` factory injects a real
+  `UploadImageHandler` (progress is reported as 0–100 percent; supports
+  `AbortController` for cancellation); a safe in-memory mock is provided
   as the default but it produces `blob:` URLs that are not serialisable,
-  so **consumers must provide `uploadImage` if they intend to persist**.
-  `fileId` (integer returned by the upload handler) uses a per-editor
-  reference counter that emits `cleanup:image-file` when the last block
-  referencing a fileId is removed, so consumers can clean up cloud storage.
+  so **consumers must compose a real `upload` handler if they intend to
+  persist**. `fileId` (integer returned by the upload handler) uses a
+  per-editor reference counter tracked by the `image-upload` plugin; when
+  the last block referencing a fileId is removed, the plugin invokes
+  `createImageExtension({ onFileCleanup })` so consumers can clean up
+  cloud storage. `BlockEditor.vue` no longer carries an `uploadImage`
+  prop nor emits `cleanup:image-file` — both responsibilities live on the
+  extension and on `Editor.registerExtensionMethod` (which the view layer
+  forwards to the existing `useBeginImageUpload()` Vue injection).
 - **Block-level attrs**: align (left/center/right/justify), text color,
   background color, indent (0–10).
 
 ### Phase 6 — Media & Link Marks ✅
 Image block (schema + renderer) with upload pipeline (side-channel state,
-`uploadImage` prop, `cleanup:image-file` event), link mark (`setLink`/
+`createImageExtension({ upload, onFileCleanup })` factory), link mark (`setLink`/
 `unsetLink` commands, Mod-K shortcut, `LinkPopover`), URL safety utilities
 (`sanitizeUrl`, `looksLikeUrl`, `normalizeUrl`, `autoLinkInlineSeq`), `<a>`
 round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
@@ -1009,7 +1015,7 @@ guarantee of the brief.
 - [x] No deep reactivity; rendering subscribes per block via shallow refs.
 - [x] Modules are small and single-responsibility; no `utils.ts`. (Domain helpers live in their own modules — e.g. `urlUtils.ts`, `imageUpload.ts`.)
 - [x] Future features (Callout, Database, Columns, AI, …) require no core changes.
-- [x] **Phases 1–8 implemented**: 12 built-in block types (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, **Table**, **Divider**, **Equation**, **TableOfContents**) = 14 built-in extensions (incl. Keymap + History); inline marks including `link` with href sanitization; image block with transient upload side-channel, drag resize, caption, slash entry, fileId reference counting and `cleanup:image-file` emit; block-level attrs, slash menu, input rules, hover toolbar (incl. link button + table header-row toggle when table corner-selected), drag handle, clipboard (incl. URL paste → link, image paste → upload), i18n, theming; table of contents block (live heading list view, non-editable, slash entry, serialize → empty).
+- [x] **Phases 1–8 implemented**: 12 built-in block types (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, **Table**, **Divider**, **Equation**, **TableOfContents**) = 14 built-in extensions (incl. Keymap + History); inline marks including `link` with href sanitization; image block with transient upload side-channel, drag resize, caption, slash entry, fileId reference counting and `createImageExtension({ onFileCleanup })` callback; block-level attrs, slash menu, input rules, hover toolbar (incl. link button + table header-row toggle when table corner-selected), drag handle, clipboard (incl. URL paste → link, image paste → upload), i18n, theming; table of contents block (live heading list view, non-editable, slash entry, serialize → empty).
 - [x] **Table block invariants**: table content lives entirely in `Block.attrs` (`content: 'none'`) so core transactions/undo are untouched; all cell operations route through `editor.commands.setAttrs` → pure `tableModel.ts` (immutable in, new attrs out); code-block-cell Enter inserts a newline character rather than splitting the block.
 - [x] **Security — link href sanitization**: every path that writes or reconstructs a link `href` (`inlineToHtml`, `inlineFromDom`, `LinkPopover` save, `BlockContent` URL paste/auto-link) funnels through the single `sanitizeUrl` whitelist; unsafe schemes (`javascript:`, `vbscript:`, `data:`, `file:`) never reach the DOM.
 - [x] **Image upload invariants**: `Block.attrs` never stores transient upload state (pending/progress/error/blob URLs) — transient state lives in `view/imageUpload.ts`; undo/redo and reload-from-persistence therefore never resurrect invalid `blob:` or `pending` state.

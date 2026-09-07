@@ -112,6 +112,15 @@ export const editableKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-edit
  * can initiate an image upload against the correct upload target block,
  * with proper transient state management and document updating.
  *
+ * The function itself is owned by `ImageExtension`, which registers it as
+ * an async `startImageUpload` extension method via
+ * `createImageExtension({ upload, onFileCleanup })`. BlockEditor simply
+ * looks it up with `editor.getExtensionMethod('startImageUpload')` and
+ * publishes it here when present — so `<BlockEditor>` has zero
+ * image-specific knowledge. If the consumer doesn't include an
+ * Image extension (or doesn't provide an upload handler), this injection
+ * is omitted and child components no-op gracefully.
+ *
  * The callback returns the BlockId of the NEW (or existing) image block so
  * the caller can set focus / selection if needed.
  */

@@ -202,8 +202,8 @@ import { inlineText, inlineFromString, splitInline } from '../core/types';
 import { Editor } from '../core/Editor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
-import { editorKey, imageUploadKey, editableKey, mobileKey, fixedToolbarBridgeKey, fixedToolbarBottomKey } from './context';
-import type { FixedToolbarDescriptor, BlockRenderItem, BeginImageUploadFn  } from './context';
+import { editorKey, editableKey, mobileKey, fixedToolbarBridgeKey, fixedToolbarBottomKey, imageUploadKey } from './context';
+import type { FixedToolbarDescriptor, BlockRenderItem, BeginImageUploadFn } from './context';
 
 import { dispatchKeymap } from './keymapHandler';
 import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
@@ -222,22 +222,8 @@ import { blockBefore, flatten as flattenDoc, indexOf as blockIndexOf, parentOf }
 import { orderedListNumber } from '../extensions/OrderedList';
 import { inlineToHtml } from './inlineDom';
 import { BuiltinExtensions } from '../extensions/builtin';
-import { createEquationExtension } from '../extensions/Equation';
-import type { EquationRenderer } from '../extensions/Equation';
 import '../style.css';
 import { provideI18n, useI18n, normalizeLocale, normalizeTheme, type Theme, type Locale } from '../i18n';
-import {
-  subscribeToUploadChanges,
-  clearAllUploadStates,
-  revokeAllTempUrls,
-  beginUpload,
-  registerUploadHandler,
-  mockUpload,
-  cleanupUploadState,
-  type UploadImageHandler,
-} from './imageUpload';
-import type { ImageAttrs } from '../extensions/Image';
-import { defaultAttrs } from '../core/schema/BlockSchema';
 
 type PlusMenuMode = 'slash' | 'insert';
 
@@ -250,26 +236,6 @@ const props = withDefaults(defineProps<{
   theme?: Theme | string;
   /** 'zh-CN' (default) or 'en-US'.  Any non-empty non-'zh-CN' value ⇒ en-US. */
   locale?: Locale | string;
-  /**
-   * Optional: image upload delegation function. When provided, the editor
-   * delegates image uploads to this function instead of using the built-in
-   * mock upload. The function receives the file name, File, an
-   * AbortController (aborted if the block is removed or the editor unmounts),
-   * and an onProgress callback (0–100). It must return a Promise that
-   * resolves with the final uploaded URL or rejects with an error.
-   *
-   * If omitted, the editor falls back to an internal mock upload that stores
-   * the file in memory as an object URL — fine for demos but NOT for
-   * persisted documents.
-   */
-  uploadImage?: UploadImageHandler;
-  /**
-   * Optional: replace the built-in equation renderer (KaTeX / MathJax / ...).
-   * The renderer is captured when the editor is constructed, and drives BOTH
-   * the on-screen block and `serialize.toHTML`. Omit it to use the built-in
-   * zero-dependency renderer.
-   */
-  equationRenderer?: EquationRenderer;
   /** Optional: fixed width for the editor (e.g. '800px', '100%', 600). */
   width?: string | number;
   /** Optional: fixed height for the editor. When set, the editor scrolls
@@ -289,11 +255,6 @@ const props = withDefaults(defineProps<{
   theme: 'light',
   locale: 'zh-CN',
   placeholder: '',
-
-  // optional: when omitted, the editor falls back to its built-in mock upload.
-  uploadImage: undefined,
-  // `undefined` = use the built-in zero-dependency equation renderer.
-  equationRenderer: undefined,
   width: undefined,
   height: undefined,
   toolbarPosition: 'auto',
@@ -305,14 +266,12 @@ const hasExplicitPlaceholder = props.placeholder !== '';
 
 const emit = defineEmits<{
   'update:modelValue': [DocumentData];
-  /**
-   * Emitted when the last image block referencing a given fileId has been
-   * removed or replaced with a different file. Consumers can use this hook
-   * to reclaim cloud storage for orphaned files.
-   * fileId === 0 ("no managed file") is never emitted.
-   */
-  'cleanup:image-file': [fileId: number];
 }>();
+// NOTE: the previous `'cleanup:image-file'` Vue emit (fired when the last
+// image block referencing a given `fileId` was removed) is gone.
+// Equivalent functionality is now provided by `ImageExtension`'s
+// `onFileCleanup` option — pass it via `createImageExtension({ onFileCleanup })`
+// when composing `:extensions`. See `src/extensions/Image.ts` for details.
 
 // --- I18n + theme -------------------------------------------------------
 
@@ -371,18 +330,17 @@ const effectivePlaceholder = computed<string>(
 );
 
 // --- Editor construction ------------------------------------------------
-
-// A custom equation renderer is injected by appending an override extension:
-// `flattenExtensions` de-duplicates by name and later entries win, so this
-// replaces the built-in `equation` extension without touching anything else.
-// The same renderer instance therefore drives the block component AND
-// `serialize.toHTML`. (Like `extensions`, it is captured at construction time.)
-const effectiveExtensions: readonly Extension[] = props.equationRenderer
-  ? [...props.extensions, createEquationExtension({ renderer: props.equationRenderer })]
-  : props.extensions;
+//
+// Extension-specific options (custom equation renderer, image upload
+// handler, …) are injected by composing `:extensions` with the matching
+// factory (e.g. `createEquationExtension({ renderer })`,
+// `createImageExtension({ upload, onFileCleanup })`). `BlockEditor.vue`
+// itself never imports extension internals or attaches them on behalf of
+// the consumer — that responsibility now lives entirely in the extension
+// layer.
 
 const editor = new Editor({
-  extensions: effectiveExtensions,
+  extensions: props.extensions,
   initialDocument: props.modelValue,
   editable: props.editable,
 });
@@ -492,261 +450,23 @@ watch(
   },
 );
 
-// --- Image upload orchestration ----------------------------------------
+// --- Image upload integration ------------------------------------------
 //
-// Transient upload state lives in the side-channel `imageUpload.ts` and is
-// intentionally never written into the document. The flow is:
-//   1. Caller (slash / paste / drop / replace) creates an EMPTY image block
-//      in the doc and then invokes `beginUpload` with that blockId + file.
-//   2. imageUpload.ts tracks pending/progress/error state → UI reads it
-//      reactively (via uploadSubscribers + Vue re-renders).
-//   3. When the upload succeeds (with a FINAL url, not a blob: URL), a
-//      setAttrs command writes that src (and width/height) into the block.
-//
-// If the consumer provided an `uploadImage` prop function, we call it;
-// otherwise we fall back to an in-memory mock upload (blob: URL).
+// The image upload pipeline (handler registration, transient upload state,
+// progress UI, fileId ref-count tracking, `onFileCleanup` notification)
+// now lives entirely on `ImageExtension` (see `extensions/Image.ts`).
+// `BlockEditor.vue` only forwards the async command the extension
+// registers on the editor to the existing `useBeginImageUpload()` Vue
+// injection so child components (slash menu, paste handler, drop)
+// keep their API surface. BlockEditor itself knows nothing about the
+// `imageUpload.ts` module or any image-block-specific logic.
 
-// Register the global upload request handler. This is called by
-// imageUpload.beginUpload / dispatchUploadRequest whenever a File needs to
-// be turned into a final URL. It routes either to the consumer's
-// `uploadImage` prop function or to our internal mock.
-registerUploadHandler((name, file, controller, callbacks) => {
-  const { onProgress: onProgressCb, onSuccess, onError } = callbacks;
-  const handler = props.uploadImage;
-  if (typeof handler === 'function') {
-    // External handler: call the prop function with (name, file, controller, onProgress).
-    // The function returns a Promise<ImageUploadResult> — on resolve we write
-    // the final attrs (including optional fileId / alt / title) into the block.
-    handler(name, file, controller, (pct: number) => {
-      // External handlers report progress as 0–100; internal uses 0–1.
-      const clamped = Number.isFinite(pct) ? Math.max(0, Math.min(1, pct / 100)) : 0;
-      onProgressCb(clamped);
-    })
-      .then((result) => {
-        onSuccess({
-          url: result.url,
-          width: result.width,
-          height: result.height,
-          alt: result.alt,
-          title: result.title,
-          fileId: result.fileId,
-        });
-      })
-      .catch((err) => {
-        // If the upload was aborted (block removed / editor unmounted),
-        // don't surface an error — the state has already been cleaned up.
-        if (controller.signal.aborted) return;
-        onError(err instanceof Error ? err.message : String(err));
-      });
-  } else {
-    // No external handler: use the built-in mock upload (stored in-memory
-    // as object URL). This is demo-safe, but because object URLs are NOT
-    // serialisable, consumers MUST provide `uploadImage` if they intend
-    // to persist and reload documents.
-    void mockUpload(file, onProgressCb).then(
-      (r) => onSuccess({ url: r.url, width: r.width, height: r.height }),
-      (err) => onError(err instanceof Error ? err.message : String(err)),
-    );
-  }
-});
-
-/**
- * The reactive upload-state map used by Vue renderers. Every mutation to
- * the upload store (setUploadState) bumps this ref's value so components
- * that read from it re-render. This is the single Vue-reactive bridge
- * between the framework-agnostic upload state store and the Vue render
- * tree.
- */
-const uploadStateTick = ref(0);
-const _unsubUpload = subscribeToUploadChanges(() => {
-  uploadStateTick.value++;
-});
-
-/**
- * Kick off an image upload flow:
- *
- *   - If given a File: creates/resolves an image block, starts the upload,
- *     then writes the final attrs into the block.
- *   - If given a URL string: creates the block and writes attrs directly
- *     (assumes the URL is already a final, serialisable URL — e.g. a public
- *     image URL inserted via the command API).
- *
- * Returns the (possibly newly-created) image block id, or null if the
- * editor had no suitable block to attach to.
- */
-const beginImageUpload: BeginImageUploadFn = async (fileOrSrc, opts = {}) => {
-  const {
-    relativeToBlockId = null,
-    position = 'after',
-    convertIfEmpty = true,
-  } = opts;
-
-  // Touch the tick so Vue tracks us as a reactive reader — any upload-state
-  // change during this function's async gaps will re-render consumers.
-  void uploadStateTick.value;
-
-  // --- Step 1: resolve the target image block id ------------------------
-  let imageBlockId: BlockId | null = null;
-
-  // Prefer explicit reference block, else fall back to current selection.
-  let anchorBlockId: BlockId | null = relativeToBlockId ?? null;
-  if (!anchorBlockId) {
-    const sel = editor.getState().selection;
-    if (sel.kind === 'caret') anchorBlockId = sel.blockId;
-    else if (sel.kind === 'text') anchorBlockId = sel.anchor.blockId;
-  }
-  // Absolute last-resort: first block in the document or create one.
-  if (!anchorBlockId) {
-    const firstId = state.value.doc.root[0] ?? null;
-    anchorBlockId = firstId;
-  }
-
-  if (position === 'replace' && anchorBlockId) {
-    // Convert an existing block (usually another image block that failed or
-    // is being replaced) into a fresh image block with empty attrs.
-    const schema = editor.registries.schema.get('image');
-    if (schema) {
-      editor.commands.replaceBlock?.({
-        id: anchorBlockId,
-        type: 'image',
-        attrs: defaultAttrs(schema),
-      });
-      imageBlockId = anchorBlockId;
-    }
-  }
-
-  if (!imageBlockId && anchorBlockId && convertIfEmpty && position !== 'before') {
-    const doc = editor.getState().doc;
-    const anchor = doc.blocks.get(anchorBlockId);
-    // If the anchor block is an empty paragraph, CONVERT it in-place. This
-    // is what slash-command does: the empty paragraph the user typed "/"
-    // into becomes the new image block, preserving focus.
-    if (anchor && anchor.type === 'paragraph' && inlineText(anchor.content).length === 0) {
-      const schema = editor.registries.schema.get('image');
-      if (schema) {
-        editor.commands.replaceBlock?.({
-          id: anchorBlockId,
-          type: 'image',
-          attrs: defaultAttrs(schema),
-        });
-        imageBlockId = anchorBlockId;
-      }
-    }
-  }
-
-  if (!imageBlockId && anchorBlockId && position === 'before') {
-    const schema = editor.registries.schema.get('image');
-    if (schema) {
-      editor.commands.insertBlock?.({
-        before: anchorBlockId,
-        type: 'image',
-        attrs: defaultAttrs(schema),
-      });
-      const sel = editor.getState().selection;
-      if (sel.kind === 'caret') imageBlockId = sel.blockId;
-      else if (sel.kind === 'text') imageBlockId = sel.anchor.blockId;
-    }
-  }
-
-  if (!imageBlockId && anchorBlockId) {
-    // Default path: insert a new image block AFTER the anchor.
-    const schema = editor.registries.schema.get('image');
-    if (schema) {
-      editor.commands.insertBlock?.({
-        after: anchorBlockId,
-        type: 'image',
-        attrs: defaultAttrs(schema),
-      });
-      const sel = editor.getState().selection;
-      if (sel.kind === 'caret') imageBlockId = sel.blockId;
-      else if (sel.kind === 'text') imageBlockId = sel.anchor.blockId;
-    }
-  }
-
-  if (!imageBlockId) {
-    // No anchor at all: append to the end of the (possibly empty) doc.
-    const schema = editor.registries.schema.get('image');
-    if (!schema) return null;
-    const doc = editor.getState().doc;
-    const lastId = doc.root[doc.root.length - 1] ?? null;
-    if (lastId) {
-      editor.commands.insertBlock?.({
-        after: lastId,
-        type: 'image',
-        attrs: defaultAttrs(schema),
-      });
-    } else {
-      // Empty document: we need a block, so try to insert as first child
-      // via insertBlock with "after: null" — fall back to commands
-      // primitives if that isn't supported.
-      editor.commands.insertBlock?.({
-        after: null as unknown as BlockId,
-        type: 'image',
-        attrs: defaultAttrs(schema),
-      });
-    }
-    const sel = editor.getState().selection;
-    if (sel.kind === 'caret') imageBlockId = sel.blockId;
-    else if (sel.kind === 'text') imageBlockId = sel.anchor.blockId;
-  }
-
-  if (!imageBlockId) return null;
-
-  // --- Step 2: if a string URL, write attrs directly and finish. --------
-  if (typeof fileOrSrc === 'string') {
-    const src = fileOrSrc;
-    // Try to measure natural dims via an off-screen HTMLImageElement.
-    try {
-      const measured = await new Promise<{ width?: number; height?: number }>((resolve) => {
-        if (typeof document === 'undefined') return resolve({});
-        const img = document.createElement('img');
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          resolve({
-            width: img.naturalWidth || undefined,
-            height: img.naturalHeight || undefined,
-          });
-        };
-        img.onload = finish;
-        img.onerror = finish;
-        img.src = src;
-        // Safety timeout.
-        setTimeout(finish, 4000);
-      });
-      const attrs: Partial<ImageAttrs> = {
-        src,
-        width: measured.width,
-        height: measured.height,
-      };
-      editor.commands.setAttrs?.({ id: imageBlockId, attrs });
-    } catch {
-      editor.commands.setAttrs?.({ id: imageBlockId, attrs: { src } });
-    }
-    return imageBlockId;
-  }
-
-  // --- Step 3: it's a File → dispatch to upload + await final attrs. ---
-  const result = await beginUpload(imageBlockId, fileOrSrc);
-  if (result.ok) {
-    const r = result.value;
-    const attrs: Partial<ImageAttrs> = {
-      src: r.url,
-      alt: r.alt,
-      title: r.title,
-      width: r.width,
-      height: r.height,
-      fileId: r.fileId,
-    };
-    editor.commands.setAttrs?.({ id: imageBlockId, attrs });
-  }
-  return imageBlockId;
-};
-
-// Provide it so slash menu, image block replace, block-list drop, etc.
-// can call useBeginImageUpload() and kick off a fresh upload.
-provide(imageUploadKey, beginImageUpload);
+// Forward the async `startImageUpload` extension method to the Vue tree
+// so children keep calling `useBeginImageUpload()` as before.
+const beginImageUpload: BeginImageUploadFn | undefined = editor.getExtensionMethod<BeginImageUploadFn>('startImageUpload');
+if (beginImageUpload) {
+  provide(imageUploadKey, beginImageUpload);
+}
 
 // --- Reactive state -----------------------------------------------------
 
@@ -1288,30 +1008,6 @@ const NON_TEXT_BLOCK_TYPES = new Set([
   'image', 'divider', 'table', 'toc', 'tableOfContents', 'codeBlock', 'equation',
 ]);
 
-// fileId → reference-count (number of image blocks referencing the file).
-// When the count drops to zero (last referencing block is removed or
-// replaced), we emit `cleanup:image-file` so the consumer can reclaim
-// cloud storage.
-const fileIdRefCountsMap = new Map<number, number>();
-// Snapshot of the doc.blocks Map BEFORE the current update; used to look
-// up the PREVIOUS fileId of changed/removed blocks. Populated at the end
-// of each update and at mount (from initial doc).
-let stateBeforeDocRef: ReadonlyMap<BlockId, Block> = editor.getState().doc.blocks;
-// Initialise fileId counts from the initial doc (so the consumer can pass
-// a pre-populated doc via `modelValue` and we won't spuriously emit
-// cleanup for the files already referenced there).
-{
-  const doc = editor.getState().doc;
-  for (const id of doc.root) {
-    const b = doc.blocks.get(id);
-    if (!b || b.type !== 'image') continue;
-    const fid = (b.attrs as unknown as ImageAttrs).fileId as number;
-    if (typeof fid === 'number' && Number.isFinite(fid) && fid > 0) {
-      fileIdRefCountsMap.set(fid, (fileIdRefCountsMap.get(fid) ?? 0) + 1);
-    }
-  }
-}
-
 /**
  * Guard flag: while true, the `watch(props.modelValue)` callback must skip
  * applying external changes, because a document change from INSIDE the
@@ -1324,65 +1020,8 @@ let externalEmitInFlight = false;
 
 const unsubscribe = editor.subscribe((update) => {
   state.value = update.state;
-  if (update.removed.size > 0) {
-    // Clean up transient upload state for any removed blocks. This prevents
-    // object-URL leaks when an image block is deleted (via backspace,
-    // removeBlock, undo…). Because upload state lives outside the doc, a
-    // normal transaction rollback won't touch it.
-    cleanupUploadState(update.removed);
-  }
 
-  // --- Recompute fileId reference counts and emit cleanup:image-file ---
-  //
-  // For every image block in the updated doc, collect which fileIds they
-  // reference. Compare against the reference map from the PREVIOUS state of
-  // any blocks that were changed or removed (the delta). Any fileId whose
-  // reference count drops to zero is reported back to the consumer so they
-  // can reclaim cloud storage.
-  // fileId === 0 ("no managed file") is always skipped.
   if (update.changed.size > 0 || update.removed.size > 0) {
-    // 1. Build the NEW reference map (fileId → number of blocks referencing it,
-    //    across the ENTIRE doc). This keeps the logic simple even when blocks
-    //    are moved or converted.
-    const newCounts = new Map<number, number>();
-    for (const id of update.state.doc.root) {
-      const b = update.state.doc.blocks.get(id);
-      if (!b || b.type !== 'image') continue;
-      const fid = (b.attrs as unknown as ImageAttrs).fileId as number;
-      if (typeof fid === 'number' && Number.isFinite(fid) && fid > 0) {
-        newCounts.set(fid, (newCounts.get(fid) ?? 0) + 1);
-      }
-    }
-    // 2. Find the set of fileIds present in the PREVIOUS state of changed
-    //    or removed blocks (the only ones whose reference counts might have
-    //    dropped) + any in the new map (to catch added-then-zeroed cases).
-    const candidates = new Set<number>();
-    for (const id of update.changed) {
-      const prevB = id ? stateBeforeDocRef.get(id) : undefined;
-      if (prevB && prevB.type === 'image') {
-        const fid = (prevB.attrs as unknown as ImageAttrs).fileId as number;
-        if (typeof fid === 'number' && Number.isFinite(fid) && fid > 0) candidates.add(fid);
-      }
-    }
-    for (const id of update.removed) {
-      const prevB = id ? stateBeforeDocRef.get(id) : undefined;
-      if (prevB && prevB.type === 'image') {
-        const fid = (prevB.attrs as unknown as ImageAttrs).fileId as number;
-        if (typeof fid === 'number' && Number.isFinite(fid) && fid > 0) candidates.add(fid);
-      }
-    }
-    for (const fid of newCounts.keys()) candidates.add(fid);
-    for (const fid of candidates) {
-      const newCount = newCounts.get(fid) ?? 0;
-      const prevCount = fileIdRefCountsMap.get(fid) ?? 0;
-      fileIdRefCountsMap.set(fid, newCount);
-      if (newCount === 0 && prevCount > 0) {
-        emit('cleanup:image-file', fid);
-      }
-    }
-    // Snapshot current doc blocks for the next update's "before" comparison.
-    stateBeforeDocRef = update.state.doc.blocks;
-
     externalEmitInFlight = true;
     emit('update:modelValue', editor.toData());
     // The parent's v-model assignment runs synchronously (Vue emits then
@@ -2424,6 +2063,12 @@ async function onFileDrop(e: DragEvent): Promise<void> {
   const images = collectImageFilesFromDataTransfer(dt);
   if (images.length === 0) return;
 
+  // The upload orchestration lives on the Image extension. If the consumer
+  // didn't register one (e.g. they used the default `extensions` slot and
+  // forgot to compose `createImageExtension({ upload })`), drop is a no-op.
+  const begin = beginImageUpload;
+  if (!begin) return;
+
   // Compute anchor block + position, then reset indicators.
   const finalTarget: BlockId | null = dropTargetBlockId.value;
   const finalPos: DropPosition = dropPosition.value;
@@ -2454,7 +2099,7 @@ async function onFileDrop(e: DragEvent): Promise<void> {
   let lastBlockId = relativeTo;
   for (let i = 0; i < images.length; i++) {
     const file = images[i]!;
-    const bid = await beginImageUpload(file, {
+    const bid = await begin(file, {
       relativeToBlockId: lastBlockId,
       position: i === 0 ? pos : 'after',
       convertIfEmpty: i === 0,
@@ -2638,8 +2283,11 @@ function onPlusCommit(cmd: SlashCommand, _mode: PlusMenuMode): void {
       //
       // We use nextTick so the renderer has swapped to ImageBlock before we
       // try to access anything; but we don't actually need the renderer,
-      // we just need a temp <input> + beginImageUpload with position=replace.
-      if (cmd.id === 'image') {
+      // we just need a temp <input> + the image extension's upload method.
+      // If the consumer didn't register an image upload handler, skip the
+      // picker — the empty placeholder image block stays as-is.
+      if (cmd.id === 'image' && beginImageUpload) {
+        const begin = beginImageUpload;
         nextTick(() => {
           const input = document.createElement('input');
           input.type = 'file';
@@ -2648,7 +2296,7 @@ function onPlusCommit(cmd: SlashCommand, _mode: PlusMenuMode): void {
           input.addEventListener('change', () => {
             const f = input.files?.[0];
             if (f) {
-              void beginImageUpload(f, {
+              void begin(f, {
                 relativeToBlockId: blockId,
                 position: 'replace',
                 convertIfEmpty: true,
@@ -3610,12 +3258,12 @@ onBeforeUnmount(() => {
   document.removeEventListener('touchmove', onTouchMove, true);
   document.removeEventListener('touchend', onTouchEnd, true);
   document.removeEventListener('touchcancel', onTouchEnd, true);
+  // Image upload side-channel cleanup is now the responsibility of
+  // `ImageExtension`'s `onDestroy` hook, which runs from `editor.destroy()`
+  // above (it clears all transient upload state, revokes object URLs, and
+  // deregisters the upload handler in one place).
   unsubscribe();
   editor.destroy();
-  // Image upload side-channel cleanup.
-  _unsubUpload();
-  clearAllUploadStates();
-  revokeAllTempUrls();
 });
 
 defineExpose({ editor });
