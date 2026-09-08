@@ -39,8 +39,8 @@ Verify with `npm whoami` after login.
 npm view xiaodao-editor version
 ```
 
-- `E404` means the name is free — publish is clear
-- A returned version number means the package already exists — confirm you are a collaborator or owner
+- `E404` means the name is free, so publish is clear
+- A returned version number means the package already exists; confirm you are a collaborator or owner
 
 ## Versioning
 
@@ -117,7 +117,7 @@ pnpm pack
 npm pack --dry-run
 ```
 
-The output should only contain `package.json` and `dist/**/*` — no `src/`, `playground/`, `docs/`, `.gitignore` or other unrelated files.
+The output should only contain `package.json` and `dist/**/*`; no `src/`, `playground/`, `docs/`, `.gitignore` or other unrelated files.
 The `files` field in `package.json` limits inclusion to `["dist"]`. Add a `.npmignore` if extra files leak in.
 
 ### 5. Publish
@@ -155,7 +155,7 @@ push a version tag.
 Both jobs run in parallel. The GitHub Packages job temporarily renames the
 package to `@xiaodaozhi/xiaodao-editor` via `npm pkg set name=...` because
 GitHub Packages requires scoped names. The `dist/` build output is identical
-for both registries — only the package name differs.
+for both registries; only the package name differs.
 
 ### One-time setup
 
@@ -287,5 +287,5 @@ import 'xiaodao-editor/style.css';
 | `package.json` | `name` / `version` / `files` / `exports` / `publishConfig` / `prepublishOnly` |
 | `vite.config.ts` | Library build config: lib entry, ES+UMD outputs, `vue` external, `dts` type generation |
 | `tsconfig.json` | Type checking (the `build` script runs `vue-tsc --noEmit` first) |
-| `src/index.ts` | Public API barrel — controls which symbols are exported to consumers |
+| `src/index.ts` | Public API barrel: controls which symbols are exported to consumers |
 | `dist/` | Build output (shipped in the package, not committed to git) |

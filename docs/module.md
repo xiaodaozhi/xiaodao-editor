@@ -1,6 +1,6 @@
 # Xiaodao Editor Module Reference
 
-This document is the per-module API reference for the `xiaodao-editor` package, a Notion-style, block-first editor built as a reusable Vue 3 + TypeScript library. The **core** (`src/core/**`) is framework-agnostic — it has zero Vue imports and is portable to any framework — while the **view layer** (`src/view/**`) is the sole bridge to Vue reactivity and the DOM. Every block type and editing behavior is contributed by an **extension**, so the core never switches on a block type. The package ships 14 built-in extensions (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, Table, Divider, **Equation**, **TableOfContents**, Keymap, History) covering all block types, inline marks (bold/italic/underline/strike/code/**link with href attribute + URL sanitization**), block-level attrs, slash menu, input rules, hover toolbar (+ link button), drag handle, clipboard, i18n, theming, **image upload pipeline with transient side-channel and fileId cleanup events**, **link popover (view/edit/copy/remove), Mod+K, paste/type URL auto-link**, **table block with merge/split/header-row**, **equation block (pluggable LaTeX renderer: built-in zero-dependency math engine, KaTeX injectable)**, **table-of-contents block (live heading list view)**, JSON persistence, and Markdown/HTML serialize/deserialize. This reference is organized by subsystem; for design rationale and the update flow, see `docs/architecture.md` (notably §4 document model, §6 rendering, §7 commands, §10 state, §11 keyboard/IME, §14 Phase 6 Image + Link Mark, Phase 7 Table + Divider, Phase 8 Table of Contents).
+This document is the per-module API reference for the `xiaodao-editor` package, a Notion-style, block-first editor built as a reusable Vue 3 + TypeScript library. The **core** (`src/core/**`) is framework-agnostic (it has zero Vue imports and is portable to any framework), while the **view layer** (`src/view/**`) is the sole bridge to Vue reactivity and the DOM. Every block type and editing behavior is contributed by an **extension**, so the core never switches on a block type. The package ships 14 built-in extensions (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, Table, Divider, **Equation**, **TableOfContents**, Keymap, History) covering all block types, inline marks (bold/italic/underline/strike/code/**link with href attribute + URL sanitization**), block-level attrs, slash menu, input rules, hover toolbar (+ link button), drag handle, clipboard, i18n, theming, **image upload pipeline with transient side-channel and fileId cleanup events**, **link popover (view/edit/copy/remove), Mod+K, paste/type URL auto-link**, **table block with merge/split/header-row**, **equation block (pluggable LaTeX renderer: built-in zero-dependency math engine, KaTeX injectable)**, **table-of-contents block (live heading list view)**, JSON persistence, and Markdown/HTML serialize/deserialize. This reference is organized by subsystem; for design rationale and the update flow, see `docs/architecture.md` (notably §4 document model, §6 rendering, §7 commands, §10 state, §11 keyboard/IME, §14 Phase 6 Image + Link Mark, Phase 7 Table + Divider, Phase 8 Table of Contents).
 
 ## Document Model & Types
 
@@ -76,7 +76,7 @@ function asBlockId(value: string): BlockId;  // coerce trusted strings (rehydrat
 
 ### `src/core/state/store.ts`
 
-**Responsibility.** Owns construction of a normalized `DocState` from nested JSON, serialization back to JSON, and pure lookup helpers (parent, sibling, document-order traversal). It never mutates a `DocState` in place — mutations live in `Step.ts` / `Transaction.ts`. See `docs/architecture.md` §4.4 (forest + normalized store) and §10.
+**Responsibility.** Owns construction of a normalized `DocState` from nested JSON, serialization back to JSON, and pure lookup helpers (parent, sibling, document-order traversal). It never mutates a `DocState` in place: mutations live in `Step.ts` / `Transaction.ts`. See `docs/architecture.md` §4.4 (forest + normalized store) and §10.
 
 **Public API.**
 
@@ -106,11 +106,11 @@ function withAttrs(block: Block, attrs: Block['attrs']): Block;
 
 **Interactions.** Depends on `types.ts` and `ids.ts`. Used by `Step.ts` (apply reads parents/children), `invert.ts` (`indexOf`, `parentOf`, `requireBlock` to invert steps), `Editor.ts` (`docFromData`, `docToData`, `flatten`, `getBlock`), and `primitiveCommands.ts` (traversal for Enter/Backspace/navigation).
 
-**Extension points.** The id policy (preserve if unique, else regenerate, returning an `idMap`) is the single place to change import identity rules — see open question §17.1. `flatten` is the seam the view bridge uses to derive a flat render list; a future virtualized `BlockList` consumes the same output.
+**Extension points.** The id policy (preserve if unique, else regenerate, returning an `idMap`) is the single place to change import identity rules (see open question §17.1). `flatten` is the seam the view bridge uses to derive a flat render list; a future virtualized `BlockList` consumes the same output.
 
 ### `src/core/state/Step.ts`
 
-**Responsibility.** Defines the atomic, serializable structural operations (`Step`) that mutate a document, and `applySteps`, which produces a new immutable `DocState` plus a diff (`changed` / `removed`) that the view bridge consumes to update only affected blocks. Steps are intentionally low-level and dumb — they carry fully-resolved data and make no policy decisions; commands assign ids and sequence steps. See `docs/architecture.md` §7.2 and §10.3.
+**Responsibility.** Defines the atomic, serializable structural operations (`Step`) that mutate a document, and `applySteps`, which produces a new immutable `DocState` plus a diff (`changed` / `removed`) that the view bridge consumes to update only affected blocks. Steps are intentionally low-level and dumb: they carry fully-resolved data and make no policy decisions; commands assign ids and sequence steps. See `docs/architecture.md` §7.2 and §10.3.
 
 **Public API.**
 
@@ -132,11 +132,11 @@ function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult;
 
 **Interactions.** Depends on `types.ts`. Consumed by `EditorState.ts` (`applyTransaction` calls `applySteps`), `Transaction.ts` (the `Step` type), and `invert.ts` (inverts step lists). The diff (`changed`/`removed`) flows out through `applyTransaction` → `Editor.dispatch` → the view layer.
 
-**Extension points.** New structural operations (e.g. `insertInlineNode`, `setMark`) are added as new union members plus a `case` in `applySteps`. Because steps are serializable, they are the unit a future collaboration transport would broadcast — see §15 (collaboration).
+**Extension points.** New structural operations (e.g. `insertInlineNode`, `setMark`) are added as new union members plus a `case` in `applySteps`. Because steps are serializable, they are the unit a future collaboration transport would broadcast (see §15).
 
 ### `src/core/state/Transaction.ts`
 
-**Responsibility.** Defines `Transaction` — the only path to mutate editor state — as an ordered list of `Step`s plus an optional resulting selection and metadata. Provides a fluent `TransactionBuilder` that commands use to assemble transactions. Meta carries cross-cutting hints: `addToHistory`, `historyGroup`, `viewHints.skipDomWrite`, and a `source` provenance tag. See `docs/architecture.md` §6.3, §7.2, §10.3.
+**Responsibility.** Defines `Transaction` (the only path to mutate editor state) as an ordered list of `Step`s plus an optional resulting selection and metadata. Provides a fluent `TransactionBuilder` that commands use to assemble transactions. Meta carries cross-cutting hints: `addToHistory`, `historyGroup`, `viewHints.skipDomWrite`, and a `source` provenance tag. See `docs/architecture.md` §6.3, §7.2, §10.3.
 
 **Public API.**
 
@@ -202,7 +202,7 @@ function createState(doc: DocState, selection: Selection, pluginState?: Readonly
 
 ### `src/core/state/invert.ts`
 
-**Responsibility.** Computes the steps that undo a given step list against the document state *before* those steps were applied. This enables memory-light, correct undo/redo without snapshotting the whole document — only the blocks a transaction touched are referenced by the inverse. Steps are inverted in reverse order so the last-applied change is undone first. See `docs/architecture.md` §9 and §16.
+**Responsibility.** Computes the steps that undo a given step list against the document state *before* those steps were applied. This enables memory-light, correct undo/redo without snapshotting the whole document: only the blocks a transaction touched are referenced by the inverse. Steps are inverted in reverse order so the last-applied change is undone first. See `docs/architecture.md` §9 and §16.
 
 **Public API.**
 
@@ -214,7 +214,7 @@ Per-op inversion: `insertBlock` → `removeBlock`; `removeBlock` → a pre-order
 
 **Interactions.** Depends on `types.ts`, `Step.ts`, and `store.ts` (`indexOf`, `parentOf`, `requireBlock`). Consumed by `HistoryManager.ts`, which calls `invertSteps` when recording a transaction so each history item carries both its original and inverse steps.
 
-**Extension points.** New step ops require a matching `case` here, otherwise undo would silently skip them. The module is deliberately standalone so this inversion logic stays auditable — see §13.1 ("`invert.ts` not in design → Added").
+**Extension points.** New step ops require a matching `case` here, otherwise undo would silently skip them. The module is deliberately standalone so this inversion logic stays auditable (see §13.1).
 
 ## Schema System
 
@@ -250,7 +250,7 @@ The default schema (when a field is omitted) is `content: 'text'`, `nestable: fa
 
 **Interactions.** Depends on `types.ts`. Used by `SchemaRegistry.ts` (which wraps it with type-keyed lookup) and indirectly by `Registry.ts` (`defineSchema` normalizes every extension's spec). Predicates are read by `primitiveCommands.ts` via `SchemaRegistry` to drive Enter/Backspace/split/merge without referencing types.
 
-**Extension points.** A block type extension supplies a `BlockSchemaSpec`; `defineSchema` fills the gaps. Future structural flags (e.g. `inlineContent: 'marks'`, `void: true`) are additive fields on the spec. `allowedChildren` whitelists are how future nested blocks (Toggle, Columns, Callout) constrain their children — see §15.
+**Extension points.** A block type extension supplies a `BlockSchemaSpec`; `defineSchema` fills the gaps. Future structural flags (e.g. `inlineContent: 'marks'`, `void: true`) are additive fields on the spec. `allowedChildren` whitelists are how future nested blocks (Toggle, Columns, Callout) constrain their children (see §15).
 
 ### `src/core/schema/SchemaRegistry.ts`
 
@@ -274,7 +274,7 @@ class SchemaRegistry {
 
 **Interactions.** Depends on `BlockSchema.ts` (delegates to its pure functions). Constructed by `Registry.ts` (`buildRegistries`) with a `FALLBACK_SCHEMA` of `type: '__fallback__'`. Read heavily by `primitiveCommands.ts` (e.g. `enter` checks `hasText`/`isEmpty`/`isIsolating`; `splitBlock` checks `hasText`) and by `Editor.ts` (`defaultAttrsFor` when seeding an empty document).
 
-**Extension points.** The fallback schema is what lets the core operate even if a block type is missing — useful during dynamic registration. Adding a new block type is "register a schema via an extension"; the registry rebuilds on editor reconfiguration (§5.4).
+**Extension points.** The fallback schema is what lets the core operate even if a block type is missing, which is useful during dynamic registration. Adding a new block type is "register a schema via an extension"; the registry rebuilds on editor reconfiguration (§5.4).
 
 ## Command System
 
@@ -416,7 +416,7 @@ class SlashCommandRegistry {
 
 ### `src/core/extension/Extension.ts`
 
-**Responsibility.** The `Extension` contract: the single mechanism by which the editor gains new block types and behaviors. An extension is a plain spec object (produced by a factory) contributed at construction; the core never imports extensions, it only processes their specs into registries. Each field is optional — an extension contributes only what it needs. See `docs/architecture.md` §5.
+**Responsibility.** The `Extension` contract: the single mechanism by which the editor gains new block types and behaviors. An extension is a plain spec object (produced by a factory) contributed at construction; the core never imports extensions, it only processes their specs into registries. Each field is optional: an extension contributes only what it needs. See `docs/architecture.md` §5.
 
 **Public API.**
 
@@ -446,7 +446,7 @@ function extensionBlockType(ext: Extension): BlockType | null;   // convenience:
 
 **Interactions.** Depends (type-only) on `BlockSchema`, `Command`, `InputRule`, `Keymap`, `Plugin`, `SlashCommand`, `Serializer`, and `types`. Consumed by `Registry.ts` (`flattenExtensions` + `buildRegistries`). The built-in extensions (`Paragraph`, `Heading`, `Keymap`, `History`) implement it; user extensions are passed to `Editor` / `BlockEditor.vue`.
 
-**Extension points.** This *is* the extension point. Adding a block type = create an `Extension` with `schema` + `renderer` (+ optional serialize/slash/commands) and pass it to the editor — zero core changes (§5.4, §15). The `uses` graph enables composition (e.g. a "CodeBlock" extension that bundles a `History`-like behavior).
+**Extension points.** This *is* the extension point. Adding a block type = create an `Extension` with `schema` + `renderer` (+ optional serialize/slash/commands) and pass it to the editor: zero core changes (§5.4, §15). The `uses` graph enables composition (e.g. a "CodeBlock" extension that bundles a `History`-like behavior).
 
 ### `src/core/extension/Registry.ts`
 
@@ -488,13 +488,13 @@ function buildRegistries(extensions: readonly Extension[], options?: BuildRegist
 
 **Interactions.** Depends on every registry module (`Command`, `InputRule`, `Keymap`, `SlashCommand`, `SchemaRegistry`, `BlockSchema`, `Serializer`) and `Extension.ts`/`Plugin.ts`. Called once by `Editor.ts` in its constructor. The resulting `EditorRegistries` is the central object `primitiveCommands.ts`, `Editor.ts`, and the view layer read from.
 
-**Extension points.** `flattenExtensions`'s "last wins" rule is how user extensions override built-ins with the same `name`. Adding a new registry (e.g. a future `MarkRegistry` for inline formatting) means adding a field to `EditorRegistries`, a class, and a registration loop in `buildRegistries` — localized, no command/core changes.
+**Extension points.** `flattenExtensions`'s "last wins" rule is how user extensions override built-ins with the same `name`. Adding a new registry (e.g. a future `MarkRegistry` for inline formatting) means adding a field to `EditorRegistries`, a class, and a registration loop in `buildRegistries`: localized, no command/core changes.
 
 ## Plugin System
 
 ### `src/core/plugin/Plugin.ts`
 
-**Responsibility.** The `Plugin` contract. Plugins augment editor behavior at well-defined hooks. They differ from extensions: extensions *declare* blocks/commands/keymaps; plugins *react* to editor lifecycle and events. Plugin state is stored inside `EditorState` (keyed by name) so it is part of the immutable, versioned state — this is what makes undo/redo correct across plugin effects. See `docs/architecture.md` §9.
+**Responsibility.** The `Plugin` contract. Plugins augment editor behavior at well-defined hooks. They differ from extensions: extensions *declare* blocks/commands/keymaps; plugins *react* to editor lifecycle and events. Plugin state is stored inside `EditorState` (keyed by name) so it is part of the immutable, versioned state; this is what makes undo/redo correct across plugin effects. See `docs/architecture.md` §9.
 
 **Public API.**
 
@@ -527,7 +527,7 @@ interface Plugin {
 
 ### `src/core/selection/Selection.ts`
 
-**Responsibility.** Constructors, type guards, and pure helpers for `Selection`. Selection is part of editor state but *separate* from the document (§8). This module never touches the DOM — native-selection sync lives in `view/domSelection.ts`. See `docs/architecture.md` §8.
+**Responsibility.** Constructors, type guards, and pure helpers for `Selection`. Selection is part of editor state but *separate* from the document (§8). This module never touches the DOM: native-selection sync lives in `view/domSelection.ts`. See `docs/architecture.md` §8.
 
 **Public API.**
 
@@ -574,7 +574,7 @@ class HistoryManager {
 
 **Interactions.** Depends on `types.ts`, `Step.ts`, `Transaction.ts` (`createTransaction`), and `invert.ts` (`invertSteps`). Owned by `Editor.ts`, which calls `record` inside `dispatch` and exposes `undo()`/`redo()`/`canUndo()`/`canRedo()`. The `undo`/`redo` core commands (registered in `Editor`) delegate to it.
 
-**Extension points.** `historyGroup` is the meta key that controls granularity — a future "word-boundary" grouping strategy changes only how commands set `historyGroup`. The `limit` and the inversion-based (not snapshot-based) approach keep memory bounded for large documents. A collaboration layer can read the stacks to reconcile remote/local history.
+**Extension points.** `historyGroup` is the meta key that controls granularity: a future "word-boundary" grouping strategy changes only how commands set `historyGroup`. The `limit` and the inversion-based (not snapshot-based) approach keep memory bounded for large documents. A collaboration layer can read the stacks to reconcile remote/local history.
 
 ## Serialization
 
@@ -676,7 +676,7 @@ Construction: `buildRegistries`, register primitive commands, let extension comm
 
 ### `src/view/context.ts`
 
-**Responsibility.** View-layer shared context and types. Provides the framework-agnostic `Editor` instance to child components via Vue's provide/inject (`editorKey` / `useEditor`), and defines `BlockRenderItem`, the DTO passed from `BlockEditor` to `BlockList`. The editor is provided as a non-reactive value — components that need to react to state changes subscribe via `editor.subscribe()`, keeping the editor's internal state outside Vue's reactivity system (avoiding deep-reactivity overhead on large documents). See `docs/architecture.md` §6.2.
+**Responsibility.** View-layer shared context and types. Provides the framework-agnostic `Editor` instance to child components via Vue's provide/inject (`editorKey` / `useEditor`), and defines `BlockRenderItem`, the DTO passed from `BlockEditor` to `BlockList`. The editor is provided as a non-reactive value: components that need to react to state changes subscribe via `editor.subscribe()`, keeping the editor's internal state outside Vue's reactivity system (avoiding deep-reactivity overhead on large documents). See `docs/architecture.md` §6.2.
 
 **Public API.**
 
@@ -694,7 +694,7 @@ function useEditor(): Editor;  // throws if called outside a <BlockEditor> tree
 
 ### `src/view/BlockEditor.vue`
 
-**Responsibility.** The public root editor component. Constructs the `Editor` from extensions + initial document, maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `update:modelValue`, and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links — opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) for image upload, simply forwards the async `startImageUpload` extension method (registered by `ImageExtension` via `Editor.registerExtensionMethod`) to the existing `useBeginImageUpload()` Vue injection — all upload orchestration + fileId ref-count tracking + `onFileCleanup` wiring now lives on the `image-upload` plugin in `extensions/Image.ts`. See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
+**Responsibility.** The public root editor component. Constructs the `Editor` from extensions + initial document, maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `update:modelValue`, and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links: opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) for image upload, simply forwards the async `startImageUpload` extension method (registered by `ImageExtension` via `Editor.registerExtensionMethod`) to the existing `useBeginImageUpload()` Vue injection: all upload orchestration + fileId ref-count tracking + `onFileCleanup` wiring now lives on the `image-upload` plugin in `extensions/Image.ts`. See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
 
 **Public API (props/emits/expose).**
 
@@ -706,16 +706,16 @@ props: {
   placeholder?: string;                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
   theme?: 'light' | 'dark';                 // default 'light'
   locale?: 'zh-CN' | 'en-US';               // default 'zh-CN'; any non-empty non-'zh-CN' value ⇒ 'en-US'
-  // — Sizing (optional): a number is interpreted as CSS pixels; a string is used as-is —
+  // Sizing (optional): a number is interpreted as CSS pixels; a string is used as-is
   width?: string | number;                  // default undefined (fills container, width: 100%)
   height?: string | number;                 // default undefined (grows with content; host page scrolls)
-  // — Toolbar placement (FixedToolbar): 'auto' = top on desktop / bottom on mobile.
+  // Toolbar placement (FixedToolbar): 'auto' = top on desktop / bottom on mobile.
   //   'float' (desktop only) hides the FixedToolbar and renders a floating
   //   HoverToolbar that follows the text selection; falls back to 'auto' on mobile.
   toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';    // default 'auto'
   // NOTE: there is NO `equationRenderer` prop. To use a custom renderer, compose
   // `createEquationExtension({ renderer })` AFTER the built-in EquationExtension
-  // in `:extensions` — name-based de-duplication picks up the later entry.
+  // in `:extensions`; name-based de-duplication picks up the later entry.
   // NOTE: there is NO `uploadImage` prop. Composing `createImageExtension({ upload,
   // onFileCleanup })` replaces the default mock upload + wires the cleanup
   // callback. See `src/extensions/Image.ts`.
@@ -729,15 +729,15 @@ emits: {
 expose: { editor: Editor }
 ```
 
-The `suppressSelectionSync` flag prevents feedback loops: when the DOM selection is read and dispatched to state, the subscribe callback must NOT write it back to the DOM. `renderItems` is a `computed` mapping `doc.root` → `BlockRenderItem[]`. `onKeyDown` calls `syncSelectionFromDom()` (reads the native selection into state with `addToHistory: false`) then `dispatchKeymap`; if handled, `preventDefault()`. Mod+K is handled inside `BlockEditor.vue` itself (not via the keymap registry) because it bridges selection state, the link mark, and the floating UI — a pure keymap command could not open the popover.
+The `suppressSelectionSync` flag prevents feedback loops: when the DOM selection is read and dispatched to state, the subscribe callback must NOT write it back to the DOM. `renderItems` is a `computed` mapping `doc.root` → `BlockRenderItem[]`. `onKeyDown` calls `syncSelectionFromDom()` (reads the native selection into state with `addToHistory: false`) then `dispatchKeymap`; if handled, `preventDefault()`. Mod+K is handled inside `BlockEditor.vue` itself (not via the keymap registry) because it bridges selection state, the link mark, and the floating UI; a pure keymap command could not open the popover.
 
 **Interactions.** Imports `vue`, `core/Editor`, `core/extension/Extension`, `core/types`, `core/state/EditorState`, `core/state/Transaction`, `view/context` (`editorKey`, `BlockRenderItem`), `view/keymapHandler` (`dispatchKeymap`), `view/domSelection` (`readDomSelection`, `applySelectionToDom`), `view/inlineDom`, `view/clipboard`, **`view/imageUpload`** (subscribes/unsubscribes transient upload states, owns the fileId→refcount map, invokes `uploadImage` prop or mock), **`view/urlUtils`** (`sanitizeUrl` guards href in link popover save path), `i18n` (`provideI18n`, `useI18n`, `normalizeLocale`, `normalizeTheme`), `BlockList.vue` + 8 popup components (`PlusMenu`, `BlockSettingsMenu`, `HoverToolbar`, `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, **`LinkPopover`**). Subscribes to the editor; on unmount it unsubscribes, revokes any outstanding temporary object URLs from `imageUpload`, and calls `editor.destroy()`.
 
-**Extension points.** This component is the sole reactivity boundary (the design's `ViewBridge` was folded into it — §13.1). If the view layer grows, the bridge can be extracted without changing the core. A virtualized list swap replaces `BlockList` only. The `theme`/`locale` props flow through provide/inject so all child components (including `<Teleport>`-ed popovers) can access `t(key)` reactively.
+**Extension points.** This component is the sole reactivity boundary (the design's `ViewBridge` was folded into it, §13.1). If the view layer grows, the bridge can be extracted without changing the core. A virtualized list swap replaces `BlockList` only. The `theme`/`locale` props flow through provide/inject so all child components (including `<Teleport>`-ed popovers) can access `t(key)` reactively.
 
 ### `src/view/BlockList.vue`
 
-**Responsibility.** Renders a list of blocks **recursively**: it renders each block, then re-renders itself for that block's `children` (wrapped in a `.block-children` container with its own indent), so the whole nesting tree displays with proper indentation. Phase 1 rendered a flat list (`doc.root`); the authoritative nesting is `Block.children` (`DocState.parent`), with `attrs.indent` only a derived shadow. When nested (`is-nested`), it disables the root-only drop indicators and the first-block placeholder. Uses `:key="item.id"` so Vue reuses component instances across re-renders; because block objects maintain referential identity (structural sharing), unchanged blocks don't trigger `BlockHost` re-renders. This is the **virtualization seam** — the single component that decides which blocks are mounted; a virtualized implementation can drop in later without touching block components. See `docs/architecture.md` §6.1, §12.
+**Responsibility.** Renders a list of blocks **recursively**: it renders each block, then re-renders itself for that block's `children` (wrapped in a `.block-children` container with its own indent), so the whole nesting tree displays with proper indentation. Phase 1 rendered a flat list (`doc.root`); the authoritative nesting is `Block.children` (`DocState.parent`), with `attrs.indent` only a derived shadow. When nested (`is-nested`), it disables the root-only drop indicators and the first-block placeholder. Uses `:key="item.id"` so Vue reuses component instances across re-renders; because block objects maintain referential identity (structural sharing), unchanged blocks don't trigger `BlockHost` re-renders. This is the **virtualization seam**: the single component that decides which blocks are mounted; a virtualized implementation can drop in later without touching block components. See `docs/architecture.md` §6.1, §12.
 
 **Public API (props).**
 
@@ -761,7 +761,7 @@ All props and events are forwarded verbatim to the recursively-rendered nested l
 
 **Interactions.** Imports `BlockHost.vue` and `view/context` (`BlockRenderItem`). Rendered by `BlockEditor.vue`. Passes each `block` (and the first-block placeholder) to `BlockHost`.
 
-**Extension points.** A `VirtualizedBlockList` can replace this component without touching `BlockHost` or block renderers — block components are kept side-effect-free and idempotent so virtualization is safe (§12), and the recursive nested lists reuse the same `BlockRenderItem` shape.
+**Extension points.** A `VirtualizedBlockList` can replace this component without touching `BlockHost` or block renderers: block components are kept side-effect-free and idempotent so virtualization is safe (§12), and the recursive nested lists reuse the same `BlockRenderItem` shape.
 
 ### `src/view/BlockHost.vue`
 
@@ -774,7 +774,7 @@ props: { block: Block; placeholder?: string };
 emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] };
 ```
 
-`resolvedComponent` is a `computed` that reads `editor.registries.renderers.get(block.type)` and casts the opaque `component` to a Vue `Component` — the single boundary where the view layer interprets the framework-agnostic spec. The host wraps the renderer in a `.block-host` div carrying `data-block-type`.
+`resolvedComponent` is a `computed` that reads `editor.registries.renderers.get(block.type)` and casts the opaque `component` to a Vue `Component`: the single boundary where the view layer interprets the framework-agnostic spec. The host wraps the renderer in a `.block-host` div carrying `data-block-type`.
 
 **Interactions.** Imports `vue` (`computed`, `Component`), `core/types`, `view/context` (`useEditor`), and `BlockContent.vue` (fallback). Rendered by `BlockList.vue`; renders the extension-supplied component (e.g. `ParagraphBlock`, `HeadingBlock`) which in turn renders `BlockContent`. The `linkClick` event forwarded here is consumed by `BlockEditor.vue` to position the `LinkPopover` over the clicked `<a>`.
 
@@ -782,7 +782,7 @@ emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: numbe
 
 ### `src/view/BlockContent.vue`
 
-**Responsibility.** The per-block contenteditable component — the most delicate view-layer piece. Owns a single `contenteditable` element and is responsible for: rendering the block's inline content as DOM text *with mark spans* (including `<a>` elements for the `link` mark, all hrefs sanitized by `inlineDom.ts`), syncing user input back to state via the `setText` command, correctly handling IME (CJK) composition (no sync during composition; the DOM is the source of truth), tracking focus, showing a placeholder when empty, **(Phase 6 link features)** detecting clicks on inline `<a>` descendants and emitting `linkClick` so `BlockEditor.vue` can open the popover anchored to the exact click rectangle, auto-linking URLs on space/word-break (when the user types a space after what `looksLikeUrl` detected, replaces the current inline seq with `autoLinkInlineSeq(output)` via `setText`), and auto-linking when a plain-text URL is pasted over a text selection. Key invariant: it NEVER writes text to the DOM while the user is typing (the `skipDomWrite` transaction meta + the `textContent !== newText` guard protect the caret). See `docs/architecture.md` §6.3 and Phase 6.
+**Responsibility.** The per-block contenteditable component: the most delicate view-layer piece. Owns a single `contenteditable` element and is responsible for: rendering the block's inline content as DOM text *with mark spans* (including `<a>` elements for the `link` mark, all hrefs sanitized by `inlineDom.ts`), syncing user input back to state via the `setText` command, correctly handling IME (CJK) composition (no sync during composition; the DOM is the source of truth), tracking focus, showing a placeholder when empty, **(Phase 6 link features)** detecting clicks on inline `<a>` descendants and emitting `linkClick` so `BlockEditor.vue` can open the popover anchored to the exact click rectangle, auto-linking URLs on space/word-break (when the user types a space after what `looksLikeUrl` detected, replaces the current inline seq with `autoLinkInlineSeq(output)` via `setText`), and auto-linking when a plain-text URL is pasted over a text selection. Key invariant: it NEVER writes text to the DOM while the user is typing (the `skipDomWrite` transaction meta + the `textContent !== newText` guard protect the caret). See `docs/architecture.md` §6.3 and Phase 6.
 
 **Public API (props/events).**
 
@@ -793,7 +793,7 @@ props: { block: Block; placeholder?: string };
 // emits: 'linkClick' ({ blockId, href, from, to, clientRect })
 ```
 
-On `input` (outside composition) it first applies `autoLinkInlineSeq(newSeq)` to detect URLs the user just finished typing, then dispatches `editor.commands.setText({ id, content: seq })` — `setText` carries `historyGroup('type')` and `skipDomWrite([id])` so the view bridge does not write back to the focused element. On `compositionend` it dispatches one `setText`. `onFocus`/`onBlur` set/clear `editor.focusBlockId`. A `watch` on `props.block` writes new text to the DOM only if it differs and the block is not composing. Clicks: the contenteditable's `onClick` walks `event.target.closest('a')`; if found it computes the model offset of that `<a>` within the block's current inline seq, and emits `linkClick` with the click bounding rect so the popover can position itself.
+On `input` (outside composition) it first applies `autoLinkInlineSeq(newSeq)` to detect URLs the user just finished typing, then dispatches `editor.commands.setText({ id, content: seq })`; `setText` carries `historyGroup('type')` and `skipDomWrite([id])` so the view bridge does not write back to the focused element. On `compositionend` it dispatches one `setText`. `onFocus`/`onBlur` set/clear `editor.focusBlockId`. A `watch` on `props.block` writes new text to the DOM only if it differs and the block is not composing. Clicks: the contenteditable's `onClick` walks `event.target.closest('a')`; if found it computes the model offset of that `<a>` within the block's current inline seq, and emits `linkClick` with the click bounding rect so the popover can position itself.
 
 **Interactions.** Imports `vue`, `core/types` (`inlineText`, `inlineFromString`), **`view/urlUtils`** (`autoLinkInlineSeq`), and `view/context` (`useEditor`). Rendered by `BlockHost.vue` (and directly as the fallback). Reads/writes `editor.focusBlockId`; calls `editor.commands.setText`. The `data-block-id` attribute is what `domSelection.ts` uses to map DOM nodes to block ids. Paste handling: `clipboard.ts` is the canonical path (see its module entry) via `BlockEditor.vue`, which can also upgrade a URL paste to a link mark.
 
@@ -801,7 +801,7 @@ On `input` (outside composition) it first applies `autoLinkInlineSeq(newSeq)` to
 
 ### `src/view/domSelection.ts`
 
-**Responsibility.** DOM selection ↔ editor-state selection sync. The native browser selection operates on DOM nodes/ranges; the editor's model operates on block ids + character offsets. This module bridges the two. Strategy (flat blocks, rich-text content): each contenteditable carries `data-block-id`; character offsets are computed by walking text nodes; sync is **just-in-time** (read before dispatching a command, write after a state update) — it does NOT listen to `selectionchange` (too noisy, creates feedback loops). Also provides cross-block text selection rect computation for the selection overlay. See `docs/architecture.md` §8.2.
+**Responsibility.** DOM selection ↔ editor-state selection sync. The native browser selection operates on DOM nodes/ranges; the editor's model operates on block ids + character offsets. This module bridges the two. Strategy (flat blocks, rich-text content): each contenteditable carries `data-block-id`; character offsets are computed by walking text nodes; sync is **just-in-time** (read before dispatching a command, write after a state update); it does NOT listen to `selectionchange` (too noisy, creates feedback loops). Also provides cross-block text selection rect computation for the selection overlay. See `docs/architecture.md` §8.2.
 
 **Public API.**
 
@@ -822,7 +822,7 @@ function isCrossBlockText(selection: Selection): boolean;
 
 ### `src/view/inlineDom.ts`
 
-**Responsibility.** Bridges the `InlineSeq` model (text runs with optional marks) and the DOM. Converts inline sequences to HTML for rendering (via `inlineToHtml`) and parses DOM nodes back into inline sequences (via `inlineFromDom`). Used by `BlockContent.vue` for rendering and `clipboard.ts` for paste parsing. **Phase 6 (links):** `inlineToHtml` renders the `link` mark as `<a href="…">` — **href is always piped through `sanitizeUrl()` from `urlUtils.ts`**, so dangerous schemes (`javascript:`, `data:`, `vbscript:`) and obfuscated URLs never hit the DOM (they render as plain `<span>` without href). Conversely, `inlineFromDom` collects `<a href>` attributes and converts them back into `{ type: 'link', attrs: { href: normalizeUrl(rawHref) } }` marks.
+**Responsibility.** Bridges the `InlineSeq` model (text runs with optional marks) and the DOM. Converts inline sequences to HTML for rendering (via `inlineToHtml`) and parses DOM nodes back into inline sequences (via `inlineFromDom`). Used by `BlockContent.vue` for rendering and `clipboard.ts` for paste parsing. **Phase 6 (links):** `inlineToHtml` renders the `link` mark as `<a href="…">`: **href is always piped through `sanitizeUrl()` from `urlUtils.ts`**, so dangerous schemes (`javascript:`, `data:`, `vbscript:`) and obfuscated URLs never hit the DOM (they render as plain `<span>` without href). Conversely, `inlineFromDom` collects `<a href>` attributes and converts them back into `{ type: 'link', attrs: { href: normalizeUrl(rawHref) } }` marks.
 
 **Public API.**
 
@@ -837,7 +837,7 @@ function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq;
 
 ### `src/view/clipboard.ts`
 
-**Responsibility.** Clipboard parsing for copy/cut/paste. Converts pasted HTML or plain text into `ParsedBlock[]` (block-type + attrs + inline content), and serializes editor blocks into clean HTML/plain-text for the clipboard. Strips whitespace-only text nodes, trims leading/trailing whitespace per block (non-code), and avoids extra newlines. **Phase 6 additions:** (1) If paste's `clipboardData.files` contains image types (`image/png`, `image/jpeg`, …) → return a special `ParsedBlock` of type `'image'` with a transient `_pendingFile` field (never stored in attrs; passed to `imageUpload.ts` for uploading) — the paste path in `BlockEditor.vue` inserts a new image block per file and starts upload. (2) If pasted HTML contains a `<img>` (standalone or within `<figure>`), return a `ParsedBlock` with `type='image'` and `attrs.src` set from the `src` attribute. (3) If the user has a non-empty text selection and pastes plain text that `looksLikeUrl(text)` → return a structured hint `{ wrapSelectionInLink: true, href }` and `BlockEditor.vue` dispatches `setLink` instead of pasting text. (4) Plain-text clipboard paragraphs that contain URLs receive `autoLinkInlineSeq` so a paste of e.g. "Visit https://example.com" becomes a link automatically.
+**Responsibility.** Clipboard parsing for copy/cut/paste. Converts pasted HTML or plain text into `ParsedBlock[]` (block-type + attrs + inline content), and serializes editor blocks into clean HTML/plain-text for the clipboard. Strips whitespace-only text nodes, trims leading/trailing whitespace per block (non-code), and avoids extra newlines. **Phase 6 additions:** (1) If paste's `clipboardData.files` contains image types (`image/png`, `image/jpeg`, …) → return a special `ParsedBlock` of type `'image'` with a transient `_pendingFile` field (never stored in attrs; passed to `imageUpload.ts` for uploading); the paste path in `BlockEditor.vue` inserts a new image block per file and starts upload. (2) If pasted HTML contains a `<img>` (standalone or within `<figure>`), return a `ParsedBlock` with `type='image'` and `attrs.src` set from the `src` attribute. (3) If the user has a non-empty text selection and pastes plain text that `looksLikeUrl(text)` → return a structured hint `{ wrapSelectionInLink: true, href }` and `BlockEditor.vue` dispatches `setLink` instead of pasting text. (4) Plain-text clipboard paragraphs that contain URLs receive `autoLinkInlineSeq` so a paste of e.g. "Visit https://example.com" becomes a link automatically.
 
 **Public API.**
 
@@ -846,7 +846,7 @@ interface ParsedBlock {
   type: BlockType;
   attrs?: Attrs;
   content: InlineSeq;
-  // — Phase 6 transient, never written into DocState —
+  // Phase 6 transient, never written into DocState
   readonly _pendingFile?: File;           // clipboard image file (uploaded via imageUpload pipeline)
 }
 interface PasteDecision {
@@ -896,7 +896,7 @@ export const imageUploadStore: ImageUploadStore;
 export function setUploadHook(hook: UploadImageHandler | null): void;
 ```
 
-The default behavior uses a built-in mock uploader (no `uploadImage` ever existed on `<BlockEditor>` — it is injected via `createImageExtension({ upload })`): the mock waits 800–2500 ms, emits fake progress ticks, and ~30% of the time rejects — so retry/error UI can be developed and tested without a backend. On `beginUpload`, the `tempSrc` object URL is created and pushed to state so `Image.ts` can render it immediately; on `resolve` the caller dispatches `setAttrs` to write the real `src`/`fileId` and then calls `cancel(blockId)` to revoke. On `reject` the error string is kept in state plus the cached `File`, so the user can click **Retry** on the image overlay.
+The default behavior uses a built-in mock uploader (no `uploadImage` ever existed on `<BlockEditor>`; it is injected via `createImageExtension({ upload })`): the mock waits 800–2500 ms, emits fake progress ticks, and ~30% of the time rejects, so retry/error UI can be developed and tested without a backend. On `beginUpload`, the `tempSrc` object URL is created and pushed to state so `Image.ts` can render it immediately; on `resolve` the caller dispatches `setAttrs` to write the real `src`/`fileId` and then calls `cancel(blockId)` to revoke. On `reject` the error string is kept in state plus the cached `File`, so the user can click **Retry** on the image overlay.
 
 **Interactions.** Depends only on `core/types` (for the `BlockId` brand). Hooked by `extensions/Image.ts` (its `createImageUploadPlugin(...)` calls `registerUploadHandler` during `init`, registers an unregister function in `onDestroy`, and exposes the async `startImageUpload` orchestrator via `Editor.registerExtensionMethod`). The `extensions/Image.ts` renderer subscribes to `state[blockId]` to drive the progress bar, error banner, and retry button. `BlockEditor.vue` is no longer involved: it only forwards the extension method to the existing `useBeginImageUpload()` Vue injection, and the `image-upload` plugin's `applyTransaction` hook is what invokes `onFileCleanup(fileId)` when ref-counts drop (the modern replacement for the old `@cleanup:image-file` Vue emit).
 
@@ -904,7 +904,7 @@ The default behavior uses a built-in mock uploader (no `uploadImage` ever existe
 
 ### `src/view/urlUtils.ts`
 
-**Responsibility.** URL helpers that every link-related path calls. Provides three related but distinct concerns: (a) heuristic detection ("does this text look like a URL?"), (b) normalization (adding `https://` when missing, trimming trailing punctuation), and (c) **security sanitization** that returns the empty string for dangerous URLs (so callers can safely omit `href` instead of rendering poisoned anchors). Also exposes `autoLinkInlineSeq`, which scans a `InlineSeq` for text runs that look like URLs and automatically applies a `link` mark — the canonical call sites are `BlockContent.vue` (space-triggered auto-link while typing) and `clipboard.ts` (pasted plain text paragraphs).
+**Responsibility.** URL helpers that every link-related path calls. Provides three related but distinct concerns: (a) heuristic detection ("does this text look like a URL?"), (b) normalization (adding `https://` when missing, trimming trailing punctuation), and (c) **security sanitization** that returns the empty string for dangerous URLs (so callers can safely omit `href` instead of rendering poisoned anchors). Also exposes `autoLinkInlineSeq`, which scans a `InlineSeq` for text runs that look like URLs and automatically applies a `link` mark (the canonical call sites are `BlockContent.vue` for space-triggered auto-link while typing and `clipboard.ts` for pasted plain text paragraphs).
 
 **Public API.**
 
@@ -919,13 +919,13 @@ function sanitizeUrl(raw: string): string;  // returns "" on unsafe/missing sche
 function autoLinkInlineSeq(seq: InlineSeq): InlineSeq;
 ```
 
-`looksLikeUrl` matches: absolute schemes `https?://`, `mailto:`, `tel:`; bare `www.` prefix (→ normalized to `https://www.`); emails matching `user@domain.tld` (→ normalized to `mailto:user@domain.tld`). It deliberately avoids matching anything inside a `code` mark. `sanitizeUrl` whitelists only `http https mailto tel`, removes `\t\n\r` mid-URL, rejects schemes with non-ASCII letters, and strips whitespace — the result is either empty or guaranteed to have a whitelisted scheme and no obvious obfuscation. Caller rule: **if `sanitizeUrl` returns `""`, treat the link as having no href** (do not write `href` to DOM).
+`looksLikeUrl` matches: absolute schemes `https?://`, `mailto:`, `tel:`; bare `www.` prefix (→ normalized to `https://www.`); emails matching `user@domain.tld` (→ normalized to `mailto:user@domain.tld`). It deliberately avoids matching anything inside a `code` mark. `sanitizeUrl` whitelists only `http https mailto tel`, removes `\t\n\r` mid-URL, rejects schemes with non-ASCII letters, and strips whitespace; the result is either empty or guaranteed to have a whitelisted scheme and no obvious obfuscation. Caller rule: **if `sanitizeUrl` returns `""`, treat the link as having no href** (do not write `href` to DOM).
 
 **Interactions.** Depends only on `core/types` (`InlineSeq`, `InlineNode`, `Mark`). Used by `primitiveCommands.ts` (`setLink` sanitizes href), `inlineDom.ts` (render), `clipboard.ts` (URL paste detection + auto-link), `BlockContent.vue` (space-triggered auto-link), `LinkPopover.vue` (onSave validates href + displays sanitized URL), `BlockEditor.vue` (Mod+K save path).
 
 ### `src/view/ui/LinkPopover.vue`
 
-**Responsibility.** Floating popover (`<Teleport>`-ed to `<body>`) that lets users view/edit/remove a link, similar to Notion/Google Docs. Has two modes: `view` and `edit`. Appears anchored to a native DOM rectangle (either the user's current text selection `getBoundingClientRect()`, or the click rectangle of an existing `<a>` element). The popover is controlled imperatively by `BlockEditor.vue` which holds `mode`, `href`, `text`, `blockId`, `from`, `to`, and `anchorRect` refs — this component is purely presentational and emits `open-link`, `copy-link`, `edit`, `remove`, `save({ href, text })`, and `cancel` events.
+**Responsibility.** Floating popover (`<Teleport>`-ed to `<body>`) that lets users view/edit/remove a link, similar to Notion/Google Docs. Has two modes: `view` and `edit`. Appears anchored to a native DOM rectangle (either the user's current text selection `getBoundingClientRect()`, or the click rectangle of an existing `<a>` element). The popover is controlled imperatively by `BlockEditor.vue`, which holds `mode`, `href`, `text`, `blockId`, `from`, `to`, and `anchorRect` refs; this component is purely presentational and emits `open-link`, `copy-link`, `edit`, `remove`, `save({ href, text })`, and `cancel` events.
 
 **Public API (props/emits).**
 
@@ -957,15 +957,15 @@ In `view` mode it renders: a clickable `<a :href="sanitizeUrl(currentHref)">` wi
 
 ### `src/view/ui/FixedToolbar.vue`
 
-**Responsibility.** Persistent action bar visible on **both desktop and mobile** — replaces the old mobile-only `MobileToolbar`. The `toolbarPosition` prop controls placement:
+**Responsibility.** Persistent action bar visible on **both desktop and mobile**, replacing the old mobile-only `MobileToolbar`. The `toolbarPosition` prop controls placement:
 - `'auto'` (default): top on desktop, bottom on mobile (stays above the virtual keyboard via the `visualViewport` API; uses `env(safe-area-inset-bottom)` for iPhone home-indicator spacing).
 - `'top'`: force top. Menus (PlusMenu, BlockSettingsMenu) open **downward**.
 - `'bottom'`: force bottom. Menus open **upward**.
-- `'float'`: **desktop only** — the FixedToolbar is hidden and `BlockEditor.vue` renders a standalone floating `HoverToolbar` (teleported to `<body>`, follows the text/table selection) instead. On mobile (`(pointer: coarse)`), `'float'` falls back to `'auto'`.
+- `'float'`: **desktop only**; the FixedToolbar is hidden and `BlockEditor.vue` renders a standalone floating `HoverToolbar` (teleported to `<body>`, follows the text/table selection) instead. On mobile (`(pointer: coarse)`), `'float'` falls back to `'auto'`.
 
 Embeds a single `<HoverToolbar>` instance **inline** (instead of rendering it as a floating overlay) so text-selection state is preserved when the user clicks formatting buttons. Left side: plus button (opens `PlusMenu`) and grip button (opens `BlockSettingsMenu`). Right side: the full `HoverToolbar` button set (type / align / marks / color / copy / table ops / link ops). Provides two injection keys that downstream menus consume to decide popup direction:
-- `fixedToolbarBottomKey: Ref<boolean>` — `true` when the toolbar is pinned to the bottom.
-- `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>` — passed to the embedded HoverToolbar so it knows what block type / attrs to show actions for.
+- `fixedToolbarBottomKey: Ref<boolean>`: `true` when the toolbar is pinned to the bottom.
+- `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>`: passed to the embedded HoverToolbar so it knows what block type / attrs to show actions for.
 
 **Interactions.** Imports `vue`, `HoverToolbar.vue`, `i18n` (`useI18n`), and `view/context` (`useEditor`, `fixedToolbarBridgeKey`, `fixedToolbarBottomKey`). Rendered **conditionally** inside `BlockEditor.vue`'s template: it is skipped when `toolbarPosition='float'` on desktop (a floating `HoverToolbar` is rendered in its place; on mobile `'float'` falls back to `'auto'` and the FixedToolbar still renders). Emits events that `BlockEditor.vue` wires to the same `onOpenPlusMenu` / `onOpenSettingsMenu` handlers used by the desktop `BlockHandle.vue`. When a table cell is focused, `TableBlock` publishes a descriptor via the `fixedToolbarBridgeKey` injection key so the embedded `HoverToolbar` reflects cell/table state instead of text-block state.
 
@@ -991,7 +991,7 @@ Returns `true` if a binding matched and the command returned `true` (handled); t
 
 ### `src/extensions/Paragraph.ts`
 
-**Responsibility.** The Paragraph block-type extension — the default text block. Registers the `"paragraph"` block type with a `content: 'text'`, nestable schema (paragraph can be a parent, so any block can be tab-indented under it) and a simple renderer (`ParagraphBlock`) that wraps `BlockContent` with a `block-paragraph` CSS class. Paragraph is the fallback block type used when the user presses Enter on an empty block or exits a non-text block. See `docs/architecture.md` §11.2 (default block type).
+**Responsibility.** The Paragraph block-type extension, the default text block. Registers the `"paragraph"` block type with a `content: 'text'`, nestable schema (paragraph can be a parent, so any block can be tab-indented under it) and a simple renderer (`ParagraphBlock`) that wraps `BlockContent` with a `block-paragraph` CSS class. Paragraph is the fallback block type used when the user presses Enter on an empty block or exits a non-text block. See `docs/architecture.md` §11.2 (default block type).
 
 **Public API.**
 
@@ -1092,7 +1092,7 @@ export const QuoteExtension: Extension;
 
 ### `src/extensions/CodeBlock.ts`
 
-**Responsibility.** The code block extension. Marked as **isolating**: Enter inserts a newline (not a new paragraph), Backspace at offset 0 on an empty code block removes it without merging. Supports only `language` attr (uses `CODE_BLOCK_ATTRS` — no align/color/bgColor/indent). The renderer switches to `white-space: pre; font-family: monospace`.
+**Responsibility.** The code block extension. Marked as **isolating**: Enter inserts a newline (not a new paragraph), Backspace at offset 0 on an empty code block removes it without merging. Supports only `language` attr (uses `CODE_BLOCK_ATTRS`: no align/color/bgColor/indent). The renderer switches to `white-space: pre; font-family: monospace`.
 
 **Public API.**
 
@@ -1129,11 +1129,11 @@ export const IMAGE_ATTRS: BlockSchemaSpec['attrs'];              // {} (image: p
 
 Color presets use CSS variables (`var(--be-color-gray)`, `var(--be-swatch-bg-gray)`) so they adapt to light/dark themes automatically. Background colors use semi-transparent tints with an `opacity` field.
 
-**Interactions.** Imported by 10 block-type extensions (7 text blocks + image / table / divider). Table and Divider intentionally avoid importing `COMMON_ATTRS` — table's text attrs live per-cell (no block-level align/indent), and divider is an isolating block with empty attrs. `classesFromAttrs` is called by each renderer that carries text attrs. `coerceAttrsFor()` in `SchemaRegistry` uses the schema's attr specs to strip invalid attrs when converting block types (e.g. removing `indent` when converting to `quote`, removing all attrs when converting to `codeBlock`, stripping all block-level text attrs when converting to `image`/`divider`/`table` and letting each schema handle its own attrs).
+**Interactions.** Imported by 10 block-type extensions (7 text blocks + image / table / divider). Table and Divider intentionally avoid importing `COMMON_ATTRS`: table's text attrs live per-cell (no block-level align/indent), and divider is an isolating block with empty attrs. `classesFromAttrs` is called by each renderer that carries text attrs. `coerceAttrsFor()` in `SchemaRegistry` uses the schema's attr specs to strip invalid attrs when converting block types (e.g. removing `indent` when converting to `quote`, removing all attrs when converting to `codeBlock`, stripping all block-level text attrs when converting to `image`/`divider`/`table` and letting each schema handle its own attrs).
 
 ### `src/extensions/Image.ts`
 
-**Responsibility.** The Image block-type extension. A `content: 'none'` block — no inline text content inside the block itself; the editable caption is implemented as a separate `contenteditable` child in the renderer. All display data lives in persistent `attrs`: `src` (string), `alt?`, `title?`, `width?`, `height?`, `caption?`, `fileId?`. The transient upload state (`status`, `progress`, `error`, `tempSrc`) is **never** stored in attrs and comes from `view/imageUpload.ts`. Entry points: slash command `/image` (opens local file picker or lets user paste an image URL into `src`), and the paste paths in `clipboard.ts` + `BlockEditor.vue` (pasted files or `<img>` HTML).
+**Responsibility.** The Image block-type extension. A `content: 'none'` block: no inline text content inside the block itself; the editable caption is implemented as a separate `contenteditable` child in the renderer. All display data lives in persistent `attrs`: `src` (string), `alt?`, `title?`, `width?`, `height?`, `caption?`, `fileId?`. The transient upload state (`status`, `progress`, `error`, `tempSrc`) is **never** stored in attrs and comes from `view/imageUpload.ts`. Entry points: slash command `/image` (opens local file picker or lets user paste an image URL into `src`), and the paste paths in `clipboard.ts` + `BlockEditor.vue` (pasted files or `<img>` HTML).
 
 **Public API.**
 
@@ -1174,7 +1174,7 @@ The `ImageBlock` renderer renders `.block-image-wrapper` → `<img class="block-
 
 ### `src/extensions/Table.ts`
 
-**Responsibility.** Table block type extension — a `content: 'none'` block using the **attrs storage** pattern (same as Image): **all table grid data** (`cells`, `colWidths`, `rows/cols`, `headerRow`, merged-cell coverage state) lives inside `attrs`, `Block.children` stays `[]`, so the core never inspects table internals and transactions/undo/redo flow through `setAttrs` for free. The renderer is a self-contained Vue component (row selector bar, column selector bar, corner all-select handle, floating toolbar, between-row/column insertion handles). All UI interactions route through the editor `commands` proxy (`tableInsert*` / `tableRemove*` / `tableMergeRect` / `tableSplitCellsInRect` / `tableSetColWidth` / **`tableToggleHeaderRow`** / `tableSetCellAttrs` / `tableSetCellMark` / `tableToggleCellMark` / `tableInsert`) which call `tableModel.ts` pure functions → `editor.commands.setAttrs({ id, attrs: next })`. Enter in a code-block cell inserts a literal newline (records caret offset, DOM-inserts `\n` TextNode, calls `syncCellContent`, then re-places caret at offset+1 in `nextTick` after Vue's async DOM patch).
+**Responsibility.** Table block type extension: a `content: 'none'` block using the **attrs storage** pattern (same as Image): **all table grid data** (`cells`, `colWidths`, `rows/cols`, `headerRow`, merged-cell coverage state) lives inside `attrs`, `Block.children` stays `[]`, so the core never inspects table internals and transactions/undo/redo flow through `setAttrs` for free. The renderer is a self-contained Vue component (row selector bar, column selector bar, corner all-select handle, floating toolbar, between-row/column insertion handles). All UI interactions route through the editor `commands` proxy (`tableInsert*` / `tableRemove*` / `tableMergeRect` / `tableSplitCellsInRect` / `tableSetColWidth` / **`tableToggleHeaderRow`** / `tableSetCellAttrs` / `tableSetCellMark` / `tableToggleCellMark` / `tableInsert`) which call `tableModel.ts` pure functions → `editor.commands.setAttrs({ id, attrs: next })`. Enter in a code-block cell inserts a literal newline (records caret offset, DOM-inserts `\n` TextNode, calls `syncCellContent`, then re-places caret at offset+1 in `nextTick` after Vue's async DOM patch).
 
 **Public API.**
 
@@ -1206,7 +1206,7 @@ export function createTableCommands(editor: Editor): {
 
 `TableBlock` component behavior:
 - Outer `.block-table-container` uses `padding-top/left=20px` to make room for selector bars and has no focus outline; the inner `.table-wrapper` has `overflow-x: auto + width: 100%`, and the inner `<table>` uses `width: max-content + table-layout: fixed`, so horizontal scrolling is independent of the editor canvas scroll.
-- Row selector bar, column selector bar, corner all-select handle, floating toolbar, and between-row/column insertion markers are **all direct children of `.block-table-container` (fixed-to-container)** — they never scroll with the content.
+- Row selector bar, column selector bar, corner all-select handle, floating toolbar, and between-row/column insertion markers are **all direct children of `.block-table-container` (fixed-to-container)**; they never scroll with the content.
 - Three cell visual states: **default** (white bg / gray border), **selected** (light-blue bg `.cell-selected`), **focus editing** (blue drop-shadow `.cell-focus-outline`). Single-click → selected; double-click → focused independent `contenteditable`; Escape → blur.
 - `cellType` controls per-row prefix/visual: heading (font size matches body headings), quote (left border), todo (checkbox + strikethrough), bullet/ordered (prefix glyphs/numbers), codeBlock (monospace font + code gray bg + `white-space: pre-wrap`).
 - Merged cells: when `cells[r][c].colspan > 1 || rowspan > 1`, the rendered `<td>` carries those attributes; `covered: true` cells are not rendered. Drag selection containing merged cells auto-calls `expandSelectionToFullRect`.
@@ -1214,13 +1214,13 @@ export function createTableCommands(editor: Editor): {
 - Row/column insertion points: hovering over the 3px hot zone between cells shows a blue insertion indicator; clicking inserts a new row/column there (new rows inherit col widths, new columns default to 120 px width).
 - Tab / Shift+Tab for cell navigation; Tab in last cell → auto appends new row; non-code-block Enter → exits focus (syncs content) + stays in single-cell selected mode.
 
-**Interactions.** Imports `vue` (`h / ref / computed / watch / nextTick / onBeforeUnmount`), `core/types` (`BlockAttrs` / `EditorRef` / `BlockId` / `Mark` / `MarkType`), `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/context` (`useEditor`), `extensions/tableModel` (all pure functions + `TABLE_ATTRS_SCHEMA` / `expandSelectionToFullRect`), `view/ui/HoverToolbar.vue` (floating toolbar), `i18n` (`t()`), and indirectly uses `core/inlineDom` (via `syncCellContent` and `inlineToHtml` / `inlineFromHtml` / `inlineToMarkdown` / `markdownToInline` calls). Included by default in `BuiltinExtensions`. Like Image, Table is a `content: 'none'` attrs-storage block — zero core changes. No cross-extension imports beyond its sibling `tableModel.ts`.
+**Interactions.** Imports `vue` (`h / ref / computed / watch / nextTick / onBeforeUnmount`), `core/types` (`BlockAttrs` / `EditorRef` / `BlockId` / `Mark` / `MarkType`), `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/context` (`useEditor`), `extensions/tableModel` (all pure functions + `TABLE_ATTRS_SCHEMA` / `expandSelectionToFullRect`), `view/ui/HoverToolbar.vue` (floating toolbar), `i18n` (`t()`), and indirectly uses `core/inlineDom` (via `syncCellContent` and `inlineToHtml` / `inlineFromHtml` / `inlineToMarkdown` / `markdownToInline` calls). Included by default in `BuiltinExtensions`. Like Image, Table is a `content: 'none'` attrs-storage block: zero core changes. No cross-extension imports beyond its sibling `tableModel.ts`.
 
 ### `src/extensions/Equation.ts` and `src/extensions/math/`
 
-**Responsibility.** Equation (LaTeX math) block type extension — a `content: 'none'`, **isolated** block that stores only `attrs.expression` (the raw LaTeX source). Rendering goes through an **injectable `EquationRenderer`** (`render(expression, { displayMode }) => EquationRenderResult` with `{ html, vnode, error, diagnostics }`): the **built-in renderer** is a zero-dependency math engine in `src/extensions/math/` that pipelines tokenizer → parser → Math AST → render tree → DOM (Vue `h` VNodes in the view, escaped HTML strings for `serialize.toHTML` / SSR). The engine supports a lightweight LaTeX-math subset — numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq` …), superscripts/subscripts (merged into a single `scripts` node), `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters, function names, large operators (`\sum \prod \int` with display limits), `\begin{matrix}` and `\begin{aligned}` (CSS grid) — unknown commands degrade to a literal `\foo` node and syntax errors surface as a `⚠` badge with position-tagged diagnostics; parsing never throws into the editor. The renderer is **pluggable**: `createEquationExtension({ renderer })` builds the extension with a custom engine (KaTeX/MathJax adapter example in README), composed **after** `BuiltinExtensions` (name-based deduplication, last entry wins) to take effect. **`<BlockEditor>` has no `equationRenderer` prop.** The component (`createEquationBlock(renderer)`) stays renderer-agnostic: in view mode it renders the computed result (VNode when provided, otherwise `SafeHtml` for string-only engines); in edit mode it shows a textarea bound to the draft expression with a live preview; Enter submits (`setAttrs`), Escape cancels, an empty expression deletes the block, and an empty block auto-enters edit mode on insert. Only `attrs.expression` is persisted — rendered output is never stored. Selection and nesting follow the editor-wide generic non-text block convention: the root element carries `block-focus-root` so the block-handle/selection ring is driven entirely by `focusedBlockId`, and `classesFromAttrs(attrs)` injects the `be-indent-N` class (`attrs.indent` mirrors depth). Markdown export serializes as `$$$ … $$$` fenced blocks; Markdown import accepts both `$$$` and `$$` fences; HTML export emits `<div class="equation-block-rendered">` (error case: `<p class="math-error-block">`).
+**Responsibility.** Equation (LaTeX math) block type extension: a `content: 'none'`, **isolated** block that stores only `attrs.expression` (the raw LaTeX source). Rendering goes through an **injectable `EquationRenderer`** (`render(expression, { displayMode }) => EquationRenderResult` with `{ html, vnode, error, diagnostics }`): the **built-in renderer** is a zero-dependency math engine in `src/extensions/math/` that pipelines tokenizer → parser → Math AST → render tree → DOM (Vue `h` VNodes in the view, escaped HTML strings for `serialize.toHTML` / SSR). The engine supports a lightweight LaTeX-math subset: numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq` …), superscripts/subscripts (merged into a single `scripts` node), `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters, function names, large operators (`\sum \prod \int` with display limits), `\begin{matrix}` and `\begin{aligned}` (CSS grid); unknown commands degrade to a literal `\foo` node and syntax errors surface as a `⚠` badge with position-tagged diagnostics; parsing never throws into the editor. The renderer is **pluggable**: `createEquationExtension({ renderer })` builds the extension with a custom engine (KaTeX/MathJax adapter example in README), composed **after** `BuiltinExtensions` (name-based deduplication, last entry wins) to take effect. **`<BlockEditor>` has no `equationRenderer` prop.** The component (`createEquationBlock(renderer)`) stays renderer-agnostic: in view mode it renders the computed result (VNode when provided, otherwise `SafeHtml` for string-only engines); in edit mode it shows a textarea bound to the draft expression with a live preview; Enter submits (`setAttrs`), Escape cancels, an empty expression deletes the block, and an empty block auto-enters edit mode on insert. Only `attrs.expression` is persisted; rendered output is never stored. Selection and nesting follow the editor-wide generic non-text block convention: the root element carries `block-focus-root` so the block-handle/selection ring is driven entirely by `focusedBlockId`, and `classesFromAttrs(attrs)` injects the `be-indent-N` class (`attrs.indent` mirrors depth). Markdown export serializes as `$$$ … $$$` fenced blocks; Markdown import accepts both `$$$` and `$$` fences; HTML export emits `<div class="equation-block-rendered">` (error case: `<p class="math-error-block">`).
 
-**Interactions.** `Equation.ts` imports `vue`, `core/types`, `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/ui/SafeHtml.vue`, `view/ui/icons` (`ICON_EQUATION`, `ICON_EDIT`), `extensions/_commonAttrs` (`COMMON_ATTRS`, `classesFromAttrs`), `view/context` (`useEditor` / `useEditable`), and `i18n` (`useI18n`) — **no third-party math library anywhere**. `extensions/math/` (`ast.ts`, `tokens.ts`, `symbols.ts`, `parser.ts`, `renderTree.ts`, `renderVNode.ts`, `renderHtml.ts`) is a self-contained engine with zero imports beyond Vue's `h` (VNode backend only). Included by default in `BuiltinExtensions` via `EquationExtension = createEquationExtension()`. Like Image/Table, Equation is a `content: 'none'` attrs-storage block — zero core changes. Enter on an empty equation exits to the default block type; the edit button calls `editor.commands.selectBlock({ id })` before entering edit mode so the block is always selected while editing. Public exports: `EquationRenderer`, `EquationRenderOptions`, `EquationRenderResult`, `EquationDiagnostic`, `builtinEquationRenderer`, `createEquationExtension`, `EquationBlock`, `renderEquation` (legacy helper), plus the engine pieces `parseMath`, `SUPPORTED_COMMANDS`, `MathNode`, `MathParseResult` from `xiaodao-editor`.
+**Interactions.** `Equation.ts` imports `vue`, `core/types`, `core/editor` (`Editor`), `core/extension/Extension` (`defineExtension`), `view/ui/SafeHtml.vue`, `view/ui/icons` (`ICON_EQUATION`, `ICON_EDIT`), `extensions/_commonAttrs` (`COMMON_ATTRS`, `classesFromAttrs`), `view/context` (`useEditor` / `useEditable`), and `i18n` (`useI18n`): **no third-party math library anywhere**. `extensions/math/` (`ast.ts`, `tokens.ts`, `symbols.ts`, `parser.ts`, `renderTree.ts`, `renderVNode.ts`, `renderHtml.ts`) is a self-contained engine with zero imports beyond Vue's `h` (VNode backend only). Included by default in `BuiltinExtensions` via `EquationExtension = createEquationExtension()`. Like Image/Table, Equation is a `content: 'none'` attrs-storage block: zero core changes. Enter on an empty equation exits to the default block type; the edit button calls `editor.commands.selectBlock({ id })` before entering edit mode so the block is always selected while editing. Public exports: `EquationRenderer`, `EquationRenderOptions`, `EquationRenderResult`, `EquationDiagnostic`, `builtinEquationRenderer`, `createEquationExtension`, `EquationBlock`, `renderEquation` (legacy helper), plus the engine pieces `parseMath`, `SUPPORTED_COMMANDS`, `MathNode`, `MathParseResult` from `xiaodao-editor`.
 
 ### `src/extensions/tableModel.ts`
 
@@ -1269,11 +1269,11 @@ export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | '
 export interface TableSelectionRect { startRow: number; endRow: number; startCol: number; endCol: number }
 ```
 
-**Interactions.** Depends only on `core/types` (type-level `Attrs` / `InlineNode` / `Mark` / `MarkType`). **No Vue / core Editor / other extension imports** — pure functions. Consumed by `Table.ts` (each command in `createTableCommands` calls a matching `tableModel.xxx`; the renderer computes selection helpers using `isRect` / `expandSelectionToFullRect` / `getColWidthsSum` etc). `validateTableAttrs` is used inside the schema coercion entry point (fills defaults). `tableToHtml` / `tableFromHtml` / `tableToMarkdown` / `tableFromMarkdown` are the serialize/deserialize exits registered in TableExtension.
+**Interactions.** Depends only on `core/types` (type-level `Attrs` / `InlineNode` / `Mark` / `MarkType`). **No Vue / core Editor / other extension imports**: pure functions. Consumed by `Table.ts` (each command in `createTableCommands` calls a matching `tableModel.xxx`; the renderer computes selection helpers using `isRect` / `expandSelectionToFullRect` / `getColWidthsSum` etc). `validateTableAttrs` is used inside the schema coercion entry point (fills defaults). `tableToHtml` / `tableFromHtml` / `tableToMarkdown` / `tableFromMarkdown` are the serialize/deserialize exits registered in TableExtension.
 
 ### `src/extensions/Divider.ts`
 
-**Responsibility.** Divider block type extension — a minimal isolating block that renders `<hr class="block-divider">`, has `content: 'none'`, and empty attrs. Input rules `---`, `***`, `___` on an empty paragraph convert to divider; slash menu offers a "divider" entry (`/divider`).
+**Responsibility.** Divider block type extension: a minimal isolating block that renders `<hr class="block-divider">`, has `content: 'none'`, and empty attrs. Input rules `---`, `***`, `___` on an empty paragraph convert to divider; slash menu offers a "divider" entry (`/divider`).
 
 **Public API.**
 
@@ -1290,7 +1290,7 @@ export const DividerExtension: Extension;
 
 ### `src/extensions/TableOfContents.ts`
 
-**Responsibility.** Table-of-Contents (TOC) block type extension — a special, **non-editable** block that renders a live, hierarchical list of every heading in the document. It deliberately stores no heading data (`content: 'none'`, empty attrs): the list is a **dynamic view** computed from the current editor state on every render, so it always stays in sync with the document (heading add/remove, text/level/order changes). `content: 'none'` + `inlineMarks: false` + `renderer.editable: false` make the block non-editable by construction — no caret, no inline text.
+**Responsibility.** Table-of-Contents (TOC) block type extension: a special, **non-editable** block that renders a live, hierarchical list of every heading in the document. It deliberately stores no heading data (`content: 'none'`, empty attrs): the list is a **dynamic view** computed from the current editor state on every render, so it always stays in sync with the document (heading add/remove, text/level/order changes). `content: 'none'` + `inlineMarks: false` + `renderer.editable: false` make the block non-editable by construction: no caret, no inline text.
 
 **Public API.**
 
@@ -1318,15 +1318,15 @@ export const TableOfContentsExtension: Extension;
 // serialize: { toHTML: () => '', toMarkdown: () => '' }
 ```
 
-The renderer subscribes to editor state updates (`editor.subscribe`) and recomputes the heading collection on every change, so the TOC re-renders whenever the document changes. Clicking an entry dispatches `setSelection` (caret at the heading, via `caretSelection(id, 0)`) and then `scrollIntoView({ block: 'center', behavior: 'smooth' })` — reusing the existing Selection / DOM positioning machinery instead of mutating the document structure.
+The renderer subscribes to editor state updates (`editor.subscribe`) and recomputes the heading collection on every change, so the TOC re-renders whenever the document changes. Clicking an entry dispatches `setSelection` (caret at the heading, via `caretSelection(id, 0)`) and then `scrollIntoView({ block: 'center', behavior: 'smooth' })`, reusing the existing Selection / DOM positioning machinery instead of mutating the document structure.
 
 **Interactions.** Imports `vue` (computed/defineComponent/h/nextTick/ref), `core/types` (`Block`, `BlockId`, `DocState`, `inlineText`), `core/state/store` (`flatten`), `core/selection/Selection` (`caretSelection`), `view/domSelection` (`findBlockEl`), `view/context` (`useEditor`), `i18n` (`useI18n`), `view/ui/icons` (`ICON_TOC`). Included by default in `BuiltinExtensions`.
 
-**Extension points.** Serialization emits empty strings for both HTML and Markdown — the generated heading list is a view, not editor content, and the real headings are exported by their own blocks, so a TOC is never duplicated into exports. Heading collection is a pure function (`collectHeadings`) that could be reused or customized (e.g. filter by level, add numbering) without touching the core.
+**Extension points.** Serialization emits empty strings for both HTML and Markdown: the generated heading list is a view, not editor content, and the real headings are exported by their own blocks, so a TOC is never duplicated into exports. Heading collection is a pure function (`collectHeadings`) that could be reused or customized (e.g. filter by level, add numbering) without touching the core.
 
 ### `src/extensions/Keymap.ts`
 
-**Responsibility.** The default keymap extension: binds core editing keys to primitive commands. These are the shortcuts every text editor needs — Enter to split/exit, Backspace/Delete to merge/delete, and Arrow keys for inter-block navigation. Extensions may register additional keymaps with higher priority (lower number) to override these defaults. See `docs/architecture.md` §11.1, §11.2, §11.3.
+**Responsibility.** The default keymap extension: binds core editing keys to primitive commands. These are the shortcuts every text editor needs: Enter to split/exit, Backspace/Delete to merge/delete, and Arrow keys for inter-block navigation. Extensions may register additional keymaps with higher priority (lower number) to override these defaults. See `docs/architecture.md` §11.1, §11.2, §11.3.
 
 **Public API.**
 
@@ -1366,7 +1366,7 @@ export const HistoryExtension: Extension;
 
 **Interactions.** Imports `core/extension/Extension` only. Bundled in `builtin.ts`; its bindings are registered by `Registry.ts` and resolved by `keymapHandler.ts`. The `undo`/`redo` commands are registered by `Editor.ts` and delegate to `HistoryManager`.
 
-**Extension points.** A user can disable the default undo/redo shortcuts by overriding the `history-keymap` extension by name, or add alternative bindings (e.g. a toolbar button) by dispatching `editor.commands.undo()` directly. The split between `HistoryManager` (engine) and this extension (keymap only) is deliberate — see §13.1.
+**Extension points.** A user can disable the default undo/redo shortcuts by overriding the `history-keymap` extension by name, or add alternative bindings (e.g. a toolbar button) by dispatching `editor.commands.undo()` directly. The split between `HistoryManager` (engine) and this extension (keymap only) is deliberate (see §13.1).
 
 ### `src/extensions/builtin.ts`
 
@@ -1421,7 +1421,7 @@ export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void;
 export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 ```
 
-`provideI18n` provides the raw locale/theme refs directly (not wrapped in an object) so each consumer's `t()` function reads `localeRef.value` — a plain ref read that Vue's reactivity system tracks reliably across `<Teleport>` boundaries. `useI18n()` injects the refs and builds a fresh `t()` that looks up the key in the current locale's dictionary, falling back to the raw key if missing.
+`provideI18n` provides the raw locale/theme refs directly (not wrapped in an object) so each consumer's `t()` function reads `localeRef.value`: a plain ref read that Vue's reactivity system tracks reliably across `<Teleport>` boundaries. `useI18n()` injects the refs and builds a fresh `t()` that looks up the key in the current locale's dictionary, falling back to the raw key if missing.
 
 **Interactions.** Imports `vue` (`InjectionKey`, `Ref`, `inject`, `provide`, `ref`). `BlockEditor.vue` calls `provideI18n()` in `setup()` and updates the refs via `watch(normalizedLocale, …)`. All UI components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`, `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`) call `useI18n()` to get `t()`.
 
@@ -1429,7 +1429,7 @@ export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 
 ### `src/style.css`
 
-**Responsibility.** The editor's self-contained stylesheet. All design tokens are CSS variables defined under `:root` (light) and `.block-editor.theme-dark` / `body.theme-dark` (dark). The `.block-editor` element intentionally has no `background` — the host page controls the editor's background.
+**Responsibility.** The editor's self-contained stylesheet. All design tokens are CSS variables defined under `:root` (light) and `.block-editor.theme-dark` / `body.theme-dark` (dark). The `.block-editor` element intentionally has no `background`: the host page controls the editor's background.
 
 **Key CSS variables.**
 
@@ -1462,7 +1462,7 @@ Dark mode overrides are defined on `.block-editor.theme-dark` and `body.theme-da
 **Public API.**
 
 ```ts
-// Core engine (framework-agnostic) — re-exports core/index.ts
+// Core engine (framework-agnostic); re-exports core/index.ts
 export * from './core/index';
 
 // Vue components
@@ -1488,7 +1488,7 @@ export { DividerExtension } from './extensions/Divider';
 export { KeymapExtension } from './extensions/Keymap';
 export { HistoryExtension } from './extensions/History';
 
-// — Phase 6 utilities —
+// Phase 6 utilities
 export { sanitizeUrl, looksLikeUrl, normalizeUrl, autoLinkInlineSeq } from './view/urlUtils';
 export { imageUploadStore, setUploadHook } from './view/imageUpload';
 export type { UploadStatus, ImageUploadState } from './view/imageUpload';

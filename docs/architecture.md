@@ -78,7 +78,7 @@ ProseMirror ergonomic and provides a Vue renderer via `NodeViewWrapper`.
   collaborative editing via Yjs.
 - Weaknesses: inherits all of ProseMirror's prose-first constraints. Dynamic
   block registration still fights the schema. The Vue node-view bridge is a
-  compromise — ProseMirror still owns the document DOM, so per-block Vue
+  compromise: ProseMirror still owns the document DOM, so per-block Vue
   components live inside a contenteditable it controls.
 
 ### 2.3 BlockNote
@@ -102,8 +102,8 @@ DOM. Nodes are classes with lifecycle hooks.
 
 - Strengths: fine-grained updates, good performance, modern architecture,
   designed for concurrency/collaboration.
-- Weaknesses: **React-first**; Vue story is unofficial/weak. Still **text-first**
-  — blocks are a composition of nodes, not a first-class unit. Adopting it
+- Weaknesses: **React-first**; Vue story is unofficial/weak. Still **text-first**:
+  blocks are a composition of nodes, not a first-class unit. Adopting it
   means buying Meta's node paradigm and binding it to Vue ourselves.
 
 ### 2.5 Slate
@@ -163,7 +163,7 @@ The genuinely hard problems in a browser editor are **IME composition**,
   a document-wide contenteditable.
 - **Caret/selection within a block**: native. The browser places the caret.
 - **Cross-block selection & block operations**: our core owns these, operating
-  on the JSON tree (not DOM ranges) — tractable because they're structural.
+  on the JSON tree (not DOM ranges), which is tractable because they're structural.
 - **Undo/redo**: a transaction-based history plugin (state snapshots / diffs),
   the same proven pattern as ProseMirror's `prosemirror-history`.
 - **Clipboard**: handled at the block level in Phase 5, mapping selection →
@@ -303,15 +303,15 @@ The editor builds typed registries from all extensions:
 | `RendererRegistry` | `BlockType` | Vue component |
 | `CommandRegistry` | command name | `Command` |
 | `KeymapRegistry` | priority + key | command binding |
-| `InputRuleRegistry` | — | ordered `InputRule[]` |
+| `InputRuleRegistry` | n/a | ordered `InputRule[]` |
 | `SlashCommandRegistry` | command id | `SlashCommand` |
 | `ToolbarRegistry` | block type | `ToolbarAction[]` |
 | `SerializerRegistry` | `BlockType` | `Serializer` |
 | `DeserializerRegistry` | source kind | `Deserializer` |
-| `PluginRegistry` | — | `Plugin[]` |
+| `PluginRegistry` | n/a | `Plugin[]` |
 
 Registries are **immutable after construction** (frozen). Reconfiguring the
-editor means rebuilding it — this keeps dispatch and rendering branch-free.
+editor means rebuilding it, which keeps dispatch and rendering branch-free.
 
 ### 5.3 Block schema
 
@@ -337,10 +337,10 @@ The editor accepts `extensions: Extension[]`. It flattens the `uses` graph
 (dedup by `name`), processes every contribution into the registries, and
 freezes them. Built-in extensions (`Paragraph`, `Heading`, `BulletList`,
 `OrderedList`, `TodoList`, `Quote`, `CodeBlock`, **`Image`**, **`Table`**,
-**`Divider`**, **`TableOfContents`**, `Keymap`, `History` — 13 total) are
+**`Divider`**, **`TableOfContents`**, `Keymap`, `History` (13 total) are
 included by default via `BuiltinExtensions` and can be overridden by passing
 an extension with the same `name`. Adding a new block type is "create one
-file, pass it to the editor" — zero core changes.
+file, pass it to the editor" with zero core changes.
 
 ---
 
@@ -348,18 +348,18 @@ file, pass it to the editor" — zero core changes.
 
 ### 6.1 Components
 
-- **`<BlockEditor>`** — public root component. Props: `modelValue` (document
+- **`<BlockEditor>`**: public root component. Props: `modelValue` (document
   JSON), `extensions` (defaults to `BuiltinExtensions`), `editable`,
   `placeholder` (locale-aware default), `theme` (`'light' | 'dark'`), `locale`
   (`'zh-CN' | 'en-US'`). Exposes `useEditor()` via `provide`.
-- **`<BlockList>`** — renders an ordered list of block ids (root or a parent's
+- **`<BlockList>`**: renders an ordered list of block ids (root or a parent's
   children). **Virtualization seam**: this component is the only place that
   decides *which* blocks are mounted; a virtualized implementation can drop in
   later without touching block components.
-- **`<BlockHost>`** — resolves `block.type` → renderer via the registry and
+- **`<BlockHost>`**: resolves `block.type` → renderer via the registry and
   mounts it. Provides per-block context (`blockId`, editor API, selection
   state). Uses `key=blockId` so Vue reuses the DOM across reorders.
-- **Block renderer components** — normal Vue components. For content blocks they
+- **Block renderer components**: normal Vue components. For content blocks they
   render a `contenteditable` bound to their block's content. They read state
   via `useBlock(blockId)` and dispatch via `useEditor()`.
 
@@ -435,7 +435,7 @@ interface Transaction {
 `Step` is a small, serializable structural op: `insertBlock`, `removeBlock`,
 `replaceBlock`, `moveBlock`, `setText`, `setAttrs`, `setSelection`. Applying a
 transaction produces a **new `EditorState`** (immutable) and a **diff** of which
-blocks changed. There is no other way to mutate state — this is what makes
+blocks changed. There is no other way to mutate state; this is what makes
 history, persistence, and (future) collaboration possible.
 
 ### 7.3 Core-provided primitive commands (block-type-agnostic)
@@ -509,13 +509,13 @@ interface Plugin {
 
 Built-in plugins (contributed by built-in extensions):
 
-- **History** — undo/redo stacks of transactions, with grouping and
+- **History**: undo/redo stacks of transactions, with grouping and
   `addToHistory` meta. Time-travels by reapplying steps.
-- **Keymap** — ordered shortcut resolution; returns `true` to consume.
-- **InputRules** — pattern matching on text input (e.g. `# ` → heading).
-- **SelectionSync** — native ↔ model selection synchronization, including the
+- **Keymap**: ordered shortcut resolution; returns `true` to consume.
+- **InputRules**: pattern matching on text input (e.g. `# ` → heading).
+- **SelectionSync**: native ↔ model selection synchronization, including the
   IME guard.
-- **Placeholder** — derives whether a block is empty and signals the renderer.
+- **Placeholder**: derives whether a block is empty and signals the renderer.
 
 Plugin state is stored in `EditorState` keyed by plugin name, so it is part of
 the immutable, versioned state (enables correct undo across plugin effects).
@@ -543,7 +543,7 @@ structural sharing. The previous state is retained for history.
 The normalized `Map<BlockId, Block>` is **not** deeply reactive. It is a plain
 map inside the state object. The view bridge (§6.2) is the sole consumer that
 exposes slices to Vue via shallow refs. This deliberately avoids Vue's deep
-reactivity over thousands of blocks — the explicit performance hazard called
+reactivity over thousands of blocks, the explicit performance hazard called
 out in the brief.
 
 ### 10.3 Update flow
@@ -605,7 +605,7 @@ navigation in the core while letting block types customize their own keys.
   is needed.
 
 The **default block type** is declared in editor config (`defaultBlockType`,
-conventionally `"paragraph"`) and resolved through the schema registry — the
+conventionally `"paragraph"`) and resolved through the schema registry; the
 core never hardcodes a type name.
 
 ### 11.3 Arrow navigation
@@ -644,7 +644,7 @@ Target: smooth editing at 1k / 5k / 10k blocks.
 - **Per-input model sync with history grouping** for typed text (§6.3): each
   keystroke dispatches a cheap `setText` that changes only one block (structural
   sharing) and carries `view: 'skip-dom-write'` so the focused element is never
-  re-written — no caret-disrupting reflow, no per-keystroke DOM reconciliation.
+  re-written: no caret-disrupting reflow, no per-keystroke DOM reconciliation.
 - **No `watch` over the whole document**; the brief explicitly forbids deep
   watch, and we comply.
 
@@ -751,7 +751,7 @@ because the design over-anticipated needs:
 |---|---|---|
 | `state/diff.ts` | Merged into `Step.ts` (`applySteps` returns `changed`/`removed`) | The diff is a by-product of applying steps; a separate module added indirection without value. |
 | `serialize/json.ts` | `serialize/Serializer.ts` | JSON in/out is handled by `store.ts`; this module owns per-block Markdown/HTML specs only. |
-| `view/ViewBridge.ts` | Absent — `BlockEditor.vue` owns the `shallowRef<EditorState>` directly | A separate bridge class was unnecessary for Phase 1; the root component is the sole reactivity boundary. Can be extracted if the view layer grows. |
+| `view/ViewBridge.ts` | Absent: `BlockEditor.vue` owns the `shallowRef<EditorState>` directly | A separate bridge class was unnecessary for Phase 1; the root component is the sole reactivity boundary. Can be extracted if the view layer grows. |
 | `view/useEditor.ts` + `view/useBlock.ts` | `view/context.ts` (editorKey + useEditor + BlockRenderItem) | `useBlock` was not needed in Phase 1 (blocks receive props, not subscriptions). |
 | `view/dom/selectionSync.ts` + `view/dom/caret.ts` | `view/domSelection.ts` | The two concerns are tightly coupled; splitting them added ceremony without clarity. |
 | `view/contenteditable.ts` | `view/BlockContent.vue` | The contenteditable contract is a component, not a composable. |
@@ -766,7 +766,7 @@ because the design over-anticipated needs:
 | `view/clipboard.ts` + `view/inlineDom.ts` (Phase 5) | Added | Clipboard parsing (HTML/plain-text → blocks) and InlineSeq ↔ DOM conversion are view-layer concerns. |
 | `i18n.ts` + `theme` prop (cross-cutting) | Added | Zero-dep i18n module via provide/inject; theme synced to `<body>` for Teleport-ed popovers. |
 | `view/ui/SafeHtml.vue` | Added | Isolates `v-html` to a single component so the rest of the codebase satisfies `vue/no-v-html`. Only used for trusted internal SVG/HTML glyph strings. |
-| **`extensions/Image.ts` + `view/imageUpload.ts` (Phase 6)** | Added as a `content: 'none'` block extension plus a separate view-side upload side-channel map. Upload transient state (pending/progress/error) lives OUTSIDE `Block.attrs`; only the final `src` (and fileId/alt/title/width/height/caption) is persisted. Guarantees undo restores only blocks, no "blob:" URLs leak into JSON, and reload-from-persistence never revives temporary uploads. The extension owns its own **Plugin** (`image-upload`) that tracks fileId ref-counts across transactions and invokes `onFileCleanup(fileId)` when the last block referencing a fileId is removed, so consumers can reclaim cloud storage. Drag-drop + image-file paste + HTML `<img>` paste all dispatch through the same upload pipeline. `<BlockEditor>` itself has no `uploadImage` prop and no `cleanup:image-file` emit — composition goes through `createImageExtension({ upload, onFileCleanup })` in `:extensions`. |
+| **`extensions/Image.ts` + `view/imageUpload.ts` (Phase 6)** | Added as a `content: 'none'` block extension plus a separate view-side upload side-channel map. Upload transient state (pending/progress/error) lives OUTSIDE `Block.attrs`; only the final `src` (and fileId/alt/title/width/height/caption) is persisted. Guarantees undo restores only blocks, no "blob:" URLs leak into JSON, and reload-from-persistence never revives temporary uploads. The extension owns its own **Plugin** (`image-upload`) that tracks fileId ref-counts across transactions and invokes `onFileCleanup(fileId)` when the last block referencing a fileId is removed, so consumers can reclaim cloud storage. Drag-drop + image-file paste + HTML `<img>` paste all dispatch through the same upload pipeline. `<BlockEditor>` itself has no `uploadImage` prop and no `cleanup:image-file` emit; composition goes through `createImageExtension({ upload, onFileCleanup })` in `:extensions`. |
 | **`view/urlUtils.ts` (Phase 6, link mark safety)** | Added. `sanitizeUrl` is the single trust boundary: it rejects `javascript:`, `vbscript:`, `data:`, `file:` schemes (plus protocol-relative `//…` when not http/https) and only allows an explicit whitelist (`http`, `https`, `mailto`, `tel`). `looksLikeUrl` + `normalizeUrl` drive the paste auto-link and typing auto-link. `autoLinkInlineSeq` walks a freshly-typed `InlineSeq` and applies link marks to detected URLs, skipping already-linked runs and inline-code runs. |
 | **`setLink`/`unsetLink` primitives + `<a>` round-trip in `inlineDom.ts` + `LinkPopover.vue` (Phase 6)** | Added. Link is a Mark (not an InlineNode), fully compatible with the existing mark system and incompatible with inline code via `CODE_INCOMPATIBLE`. HTML serialization always calls `sanitizeUrl` before writing `href` and always emits `target="_blank" rel="noopener noreferrer"`; deserialization reconstructs the link mark from any `<a>` element whose href passes `sanitizeUrl`. `BlockContent.vue` detects clicks on `<a>` and emits `linkClick`, forwarded up through `BlockHost` / `BlockList` to `BlockEditor.vue`, which opens `LinkPopover.vue` (positioned over the `<a>` rect). The popover provides open / copy / edit / remove (view mode) and href + text inputs with validation (edit mode). HoverToolbar has a link button, and `Mod-K` (`Ctrl/Cmd+K`) opens the editor for the current selection or the clicked link. Pasting a URL over a text selection calls `setLink` directly (no separate text change). Typing whitespace re-runs `autoLinkInlineSeq` so typed URLs link without user action. Ctrl/Cmd+click the anchor opens the page (browsers enforce `rel=noopener noreferrer`). |
 | **`Table` (Phase 7)** only noted as future extension in the design | `extensions/Table.ts` + `extensions/tableModel.ts`, registered in `BuiltinExtensions` | Table is a high-priority built-in feature. Uses the same **attrs storage** pattern as Image (grid data lives entirely in `attrs`, `Block.children=[]`), so the core never touches table internals and undo/redo is free via `setAttrs`. Self-contained Vue renderer: row/column/corner selectors, a floating toolbar with delete/merge/split/**header-row toggle** buttons, row/col insertion handles, code-cell Enter inserts newline with offset-based caret re-placement. Zero core changes. |
@@ -788,28 +788,28 @@ Ownership rules (unchanged from design):
 
 ## 14. Phased roadmap
 
-### Phase 1 — Foundation ✅
+### Phase 1: Foundation ✅
 Core types, normalized store, immutable state, transactions + diff, command
 registry + primitive commands, selection, plugin/extension/registry system,
 view bridge, `BlockEditor`/`BlockList`/`BlockHost`, per-block contenteditable
 contract, SelectionSync (IME guard), History, Keymap, Placeholder. Extensions:
 `Paragraph`, `Heading`. UX: caret, Enter, Backspace, arrow nav, placeholder.
 
-### Phase 2 — Authoring assistance ✅
+### Phase 2: Authoring assistance ✅
 Slash menu (`PlusMenu.vue`: search, keyboard nav, command palette), input
 rules / markdown shortcuts (`# `, `## `, `> `, `[] `, ```` ``` ````) via
 `inputRulesEngine.ts`.
 
-### Phase 3 — More block types ✅
+### Phase 3: More block types ✅
 Todo, Quote, Code Block, BulletList, OrderedList (each a self-contained
 extension; code block is `isolating`).
 
-### Phase 4 — Block manipulation UI ✅
+### Phase 4: Block manipulation UI ✅
 Drag handle (`BlockHandle.vue`), hover toolbar (`HoverToolbar.vue`), insert
 button (`+`), block movement (drag, keyboard move up/down), indent/outdent,
 grip menu (`BlockSettingsMenu.vue`: turn-into, align, color, actions).
 
-### Phase 5 — Clipboard & multi-select ✅
+### Phase 5: Clipboard & multi-select ✅
 Multi-block text selection overlay, copy/cut/paste (clean HTML/plain-text
 serialization via `clipboard.ts`), duplicate, delete, paste-from-external
 (HTML deserialization). **Mobile cross-block text selection**: long-press on
@@ -852,13 +852,13 @@ are suppressed during touch interaction.
   the last block referencing a fileId is removed, the plugin invokes
   `createImageExtension({ onFileCleanup })` so consumers can clean up
   cloud storage. `BlockEditor.vue` no longer carries an `uploadImage`
-  prop nor emits `cleanup:image-file` — both responsibilities live on the
+  prop nor emits `cleanup:image-file`; both responsibilities live on the
   extension and on `Editor.registerExtensionMethod` (which the view layer
   forwards to the existing `useBeginImageUpload()` Vue injection).
 - **Block-level attrs**: align (left/center/right/justify), text color,
   background color, indent (0–10).
 
-### Phase 6 — Media & Link Marks ✅
+### Phase 6: Media & Link Marks ✅
 Image block (schema + renderer) with upload pipeline (side-channel state,
 `createImageExtension({ upload, onFileCleanup })` factory), link mark (`setLink`/
 `unsetLink` commands, Mod-K shortcut, `LinkPopover`), URL safety utilities
@@ -866,7 +866,7 @@ Image block (schema + renderer) with upload pipeline (side-channel state,
 round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
 `clipboard.ts` + `BlockContent.vue`.
 
-### Phase 7 — Table block + Divider ✅
+### Phase 7: Table block + Divider ✅
 
 **Table block**
 - Schema: `content: 'none'` with **attrs storage** pattern (same as Image):
@@ -880,7 +880,7 @@ round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
   (`overflow-x: auto`, inner table `width: max-content`) for internal
   horizontal scroll. **Row selector bar, column selector bar, corner
   all-select handle, floating toolbar, row/col between-cell insertion
-  markers** are fixed-to-container direct children — they never scroll with
+  markers** are fixed-to-container direct children: they never scroll with
   the content. The floating toolbar shows a delete-row/column/table button
   when one row/col/all is selected; **merge cells** when ≥ 2 non-covered
   cells are selected; **split cells** when selection contains a merged
@@ -915,12 +915,12 @@ round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
 - Minimal isolating block: `<hr class="block-divider">`. Empty attrs; input
   rules `---` / `***` / `___` (on an empty paragraph) convert to divider.
 
-### Phase 8 — Table of Contents ✅
+### Phase 8: Table of Contents ✅
 
 **Table of Contents (TOC) block**
 - Schema: `content: 'none'`, `inlineMarks: false`, empty `attrs`, `nestable:
   false`, `empty: () => false` (the TOC always renders its panel). Renderer
-  `editable: false` — the block is non-editable by construction (no caret, no
+  `editable: false`: the block is non-editable by construction (no caret, no
   inline text).
 - Heading collection: `collectHeadings(doc)` walks the block tree via
   `flatten`, filters `type === 'heading'`, and returns `{ id, level, text }`
@@ -936,7 +936,7 @@ round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
 - Entry: slash menu `/table of contents` (keywords: `toc`, `contents`,
   `outline`, `目录`, `标题`, `大纲`). Dispatches `convertBlock` to turn the
   current block into a TOC.
-- Serialization: both `toHTML` and `toMarkdown` emit empty strings — the
+- Serialization: both `toHTML` and `toMarkdown` emit empty strings; the
   generated heading list is a view, not editor content, and the real headings
   are already exported by their own blocks. This prevents a TOC from being
   duplicated into HTML / Markdown exports.
@@ -945,7 +945,7 @@ round-trip in `inlineDom.ts`, URL paste / image paste / drag-and-drop in
 
 ### Future (architecture already supports)
 Callout, Toggle, Columns, Database, Mention, Math, Mermaid, MindMap,
-Attachment, Embed, AI — each arrives as an extension (schema + renderer +
+Attachment, Embed, AI: each arrives as an extension (schema + renderer +
 serialize + maybe nodeView) with **no core changes**.
 
 ---
@@ -1013,12 +1013,12 @@ guarantee of the brief.
 - [x] Selection is separate from document and never re-renders block bodies.
 - [x] Per-block contenteditable; IME guarded; stable cursor via `key=blockId`.
 - [x] No deep reactivity; rendering subscribes per block via shallow refs.
-- [x] Modules are small and single-responsibility; no `utils.ts`. (Domain helpers live in their own modules — e.g. `urlUtils.ts`, `imageUpload.ts`.)
+- [x] Modules are small and single-responsibility; no `utils.ts`. (Domain helpers live in their own modules, e.g. `urlUtils.ts`, `imageUpload.ts`.)
 - [x] Future features (Callout, Database, Columns, AI, …) require no core changes.
 - [x] **Phases 1–8 implemented**: 12 built-in block types (Paragraph, Heading, BulletList, OrderedList, TodoList, Quote, CodeBlock, Image, **Table**, **Divider**, **Equation**, **TableOfContents**) = 14 built-in extensions (incl. Keymap + History); inline marks including `link` with href sanitization; image block with transient upload side-channel, drag resize, caption, slash entry, fileId reference counting and `createImageExtension({ onFileCleanup })` callback; block-level attrs, slash menu, input rules, hover toolbar (incl. link button + table header-row toggle when table corner-selected), drag handle, clipboard (incl. URL paste → link, image paste → upload), i18n, theming; table of contents block (live heading list view, non-editable, slash entry, serialize → empty).
 - [x] **Table block invariants**: table content lives entirely in `Block.attrs` (`content: 'none'`) so core transactions/undo are untouched; all cell operations route through `editor.commands.setAttrs` → pure `tableModel.ts` (immutable in, new attrs out); code-block-cell Enter inserts a newline character rather than splitting the block.
-- [x] **Security — link href sanitization**: every path that writes or reconstructs a link `href` (`inlineToHtml`, `inlineFromDom`, `LinkPopover` save, `BlockContent` URL paste/auto-link) funnels through the single `sanitizeUrl` whitelist; unsafe schemes (`javascript:`, `vbscript:`, `data:`, `file:`) never reach the DOM.
-- [x] **Image upload invariants**: `Block.attrs` never stores transient upload state (pending/progress/error/blob URLs) — transient state lives in `view/imageUpload.ts`; undo/redo and reload-from-persistence therefore never resurrect invalid `blob:` or `pending` state.
+- [x] **Security: link href sanitization**: every path that writes or reconstructs a link `href` (`inlineToHtml`, `inlineFromDom`, `LinkPopover` save, `BlockContent` URL paste/auto-link) funnels through the single `sanitizeUrl` whitelist; unsafe schemes (`javascript:`, `vbscript:`, `data:`, `file:`) never reach the DOM.
+- [x] **Image upload invariants**: `Block.attrs` never stores transient upload state (pending/progress/error/blob URLs); transient state lives in `view/imageUpload.ts`; undo/redo and reload-from-persistence therefore never resurrect invalid `blob:` or `pending` state.
 - [x] **All phases implemented**: `vue-tsc --noEmit`, `eslint`, and `vite build` all pass.
 - [x] **All phases implemented**: Per-module documentation in `docs/module.md`.
 - [x] **All phases implemented**: ESLint boundary rule enforces no Vue imports in `src/core/`.

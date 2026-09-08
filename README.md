@@ -17,15 +17,15 @@ by an **extension**, so the core never switches on a block type.
 
 ## Features
 
-- **12 built-in block types** — paragraph, h1–h6 (heading), bullet list,
+- **12 built-in block types**: paragraph, h1–h6 (heading), bullet list,
   ordered list, to-do, quote, code block, **image**, **equation** (LaTeX math),
   **divider**, **table**, **table of contents** (14 extensions total including
   Keymap and History behavior extensions)
-- **Equation (LaTeX math) block** — renders LaTeX as a centered display
+- **Equation (LaTeX math) block**: renders LaTeX as a centered display
   formula via the **built-in zero-dependency math renderer** (a lightweight
   LaTeX-math subset: fractions, roots, scripts, Greek letters, functions,
   large operators, matrices, aligned rows). The document stores **only the raw
-  `expression` string** — rendered output is recomputed on the fly and never
+  `expression` string**: rendered output is recomputed on the fly and never
   persisted, so serialization stays lean. The renderer is **pluggable**: pass
   `createEquationExtension({ renderer })` (compose it after `BuiltinExtensions`)
   to swap in KaTeX, MathJax or any custom engine with full LaTeX support.
@@ -34,7 +34,7 @@ by an **extension**, so the core never switches on a block type.
   button (or clicking an empty block) opens the source editor with a live
   preview. Supports block selection and **nesting as a child block** (indents
   to match its depth). Markdown export uses `$$$ … $$$` fenced blocks.
-- **Table block** — `attrs`-based N×M grid; default 120 px column widths,
+- **Table block**: `attrs`-based N×M grid; default 120 px column widths,
   new tables default to header row; row/column selection strips,
   corner-handle to select the whole table; insert dots between rows/cols;
   floating action bar with merge/split cells, **toggle header row** (sets
@@ -45,58 +45,58 @@ by an **extension**, so the core never switches on a block type.
   newline), Escape blurs; internal horizontal scrollbar à la Arco Design;
   full-rect merge-cell selection expansion so you can never select half
   of a merged cell.
-- **Inline marks** — bold, italic, underline, strikethrough, inline code,
+- **Inline marks**: bold, italic, underline, strikethrough, inline code,
   **link** (`Mod-K`, URL pasting, auto-link, popover with view/edit/copy/remove,
   href sanitization to block `javascript:` / XSS), per-selection text color
   and background color
-- **Block-level attrs** — alignment (left/center/right/justify), text color,
+- **Block-level attrs**: alignment (left/center/right/justify), text color,
   background color, indentation (0–10); image additionally carries
   `src`, `alt`, `title`, `width`, `height`, `caption`, `fileId`
-- **Slash menu** — `/` opens a searchable command palette; input rules
+- **Slash menu**: `/` opens a searchable command palette; input rules
   (`# `, `> `, `[] `, ``` ``` ````) convert blocks on the fly; `/image`
   opens the file picker
-- **Block manipulation** — drag handle, hover toolbar, `+` insert button,
+- **Block manipulation**: drag handle, hover toolbar, `+` insert button,
   grip menu with duplicate / copy / cut / move up / move down / delete;
   **real nesting** (Tab/Shift-Tab indent/outdent builds a parent–child tree;
   drag-and-drop supports before/after sibling insert plus a **drop-into**
-  mode — pause over a block's center to nest under it as its first child);
+  mode: pause over a block's center to nest under it as its first child);
   duplicate clones the whole subtree; image additionally exposes replace /
   remove / drag-resize corner handle with locked aspect ratio and editable
   caption
-- **Fixed toolbar** — persistent action bar with a contextual
+- **Fixed toolbar**: persistent action bar with a contextual
   **HoverToolbar** embedded inline (so text selection is preserved when
   clicking formatting buttons). Supports four placement modes via the
-  `toolbarPosition` prop: `'auto'` (default — top on desktop, bottom on
+  `toolbarPosition` prop: `'auto'` (default: top on desktop, bottom on
   mobile), `'top'` (always top), `'bottom'` (always bottom), or `'float'`
-  (desktop only — hides the FixedToolbar and shows a floating selection
+  (desktop only: hides the FixedToolbar and shows a floating selection
   toolbar that follows the text/table selection; falls back to the FixedToolbar
   on mobile). Menus (PlusMenu / BlockSettingsMenu) open downward when the
   toolbar is at the top.
-- **Sizing & internal scrolling** — constrain the editor with `width`
+- **Sizing & internal scrolling**: constrain the editor with `width`
   and `height` props (numbers are treated as pixels). The content area
   scrolls vertically inside the editor instead of growing unbounded,
   so embedding layouts stay in control of overflow.
-- **Clipboard** — clean copy/cut/paste of HTML and plain text; multi-block
+- **Clipboard**: clean copy/cut/paste of HTML and plain text; multi-block
   selection overlay; **HTML `<img>` / image-file paste + drag-and-drop
   automatically create image blocks** and dispatch the upload; selecting text
   and pasting a URL wraps it as a link
-- **Mobile support** — long-press to start text selection, then drag your
+- **Mobile support**: long-press to start text selection, then drag your
   finger to select **across multiple independent `contenteditable` blocks**
   via a hit-tested overlay (the native Selection API cannot cross block
   boundaries). The fixed toolbar auto-drops to the bottom above the virtual
   keyboard.
-- **History** — undo/redo with typing grouping (`Mod-Z` / `Mod-Shift-Z`);
+- **History**: undo/redo with typing grouping (`Mod-Z` / `Mod-Shift-Z`);
   undo restores blocks but never resurrects transient upload state
-- **i18n** — `zh-CN` (default) and `en-US` via the `locale` prop; zero-dep
+- **i18n**: `zh-CN` (default) and `en-US` via the `locale` prop; zero-dep
   translation module (no `vue-i18n`)
-- **Theming** — `light` (default) and `dark` via the `theme` prop; CSS
+- **Theming**: `light` (default) and `dark` via the `theme` prop; CSS
   variables for all design tokens
-- **Accessible** — keyboard navigation throughout, ARIA roles on menus
-- **Table of contents** — a live, non-editable block that renders a
+- **Accessible**: keyboard navigation throughout, ARIA roles on menus
+- **Table of contents**: a live, non-editable block that renders a
   hierarchical list of every heading in the document; stays in sync as
   headings are added, removed, or edited; click an entry to jump to the
   heading; insert via slash menu `/table of contents`
-- **Markdown import / export** — the `Editor` instance exposes
+- **Markdown import / export**: the `Editor` instance exposes
   `toMarkdown()` and `setDocFromMarkdown(string)`. Round-trips are
   implemented natively on top of the live `DocState` (no intermediate
   `BlockData` or external converter), so heading/list nesting, inline
@@ -124,7 +124,7 @@ const doc = ref<DocumentData>({ blocks: [] });
 </template>
 ```
 
-The editor ships with all 14 built-in extensions by default — no need to pass
+The editor ships with all 14 built-in extensions by default: no need to pass
 `extensions` unless you want a custom set.
 
 ## Pluggable equation renderer
@@ -138,7 +138,7 @@ interface EquationRenderer {
 }
 
 interface EquationRenderResult {
-  /** Safe HTML string — always available (export / SSR / non-Vue consumers). */
+  /** Safe HTML string, always available (export / SSR / non-Vue consumers). */
   html: string;
   /** Optional Vue VNode tree; when present the view renders it directly (no innerHTML). */
   vnode: VNode | VNode[] | null;
@@ -148,22 +148,22 @@ interface EquationRenderResult {
 }
 ```
 
-By default the editor uses the **built-in math renderer** — a zero-dependency
+By default the editor uses the **built-in math renderer**, a zero-dependency
 implementation of a lightweight LaTeX-math subset (tokenizer → parser → AST →
 DOM): numbers/identifiers, operators (`\pm \times \div \cdot \le \ge \neq …`),
 superscripts/subscripts, `\frac`, `\sqrt` / `\sqrt[n]`, Greek letters,
 `\sin \cos \tan \log \ln \exp \lim \min \max`, large operators
 (`\sum \prod \int` with display limits), `\begin{matrix}` and
 `\begin{aligned}`. Unknown commands degrade gracefully (rendered literally)
-and syntax errors show an inline warning instead of crashing — the source is
+and syntax errors show an inline warning instead of crashing: the source is
 always preserved and re-parses automatically once fixed. It is *not* a full
 TeX engine; for that, inject an external renderer via the
-`createEquationExtension({ renderer })` factory — `<BlockEditor>` itself has no
+`createEquationExtension({ renderer })` factory; `<BlockEditor>` itself has no
 `equationRenderer` prop, because the boundary lives at the extension layer:
 
 ```vue
 <script setup lang="ts">
-// KaTeX itself is NOT a dependency of xiaodao-editor — install it yourself:
+// KaTeX itself is NOT a dependency of xiaodao-editor, install it yourself:
 //   pnpm add katex
 import katex from 'katex';
 // ★ KaTeX's CSS MUST be imported. KaTeX produces a flat HTML tree whose
@@ -172,7 +172,7 @@ import katex from 'katex';
 //   by the `.katex` / `.strut` / `<sup>` / `<sub>` / `.mord` … classes. If
 //   the CSS is missing, every span lays out inline and "garbled" output
 //   like `∫ab`, `αx3`, `e−λx` (and any upper/lower limit, fraction) is the
-//   symptom you'll see. Load it once, in your app entry — putting it next
+//   symptom you'll see. Load it once, in your app entry (putting it next
 //   to the renderer keeps the demo self-contained.
 import 'katex/dist/katex.min.css';
 import { createEquationExtension, BuiltinExtensions, type EquationRenderer } from 'xiaodao-editor';
@@ -187,14 +187,14 @@ const katexRenderer: EquationRenderer = {
       // work too but loses the MathML branch.
       const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
-        throwOnError: false,   // never throw — KaTeX wraps the bad fragment
+        throwOnError: false,   // never throw: KaTeX wraps the bad fragment
                                // in `<span class="katex-error">…</span>` instead
         trust: false,          // REQUIRED: `trust: true` allows `\href` /
                                // `\url` to inject raw HTML (XSS). Keep off.
         strict: false,         // lenient: unknown commands warn but still render
         output: 'htmlAndMathml',
       });
-      // KaTeX's error sentinel class is `katex-error` (not `merror` — that
+      // KaTeX's error sentinel class is `katex-error` (not `merror`; that
       // one is from later KaTeX versions). Surface it as `error: true` so
       // the equation block shows the ⚠ badge.
       const error = /class="katex-error"/.test(html);
@@ -208,7 +208,7 @@ const katexRenderer: EquationRenderer = {
 // Append your renderer-bearing extension AFTER `BuiltinExtensions`. The
 // extension registry is name-based deduplicated (last entry wins), so the
 // appended `createEquationExtension({ renderer })` replaces the built-in's
-// `EquationExtension`. Do NOT add both — pick one.
+// `EquationExtension`. Do NOT add both; pick one.
 const extensions = [
   ...BuiltinExtensions,
   createEquationExtension({ renderer: katexRenderer }),
@@ -221,7 +221,7 @@ const extensions = [
 ```
 
 `createEquationExtension({ renderer })` is the only supported way to override
-the equation renderer — there is no component-level prop for this. The
+the equation renderer; there is no component-level prop for this. The
 registry deduplicates by extension `name` so the override extension must
 appear **after** `BuiltinExtensions` (or anywhere later in the array) to
 take effect. You can also import the built-in engine pieces (`parseMath`,
@@ -298,7 +298,7 @@ NOT for persisted documents.
 
 | Member   | Type     | Description                                                                                                                                          |
 | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `editor` | `Editor` | The framework-agnostic `Editor` instance. Useful methods: <br>`toData(): DocumentData` — export JSON. <br>`setDocument(json: DocumentData)` — replace JSON. <br>`toMarkdown(): string` — export native Markdown. <br>`setDocFromMarkdown(md: string)` — import native Markdown (resets history). |
+| `editor` | `Editor` | The framework-agnostic `Editor` instance. Useful methods: <br>`toData(): DocumentData`: export JSON. <br>`setDocument(json: DocumentData)`: replace JSON. <br>`toMarkdown(): string`: export native Markdown. <br>`setDocFromMarkdown(md: string)`: import native Markdown (resets history). |
 
 ## Theming
 
@@ -314,7 +314,7 @@ latter so `<Teleport>`-ed popovers inherit them too).
 }
 ```
 
-The `.block-editor` element intentionally has **no background** — the host
+The `.block-editor` element intentionally has **no background**: the host
 page controls the editor's background so it blends into the surrounding UI.
 Set it explicitly if needed:
 
@@ -336,14 +336,14 @@ Set it explicitly if needed:
 | `OrderedListExtension`| `orderedList`   | Auto-numbered; `attrs.startNumber` for explicit override.        |
 | `TodoListExtension`   | `todoList`      | Checkbox via `attrs.checked`.                                    |
 | `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
-| `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating — Enter inserts a newline.           |
-| `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `createImageExtension({ upload, onFileCleanup })` — see *Pluggable image upload*. The default `ImageExtension` bundled with `BuiltinExtensions` uses an in-memory mock upload (object URLs that don't survive reload) and never invokes an `onFileCleanup` callback. |
-| `EquationExtension`   | `equation`      | `content: 'none'`; isolated block — stores only `attrs.expression` (raw LaTeX). A pluggable renderer produces the centered display formula on the fly (output never persisted); the default is the built-in **zero-dependency math renderer** (lightweight LaTeX subset — see the *Pluggable equation renderer* section), and KaTeX/MathJax can be injected via `createEquationExtension({ renderer })` composed after `BuiltinExtensions`. Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
+| `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating: Enter inserts a newline.           |
+| `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `createImageExtension({ upload, onFileCleanup })` (see *Pluggable image upload*). The default `ImageExtension` bundled with `BuiltinExtensions` uses an in-memory mock upload (object URLs that don't survive reload) and never invokes an `onFileCleanup` callback. |
+| `EquationExtension`   | `equation`      | `content: 'none'`; isolated block that stores only `attrs.expression` (raw LaTeX). A pluggable renderer produces the centered display formula on the fly (output never persisted); the default is the built-in **zero-dependency math renderer** (lightweight LaTeX subset, see the *Pluggable equation renderer* section), and KaTeX/MathJax can be injected via `createEquationExtension({ renderer })` composed after `BuiltinExtensions`. Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
 | `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |
 | `DividerExtension`    | `divider`       | Isolating horizontal rule.                                       |
-| `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`; empty attrs — the heading list is a **dynamic view** computed from the editor state on every render. Non-editable block (`editable: false`); collects all `heading` blocks in document order (table-cell headings excluded automatically); click an entry to scroll the heading into view. Serialize emits empty string (the real headings are exported by their own blocks). |
-| `KeymapExtension`     | —               | Enter / Backspace / ArrowUp / ArrowDown bindings.                |
-| `HistoryExtension`    | —               | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` undo/redo keymap.              |
+| `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`; empty attrs: the heading list is a **dynamic view** computed from the editor state on every render. Non-editable block (`editable: false`); collects all `heading` blocks in document order (table-cell headings excluded automatically); click an entry to scroll the heading into view. Serialize emits empty string (the real headings are exported by their own blocks). |
+| `KeymapExtension`     | n/a             | Enter / Backspace / ArrowUp / ArrowDown bindings.                |
+| `HistoryExtension`    | n/a             | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` undo/redo keymap.              |
 
 To use a **custom subset**, pass `extensions` explicitly:
 
@@ -367,7 +367,7 @@ interface Block {
   type: BlockType;
   attrs: Attrs;             // e.g. { level: 2, align: 'center', color: 'red' }
   content: InlineSeq;       // text runs with optional marks
-  children: BlockId[];      // child block ids — real nesting:
+  children: BlockId[];      // child block ids, real nesting:
                             // paragraph/heading + the 3 list kinds can be parents;
                             // any block type can be a child. `attrs.indent` is a
                             // derived mirror of the nesting depth.
@@ -395,7 +395,7 @@ const doc: DocumentData = {
     { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'const x = 1' }] },
     { type: 'image', attrs: {
         src: 'https://cdn.example.com/hero.png', alt: 'Hero',
-        width: 1200, height: 630, caption: 'Fig. 1 — Architecture overview', fileId: 42,
+        width: 1200, height: 630, caption: 'Fig. 1: Architecture overview', fileId: 42,
       }, content: [] },
     { type: 'divider' },
     { type: 'table', attrs: {
@@ -466,17 +466,17 @@ const extensions = [...BuiltinExtensions, CalloutExtension];
 
 ## Architecture
 
-- **`src/core/`** — framework-agnostic engine (zero Vue imports, enforced by
+- **`src/core/`**: framework-agnostic engine (zero Vue imports, enforced by
   ESLint). Owns the document model, transactions, history, commands, schema,
   extension registries, and **native Markdown import/export**
-  (`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()` — operates straight
+  (`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()`: operates straight
   on `DocState`, no intermediate `BlockData`).
-- **`src/view/`** — Vue bridge: `BlockEditor.vue` (root), `BlockList`,
+- **`src/view/`**: Vue bridge: `BlockEditor.vue` (root), `BlockList`,
   `BlockHost`, `BlockContent` (per-block `contenteditable`), and the UI
   components (`BlockHandle`, `BlockSettingsMenu`, `HoverToolbar`, `PlusMenu`,
   `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, `LinkPopover`,
   `FixedToolbar`).
-- **`src/extensions/`** — the 14 built-in extensions plus `_commonAttrs.ts`
+- **`src/extensions/`**: the 14 built-in extensions plus `_commonAttrs.ts`
   (shared align/color/bgColor/indent specs and color presets, plus
   `ImageExtension`'s upload-side-channel renderer logic). **Table** lives in
   `Table.ts` (Vue renderer + command registrations) and `tableModel.ts` (pure
@@ -489,7 +489,7 @@ const extensions = [...BuiltinExtensions, CalloutExtension];
   `attrs.indent` mirrors nesting depth so it indents as a child block). The
   built-in math engine lives in `extensions/math/` (tokenizer → parser → AST →
   render tree → DOM/HTML), with zero third-party dependencies.
-- **`src/i18n.ts`** — locale + theme module; provides `t(key)` via Vue's
+- **`src/i18n.ts`**: locale + theme module; provides `t(key)` via Vue's
   provide/inject so popovers rendered through `<Teleport>` stay reactive.
 
 ## Development
