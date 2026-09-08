@@ -7,7 +7,7 @@
       an ordered-list item). This clears any explicit `startNumber` override.
     • Start new list (from 1). This sets `startNumber = 1` on this block,
       which also acts as a boundary for following ordered-list items.
-    • Modify number value — opens the NumberPicker popup.
+    • Modify number value: opens the NumberPicker popup.
 -->
 
 <template>
@@ -95,11 +95,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** "Continue previous" — clear startNumber override. */
+  /** "Continue previous": clear startNumber override. */
   continue: [];
-  /** "Start new list" — set startNumber to 1. */
+  /** "Start new list": set startNumber to 1. */
   startNew: [];
-  /** "Modify number value" — asks the host to show the number picker. */
+  /** "Modify number value": asks the host to show the number picker. */
   modify: [initialValue: number];
   close: [];
 }>();

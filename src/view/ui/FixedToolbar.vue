@@ -3,18 +3,18 @@
   of the editor viewport.
 
   It is always visible (not limited to mobile mode) and provides:
-    1. Plus / handle buttons (left, fixed) — reuse the existing PlusMenu and
+    1. Plus / handle buttons (left, fixed): reuse the existing PlusMenu and
        BlockSettingsMenu by emitting events that BlockEditor wires to the
        same onOpenPlusMenu / onOpenSettingsMenu handlers used by the desktop
        block handle.
     2. The full HoverToolbar button set (type / align / verticalAlign / marks /
-       color / copy / table operations) — rendered by embedding a single
+       color / copy / table operations): rendered by embedding a single
        <HoverToolbar inline> instance. The props + handlers come from a
        "descriptor" that is sourced from EITHER:
          - the text-block selection state (passed as props from BlockEditor),
          - the table cell / cell-edit selection state (published by TableBlock
            via the fixedToolbarBridge injection key).
-       This means FixedToolbar does NOT duplicate any button or command logic —
+       This means FixedToolbar does NOT duplicate any button or command logic;
        it is purely a different presentation of the same HoverToolbar.
 
   Position:
@@ -121,7 +121,7 @@
       v-if="descriptor.visible"
       class="tt-sep"
     />
-    <!-- HoverToolbar (inline mode) — renders ALL contextual buttons.
+    <!-- HoverToolbar (inline mode): renders ALL contextual buttons.
          v-bind spreads the descriptor (props + onXxx handlers).
          @interacting arms BlockEditor's 500ms selection grace period even
          for Teleported dropdown content (whose clicks don't bubble through
@@ -151,7 +151,7 @@ const props = defineProps<{
   hoverBlockId: BlockId | null;
   hoverBlockType: string | null;
   hoverBlockAttrs: Readonly<Record<string, unknown>>;
-  // Menu open state — used to show active button style while dropdowns are open.
+  // Menu open state: used to show active button style while dropdowns are open.
   plusMenuVisible: boolean;
   settingsMenuVisible: boolean;
   /** Toolbar placement: 'top' or 'bottom'. When omitted, auto-detected:
@@ -221,7 +221,7 @@ const findBlockContentEl = (node: Node | null | undefined): HTMLElement | null =
 
 // Lazy-clear callback for lastTextDescriptor. Re-schedules itself every
 // 1500ms as long as a valid non-collapsed DOM text selection still exists
-// inside the editor root — this way a user holding a toolbar button down
+// inside the editor root: this way a user holding a toolbar button down
 // (no selectionchange events, no POSITIVE-FILL refresh) won't have the
 // cache wiped from under them mid-hold.
 let lazyClearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -235,7 +235,7 @@ const maybeClearCache = () => {
     if (s && s.rangeCount > 0) {
       const r = s.getRangeAt(0);
       if (!r.collapsed) {
-        // Check all four "selection endpoints" — some browsers shift
+        // Check all four "selection endpoints": some browsers shift
         // anchor/focus around button interactions even though the logical
         // range is still inside content, and forward vs reverse selections
         // can put different nodes in anchor vs focus. startContainer +
@@ -252,7 +252,7 @@ const maybeClearCache = () => {
   } catch {
     // Selection API occasionally throws in edge cases (cross-origin iframes,
     // detached DOM, etc.). Treat as "no valid selection" and proceed to
-    // clear the cache — worst case the toolbar briefly disables until the
+    // clear the cache: worst case the toolbar briefly disables until the
     // next POSITIVE-FILL from a real selectionchange.
   }
   lastTextDescriptor.value = null;
@@ -291,7 +291,7 @@ watch(
     const td = tableBridge.value;
     if (td && td.visible) return; // table takes priority, don't cache text
     if (props.hoverVisible) {
-      // Cancel any pending lazy clear — selection came back.
+      // Cancel any pending lazy clear: selection came back.
       if (lazyClearTimer) {
         clearTimeout(lazyClearTimer);
         lazyClearTimer = null;
@@ -348,7 +348,7 @@ const descriptor = computed<FixedToolbarDescriptor>(() => {
       onLinkClick: (blockId: BlockId, from: number, to: number) => emit('linkClick', blockId, from, to),
     };
   }
-  // Selection was cleared — if we have a cached text descriptor from a
+  // Selection was cleared: if we have a cached text descriptor from a
   // recent interaction, reuse it so the buttons stay enabled. The cache
   // is invalidated when the user clicks elsewhere (not on the toolbar).
   if (lastTextDescriptor.value) {
@@ -360,7 +360,7 @@ const descriptor = computed<FixedToolbarDescriptor>(() => {
       visible: true,
     };
   }
-  // No selection — if there is a focused block, still render the text-action
+  // No selection: if there is a focused block, still render the text-action
   // buttons (disabled) so the toolbar is always present. selectionRect is
   // null here, which HoverToolbar reads as "no selection" and disables the
   // buttons that require a selection.
@@ -378,7 +378,7 @@ const descriptor = computed<FixedToolbarDescriptor>(() => {
       onLinkClick: (blockId: BlockId, from: number, to: number) => emit('linkClick', blockId, from, to),
     };
   }
-  // No focus block — render the toolbar shell (plus/handle only).
+  // No focus block: render the toolbar shell (plus/handle only).
   return {
     visible: false,
     selectionRect: null,

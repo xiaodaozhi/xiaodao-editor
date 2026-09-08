@@ -5,7 +5,7 @@
  * understand". Everything listed here is rendered as a real math glyph; every
  * other command degrades gracefully to an `unknown` node.
  *
- * Glyphs are plain Unicode characters — no font download, no SVG, no MathML.
+ * Glyphs are plain Unicode characters: no font download, no SVG, no MathML.
  */
 
 /** Greek letters, lowercase + the uppercase variants the spec requires. */

@@ -113,7 +113,7 @@ function addWarning(st: ParserState, message: string, start: number, end: number
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a LaTeX-ish math expression. Always returns a result — never throws.
+ * Parse a LaTeX-ish math expression. Always returns a result: never throws.
  */
 export function parseMath(source: string): ParseResult {
   const src = source ?? '';
@@ -244,7 +244,7 @@ function parseAtom(st: ParserState): MathNode | null {
     }
     case 'char': {
       take(st);
-      // Escaped TeX spacing commands (`\,` `\:` `\;` `\!` `\ `) — a bare
+      // Escaped TeX spacing commands (`\,` `\:` `\;` `\!` `\ `): a bare
       // version of these characters would have been tokenized as an operator
       // or whitespace, so a `char` token with one of these values can only
       // come from a backslash escape.
@@ -417,7 +417,7 @@ function readDelimiter(st: ParserState): MathDelimiter | null {
     case 'char':
       return t.value === '{' || t.value === '}' ? (t.value as MathDelimiter) : null;
     default:
-      // Not a delimiter at all — put it back and treat as "none".
+      // Not a delimiter at all: put it back and treat as "none".
       st.index -= 1;
       return null;
   }

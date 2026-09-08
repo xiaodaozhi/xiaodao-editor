@@ -3,7 +3,7 @@
  *
  * - `editorKey` / `useEditor`: provides the framework-agnostic `Editor`
  *   instance to child components (BlockHost, BlockContent, …) via Vue's
- *   provide/inject. The editor is provided as a non-reactive value —
+ *   provide/inject. The editor is provided as a non-reactive value:
  *   components that need to react to state changes subscribe via
  *   `editor.subscribe()` instead of relying on Vue reactivity. This keeps
  *   the editor's internal state outside Vue's reactivity system, avoiding
@@ -23,7 +23,7 @@ import type { Block, BlockId } from '../core/types';
 /**
  * Injection key for the reactive `isMobile` flag. Provided by BlockEditor so
  * child components (TableBlock, FixedToolbar, …) can adapt their rendering
- * for touch devices. Uses `(pointer: coarse)` matchMedia — matches iOS /
+ * for touch devices. Uses `(pointer: coarse)` matchMedia: matches iOS /
  * iPadOS / Android browsers.
  */
 export const mobileKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-mobile');
@@ -78,7 +78,7 @@ export interface FixedToolbarDescriptor {
 }
 
 /**
- * Injection key for the fixed-toolbar bridge — a reactive ref holding the
+ * Injection key for the fixed-toolbar bridge: a reactive ref holding the
  * **table-sourced** descriptor (or null). BlockEditor provides it; TableBlock
  * injects it and publishes its toolbar state when running with a fixed
  * toolbar. The text-block descriptor is computed directly inside
@@ -116,7 +116,7 @@ export const editableKey: InjectionKey<Ref<boolean>> = Symbol('block-editor-edit
  * an async `startImageUpload` extension method via
  * `createImageExtension({ upload, onFileCleanup })`. BlockEditor simply
  * looks it up with `editor.getExtensionMethod('startImageUpload')` and
- * publishes it here when present — so `<BlockEditor>` has zero
+ * publishes it here when present: so `<BlockEditor>` has zero
  * image-specific knowledge. If the consumer doesn't include an
  * Image extension (or doesn't provide an upload handler), this injection
  * is omitted and child components no-op gracefully.

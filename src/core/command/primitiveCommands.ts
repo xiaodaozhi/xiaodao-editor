@@ -88,7 +88,7 @@ const MAX_INDENT = 10;
  * Two responsibilities (single source of truth, runs atomically in the same
  * transaction as the structural change so undo covers both):
  *
- *   1. **Nesting validity** (Phase 2.2 — structural): illegal parent/child
+ *   1. **Nesting validity** (Phase 2.2: structural): illegal parent/child
  *      relationships are repaired with moveBlock steps. Rules enforced:
  *        • Non-nestable parents cannot have children (child is promoted to
  *          grandparent slot).
@@ -98,7 +98,7 @@ const MAX_INDENT = 10;
  *      `collectIndentSyncPatches` so every block's `attrs.indent` becomes a
  *      faithful mirror of `depthOf(doc, id)`. This is the ONLY code path
  *      that is allowed to write the indent attr; commands must never touch
- *      attrs.indent manually — they manipulate parent/children via
+ *      attrs.indent manually: they manipulate parent/children via
  *      moveBlock/insertBlock/removeBlock instead.
  */
 function addNestingSyncToBuilder(
@@ -148,7 +148,7 @@ function insertBlockCommand(ctx: Ctx): CommandEntry<InsertBlockArgs> {
 
       // Nestable guard: when inserting under an existing parent (not root),
       // the parent's schema must be nestable:true. (CodeBlock / hr / table /
-      // divider / quote disallow children — fail closed.)
+      // divider / quote disallow children: fail closed.)
       if (parent !== null) {
         const pb = getBlock(state.doc, parent);
         if (!pb) return false;
@@ -213,7 +213,7 @@ function removeBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
           // Promote to siblings of the removed block in the same parent,
           // starting at the removed block's current index. As each move pulls
           // a child out of removed (which itself hasn't been removed from the
-          // siblings array yet), the slot keeps shifting — but moveBlock
+          // siblings array yet), the slot keeps shifting: but moveBlock
           // operates on raw tuple (parent,index) semantics and the removal
           // step is after these moves, so insertion indices just increment.
           let insertIdx = removalIndex;
@@ -301,7 +301,7 @@ function splitBlockCommand(ctx: Ctx): CommandEntry<SplitBlockArgs> {
       const parent = parentOf(state.doc, args.id);
       const index = indexOf(state.doc, args.id);
 
-      // snapshot the original block's children — they will be moved
+      // snapshot the original block's children: they will be moved
       // wholesale to the newly-created sibling block after split. This matches
       // Notion behaviour: pressing Enter inside a block with nested children
       // "hands off" all descendants to the new block right after the split point.
@@ -322,7 +322,7 @@ function splitBlockCommand(ctx: Ctx): CommandEntry<SplitBlockArgs> {
 
       // Move every child of the original block (in document order) to become
       // children of the new split block, appending at the end of its children.
-      // The new block's schema may or may not declare nestable:true — when it
+      // The new block's schema may or may not declare nestable:true: when it
       // doesn't (e.g. paragraph can usually be a parent but some custom type
       // might not) the moveBlock step would normally be rejected. However the
       // "enter splits children to the new block" UX is block-type-agnostic:
@@ -439,7 +439,7 @@ function enterCommand(ctx: Ctx): CommandEntry {
 
       // splitBlock inserts the new block as a sibling
       // immediately after `block` (same parent, index = indexOf(block)+1), so
-      // its nesting depth is automatically identical — no need to manually
+      // its nesting depth is automatically identical: no need to manually
       // transfer attrs.indent. addNestingSyncToBuilder (called inside
       // splitBlock) rewrites attrs.indent from depthOf().
       if (schema.listLike) {
@@ -532,8 +532,8 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
       if (focus.offset > 0) return false;
 
       // Caret at block start AND block is nested (depth ≥ 1): outdent FIRST
-      // (higher priority than list exit / merge). Any block type — including
-      // non-nestable ones (code, hr, table, divider, quote) — can be promoted
+      // (higher priority than list exit / merge). Any block type, including
+      // non-nestable ones (code, hr, table, divider, quote), can be promoted
       // because "nestable" only governs being a parent, not being a child.
       if (depthOf(state.doc, block.id) > 0) {
         return outdentBlockCommand(ctx).run({ id: block.id })(state, dispatch);
@@ -541,7 +541,7 @@ function backspaceCommand(ctx: Ctx): CommandEntry {
 
       // Caret at offset 0 on a list item: Backspace exits the list rather
       // than merging text into the previous block. Convert the item to a
-      // paragraph — empty or not — matching the other non-paragraph text
+      // paragraph (empty or not), matching the other non-paragraph text
       // blocks (heading/quote/codeBlock), which convert back to a paragraph
       // when empty. Keeping the item as an empty paragraph (instead of
       // deleting it) gives a progressive exit: Backspace once → paragraph,
@@ -628,7 +628,7 @@ function setSelectionCommand(): CommandEntry<{ selection: Selection }> {
 /**
  * Drop any active block selection: set the selection to an empty block
  * selection ({ kind: 'blocks', blockIds: [] }), which the core treats as
- * "nothing selected". Used when deselecting image/table/code blocks —
+ * "nothing selected". Used when deselecting image/table/code blocks:
  * they have no text caret, so there is no caret position to move to.
  */
 function clearSelectionCommand(): CommandEntry {
@@ -708,7 +708,7 @@ function moveBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId; toParent: Block
       // --- 3) Nestable guard: when moving into an existing block (not root),
       //        the target parent's schema must declare nestable:true. Block
       //        types like codeBlock / hr / table / divider / quote are
-      //        explicitly nestable:false — placing children under them would
+      //        explicitly nestable:false: placing children under them would
       //        produce dirty state that no rendering path accounts for. ---
       if (args.toParent !== null) {
         const parentBlock = getBlock(state.doc, args.toParent);
@@ -737,7 +737,7 @@ export interface ConvertBlockArgs {
 /**
  * Convert a block to a different type (or the same type with new attrs).
  * Preserves the block's text content and caret offset. Unlike replaceBlock,
- * this command keeps the same block id (no structural change) — the user
+ * this command keeps the same block id (no structural change): the user
  * perceives it as the same block, just with a different appearance/rules.
  * Used by the slash menu, hover toolbar, and block settings menu for
  * "Turn into …" actions.
@@ -759,7 +759,7 @@ function convertBlockCommand(ctx: Ctx): CommandEntry<ConvertBlockArgs> {
       let attrs = ctx.registries.schema.coerceAttrsFor(args.type, mergedRaw);
       const schema = ctx.registries.schema.get(args.type);
       // If the target schema has no text content, clear the text (don't lose
-      // it — keep in attrs would be extension-specific). For Phase 2 we only
+      // it; keeping it in attrs would be extension-specific). For Phase 2 we only
       // convert between text-carrying types so this isn't hit.
       let content = block.content;
       if (schema.content === 'none') content = [];
@@ -846,7 +846,7 @@ function moveBlockDownCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
  *  ownership, a "duplicate" must follow the parent chain and clone every
  *  descendant with a fresh id, then re-wire the children arrays of the
  *  newly-created parents to the cloned child ids. The ids are produced in
- *  root-first DFS order via `insertBlock(parent, index)` — children are
+ *  root-first DFS order via `insertBlock(parent, index)`: children are
  *  appended to their new parent's `children` array one by one so the
  *  relative order within each sibling list matches the source. */
 function duplicateBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
@@ -878,7 +878,7 @@ function duplicateBlockCommand(ctx: Ctx): CommandEntry<{ id: BlockId }> {
 
       const oldToNew = new Map<BlockId, BlockId>();
       // Tracks how many children we have already appended under each cloned
-      // parent — `insertBlock(parent, index)` will use this to append at the
+      // parent: `insertBlock(parent, index)` will use this to append at the
       // "current end" of the new parent's (still being built) children list.
       const nextChildIndex = new Map<BlockId, number>();
       const builder = createTransaction();
@@ -1001,7 +1001,7 @@ export interface SetStartNumberArgs {
   readonly id: BlockId;
   /**
    * The explicit starting number for this ordered-list item.
-   * Pass `null` / `undefined` to clear the override — the item will then
+   * Pass `null` / `undefined` to clear the override: the item will then
    * follow the previous block's numbering (standard "continue" behavior).
    */
   readonly startNumber: number | null;
@@ -1044,18 +1044,18 @@ export interface IndentBlockArgs {
  * Nesting model:
  *   • Authoritative state is the parent/children tree in DocState (Block.children
  *     + DocState.parent Map).
- *   • attrs.indent is a DERIVED shadow — it is rewritten by addNestingSyncToBuilder
+ *   • attrs.indent is a DERIVED shadow: it is rewritten by addNestingSyncToBuilder
  *     to equal depthOf(doc, id) after every transaction, and is NEVER set here.
  *
  * Behaviour (matches Notion / Google Docs):
  *   • If the block has a PREVIOUS SIBLING (same parent, earlier index), move
  *     the block to become the LAST CHILD of that previous sibling.
- *   • The PREVIOUS SIBLING must be nestable (schema.nestable) — because it
+ *   • The PREVIOUS SIBLING must be nestable (schema.nestable): because it
  *     will become the new parent. The CURRENT block can be ANY type:
  *     non-nestable blocks (codeBlock, divider, hr, table, image, quote, …)
  *     simply become children without being able to accept further children
  *     of their own (the nestable flag governs being a parent, not a child).
- *   • The resulting nesting depth is capped to MAX_INDENT — if the previous
+ *   • The resulting nesting depth is capped to MAX_INDENT: if the previous
  *     sibling already sits at MAX_INDENT the operation is a no-op
  *     (nesting under prev would place this block at MAX+1, which is invalid).
  *   • First-sibling and first-document blocks (no prev sibling) cannot indent
@@ -1081,7 +1081,7 @@ function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
       if (!id) return false;
       const block = getBlock(state.doc, id);
       if (!block) return false;
-      // NOTE: no `mySchema.nestable` check here — ANY block type is allowed
+      // NOTE: no `mySchema.nestable` check here: ANY block type is allowed
       // to BECOME a child (nestable means "can be a parent", not "can be a child").
 
       const prev = prevSibling(state.doc, id);
@@ -1105,7 +1105,7 @@ function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
 }
 
 /**
- * Decrease nesting level (Shift+Tab) — the inverse of indentBlock.
+ * Decrease nesting level (Shift+Tab): the inverse of indentBlock.
  *
  * Behaviour:
  *   • If the block has a real parent (parentOf != null → depth ≥ 1), move the
@@ -1115,7 +1115,7 @@ function indentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
  *   • The CURRENT block can be ANY type (same logic as indentBlock):
  *     non-nestable blocks can be promoted up just like any other.
  *   • After promotion, attrs.indent is normalized via addNestingSyncToBuilder
- *     (same as indentBlock — the command does NOT write the indent attr).
+ *     (same as indentBlock: the command does NOT write the indent attr).
  */
 function outdentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
   return {
@@ -1134,14 +1134,14 @@ function outdentBlockCommand(ctx: Ctx): CommandEntry<IndentBlockArgs> {
       if (!id) return false;
       const block = getBlock(state.doc, id);
       if (!block) return false;
-      // NOTE: any block type can be promoted out — "nestable" is only about
+      // NOTE: any block type can be promoted out: "nestable" is only about
       // being a parent, not being a child.
 
       const parentId = parentOf(state.doc, id);
       if (parentId === null) return false; // already at root level
 
       const grandParentId = parentOf(state.doc, parentId);
-      // Index of our parent among the grandparent's children — we insert
+      // Index of our parent among the grandparent's children: we insert
       // ourselves right after it.
       const parentSibs = siblingList(state.doc, parentId);
       const parentIdx = parentSibs.indexOf(parentId);
@@ -1302,12 +1302,12 @@ function toggleMarkCommand(ctx: Ctx): CommandEntry<ToggleMarkArgs> {
       builder.setText(args.id, newContent);
       builder.setMeta({ addToHistory: true });
       // Preserve selection explicitly: toggleMark does not move the caret or
-      // change the selection range — it only toggles inline marks. Writing
+      // change the selection range: it only toggles inline marks. Writing
       // this down means applyTransaction() doesn't rely on the implicit
       // `state.selection` fallback, killing any subtle bugs where plugins
       // or focus changes cause a transient "fallback to first block".
       builder.setSelection(state.selection);
-      // Intentionally NOT calling skipDomWrite — the DOM must re-render to
+      // Intentionally NOT calling skipDomWrite: the DOM must re-render to
       // show the new mark tags.
       dispatch?.(builder.build());
       return true;

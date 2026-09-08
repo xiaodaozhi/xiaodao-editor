@@ -14,7 +14,7 @@
  *   1. Caller (paste / drop / slash / file picker) calls `beginUpload`
  *      with a File and a target block placement hint (afterId / insertAtEnd).
  *   2. `beginUpload` inserts an image block with a PLACEHOLDER src
- *      (empty string) via a normal transaction — so undo/redo can
+ *      (empty string) via a normal transaction: so undo/redo can
  *      remove the *block itself*. It records the upload in the
  *      transient map as { status: 'pending', progress: 0 }.
  *   3. `beginUpload` runs the actual upload via the registered handler
@@ -92,13 +92,13 @@ export interface ImageUploadResult {
 
 /**
  * The `UploadImageHandler` signature. Consumers inject an upload
- * function via `createImageExtension({ upload })` — the editor no
+ * function via `createImageExtension({ upload })`: the editor no
  * longer carries an `uploadImage` prop.
  *
  * The function receives:
  *   - name:      the original file name (file.name)
  *   - file:      the File object to upload
- *   - controller: AbortController — the editor will call .abort() if the
+ *   - controller: AbortController: the editor will call .abort() if the
  *                 image block is removed or the editor is unmounted
  *   - onProgress:  callback to report progress as 0–100
  *
@@ -184,7 +184,7 @@ export const clearAllUploadStates = resetAllUploadStates;
 
 /** Explicitly release all temp preview URLs (blob: object URLs). The upload
  *  state map is not cleared so UI error states are preserved. Called when the
- *  Editor unmounts in addition to resetAllUploadStates — double-clean is safe
+ *  Editor unmounts in addition to resetAllUploadStates: double-clean is safe
  *  because URL.revokeObjectURL on a freed URL is a no-op. */
 const tempUrls = new Set<string>();
 export function revokeAllTempUrls(): void {
@@ -340,7 +340,7 @@ export function mockUpload(
 }
 
 // ---------------------------------------------------------------------------
-// `beginUpload` — the single entry-point used by BlockEditor to start a File
+// `beginUpload`: the single entry-point used by BlockEditor to start a File
 // upload for an EXISTING image block.
 //
 // This wraps the callback-based dispatchUploadRequest into a Promise-based
@@ -418,7 +418,7 @@ export function beginUpload(
         onError: (msg) => {
           const prev = getUploadState(blockId);
           // Keep tempPreviewUrl around on error so users can still see what
-          // the image would have been — it's cleaned up via setUploadState.
+          // the image would have been: it's cleaned up via setUploadState.
           setUploadState(blockId, {
             status: 'error',
             progress: 0,
@@ -465,13 +465,13 @@ export async function srcToFile(
   if (!src) return null;
 
   try {
-    // 1. data: URI — parse inline, no network needed.
+    // 1. data: URI: parse inline, no network needed.
     if (src.startsWith('data:')) {
       return dataUriToFile(src, fallbackName);
     }
 
-    // 2. blob: URI — fetch the already-local blob.
-    // 3. http(s):// URL — fetch the remote resource (may throw on CORS).
+    // 2. blob: URI: fetch the already-local blob.
+    // 3. http(s):// URL: fetch the remote resource (may throw on CORS).
     const response = await fetch(src);
     if (!response.ok) return null;
     const blob = await response.blob();
@@ -510,7 +510,7 @@ function dataUriToFile(dataUri: string, fallbackName?: string): File | null {
   const name = fallbackName
     ? ensureExtension(fallbackName, ext)
     : `image-${Date.now()}${ext}`;
-  // Wrap in a new Blob — some TS lib targets need the cast.
+  // Wrap in a new Blob: some TS lib targets need the cast.
   const blob = new Blob([bytes as BlobPart], { type: mime });
   return new File([blob], name, { type: mime });
 }

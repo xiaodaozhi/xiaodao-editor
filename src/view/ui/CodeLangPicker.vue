@@ -14,7 +14,7 @@
     - Coordinates are viewport-relative (Teleport to <body>, position:fixed).
 
   Scrolling follows the shared editor-menu pattern (useMenuScroll + up/down
-  buttons, no native scrollbar) — identical to the hover-toolbar dropdowns:
+  buttons, no native scrollbar): identical to the hover-toolbar dropdowns:
     - Up/down arrow buttons appear at the top/bottom of the list when the
       content overflows.
     - Wheel & touch drags inside the list are converted to list scrolling
@@ -202,7 +202,7 @@ const draftValue = ref<string>('');
 const currentLang = ref<string>(props.initialValue);
 const placement = ref({ top: 0, left: 0, above: false, maxHeight: 360 });
 const MARGIN = 6;
-const NEAR_BOTTOM_THRESHOLD = 200; // px — anchor within this distance of the root bottom is "near"
+const NEAR_BOTTOM_THRESHOLD = 200; // px: anchor within this distance of the root bottom is "near"
 const MENU_MIN_HEIGHT = 120;
 const MENU_MAX_HEIGHT = 360;
 const canScrollUp = ref(false);
@@ -217,11 +217,11 @@ function labelFor(lang: string): string {
  * block-type dropdown (HoverToolbar.vue positionActiveDropdown):
  *
  *   1. Natural height = the menu's full content `scrollHeight` (immune to
- *      max-height clamping — no need to wait a frame for layout).
+ *      max-height clamping: no need to wait a frame for layout).
  *   2. Direction: pop DOWN by default; if the natural height does not fit
  *      below, pop UP when there is more (or equal) space above.
  *      EXTRA RULE: when the anchor sits close to the editor root's bottom
- *      edge AND there is plenty of space above, force the menu UP — even
+ *      edge AND there is plenty of space above, force the menu UP: even
  *      if some room remains below.
  *   3. Rendered height is clamped to [120, 360].
  *   4. When popping UP, the menu's bottom edge hugs the anchor's top edge
@@ -327,7 +327,7 @@ function closeCustom(): void {
   nextTick(positionMenu);
 }
 
-/** Only letters (a-z, A-Z) — strip everything else. */
+/** Only letters (a-z, A-Z): strip everything else. */
 function onInput(): void {
   const cleaned = draftValue.value.replace(/[^a-zA-Z]/g, '').slice(0, 20);
   if (cleaned !== draftValue.value) {

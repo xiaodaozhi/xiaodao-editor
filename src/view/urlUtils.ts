@@ -20,7 +20,7 @@ const DANGEROUS_SCHEMES = ['javascript:', 'vbscript:', 'data:', 'file:'];
  * 1. It is non-empty.
  * 2. It does not start with a dangerous scheme (case-insensitive).
  * 3. If it has an explicit scheme, that scheme is in the allow-list.
- * 4. If it has no scheme (relative URL or bare domain), it is safe — the
+ * 4. If it has no scheme (relative URL or bare domain), it is safe: the
  *    browser will resolve it relative to the current page, and it cannot
  *    execute script.
  *
@@ -64,7 +64,7 @@ export function sanitizeUrl(raw: string): string | null {
 /**
  * Check if a string looks like a URL that should be auto-linked.
  *
- * This is intentionally conservative — it only matches strings that start
+ * This is intentionally conservative: it only matches strings that start
  * with a known scheme or look like a domain (e.g. "example.com/path").
  */
 export function looksLikeUrl(text: string): boolean {
@@ -159,7 +159,7 @@ export function autoLinkInlineSeq(seq: InlineSeq): InlineSeq {
       continue;
     }
 
-    // This run has at least one URL — split it into segments.
+    // This run has at least one URL: split it into segments.
     changed = true;
     let lastEnd = 0;
     URL_IN_TEXT_PATTERN.lastIndex = 0;
@@ -182,7 +182,7 @@ export function autoLinkInlineSeq(seq: InlineSeq): InlineSeq {
         }
       }
 
-      // The URL itself — add a link mark.
+      // The URL itself: add a link mark.
       const normalized = normalizeUrl(urlPart);
       const safe = sanitizeUrl(normalized);
       if (safe) {
@@ -193,7 +193,7 @@ export function autoLinkInlineSeq(seq: InlineSeq): InlineSeq {
           marks: [...runMarks, linkMark],
         });
       } else {
-        // URL didn't pass sanitization — keep as plain text.
+        // URL didn't pass sanitization: keep as plain text.
         result.push({
           type: 'text' as const,
           text: urlPart,

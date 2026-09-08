@@ -10,7 +10,7 @@
  *  - Character offsets are computed by walking text nodes within the element.
  *  - Selection sync is **just-in-time**: we read the DOM selection before
  *    dispatching a command, and write it back after a state update changes
- *    the selection. We do NOT listen to `selectionchange` — that event fires
+ *    the selection. We do NOT listen to `selectionchange`: that event fires
  *    too often and creates feedback loops.
  *
  * See docs/architecture.md §8.2 (selection sync).
@@ -432,7 +432,7 @@ export function crossBlockSelectionRects(
     if (lo >= hi && !(i === startIdx && i === endIdx)) {
       // Empty range within a fully-covered block shouldn't happen, but guard.
       // For the start/end blocks, lo > hi means the anchor is past the focus
-      // within the same block — handled by the single-block path.
+      // within the same block: handled by the single-block path.
     }
     const range = rangeFromOffsets(el, lo, Math.max(lo, hi));
     if (!range) continue;

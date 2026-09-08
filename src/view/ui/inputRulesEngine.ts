@@ -20,7 +20,7 @@ export interface InputRuleRunContext {
   readonly blockId: BlockId;
   /** The full text currently in the block (after the just-typed character). */
   readonly text: string;
-  /** True if we're in the middle of IME composition — we skip rules. */
+  /** True if we're in the middle of IME composition: we skip rules. */
   readonly composing?: boolean;
 }
 
@@ -31,7 +31,7 @@ export interface InputRuleRunContext {
  * For rule-matching we only examine the text currently in the block's leading
  * prefix (i.e. no newline; rules always match a single-line prefix up to the
  * caret). Because the editor's caret may be anywhere, `textBeforeCaret` is the
- * full block text passed in — rules are responsible for anchoring patterns with
+ * full block text passed in: rules are responsible for anchoring patterns with
  * `^…$`. This matches ProseMirror / Tiptap input-rule semantics.
  */
 export function runInputRules(ctx: InputRuleRunContext): boolean {

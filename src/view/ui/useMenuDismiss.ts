@@ -12,7 +12,7 @@
  * wheel) are bound once on mount and check `isInsideMenu(target)` at event
  * time so they no-op when the menu is closed.
  *
- * Does NOT call `preventDefault()` / `stopPropagation()` — the underlying
+ * Does NOT call `preventDefault()` / `stopPropagation()`: the underlying
  * interaction (e.g. clicking a block to focus it, scrolling the page) is
  * allowed to proceed naturally; the menu simply closes on top.
  */

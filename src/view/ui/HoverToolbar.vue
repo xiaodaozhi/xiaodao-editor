@@ -6,7 +6,7 @@
     - Floating mode (default, `inline` omitted): teleported to <body>,
       positioned above/below the text selection and follows it on scroll.
     - Inline mode (`inline` set): rendered statically inside the FixedToolbar
-      bar. Used on BOTH desktop and mobile — so despite the toolbar living in
+      bar. Used on BOTH desktop and mobile: so despite the toolbar living in
       the FixedToolbar, this is NOT a mobile-only mode. When
       `toolbarPosition='float'` on desktop, BlockEditor renders this component
       in floating mode instead of the FixedToolbar.
@@ -1474,7 +1474,7 @@ function updateActiveMarks(): void {
           }
           // Only commit the DOM-derived set when it actually found a mark. If
           // the DOM selection is momentarily unavailable or still reflects a
-          // just-rewritten tree (e.g. right after toggling bold/italic/color —
+          // just-rewritten tree (e.g. right after toggling bold/italic/color;
           // Chromium briefly collapses the selection before BlockContent
           // re-applies it), fall through to the authoritative editor-state
           // computation below. Otherwise the buttons would blank to "not
@@ -1562,7 +1562,7 @@ const marksDisabled = computed(() =>
   noTextSelection.value || props.blockType === 'codeBlock',
 );
 
-// Block-level type selector — only disabled when there's no focused block at all.
+// Block-level type selector: only disabled when there's no focused block at all.
 // Unlike marks, it works on the whole block even without a text selection.
 const typeDisabled = computed(() => {
   if (props.tableMode || props.cellEditMode) return noTextSelection.value;
@@ -1786,7 +1786,7 @@ function onHtTouchMove(e: TouchEvent): void {
   const dy = Math.abs(t.clientY - pressedStartY);
   if (dx > HT_TAP_SLOP || dy > HT_TAP_SLOP) {
     if (!swipeDetected) {
-      // A swipe just started — close any open dropdown.
+      // A swipe just started: close any open dropdown.
       openDropdown.value = null;
     }
     swipeDetected = true;
@@ -1834,7 +1834,7 @@ function hireTap(act: () => void, e: TouchEvent): void {
 watch(
   [() => props.visible, () => props.selectionRect, toolbarEl, () => props.inline],
   async () => {
-    // Inline mode: no floating placement — just measure overflow so the
+    // Inline mode: no floating placement: just measure overflow so the
     // left/right nav buttons work inside the FixedToolbar.
     if (props.inline) {
       if (props.visible) measureHtOverflow();
@@ -1850,7 +1850,7 @@ watch(
     // participates in scrollWidth only when overflow is visible). Re-measuring
     // here would then toggle `htOverflow` / `content.style.maxWidth`, changing
     // the toolbar's rendered width, and the freshly-read width would feed
-    // placeBelowSelection's center-aligned left — shifting the toolbar (and the
+    // placeBelowSelection's center-aligned left: shifting the toolbar (and the
     // open dropdown riding on it) sideways by ~10px. Lock placement while a
     // dropdown is open; it re-runs once the dropdown closes.
     if (openDropdown.value) return;
@@ -1891,7 +1891,7 @@ const shellStyle = computed(() => ({
 const toolbarStyle = computed(() => {
   const el = toolbarEl.value;
   const toolbarW = el?.offsetWidth ?? TOOLBAR_WIDTH_EST;
-  // Use clientWidth — it excludes the ~15–17px vertical scrollbar width
+  // Use clientWidth: it excludes the ~15–17px vertical scrollbar width
   // that window.innerWidth includes.  Otherwise this final clamp still
   // allows the toolbar right edge to be hidden behind the scrollbar.
   const viewportW = document.documentElement.clientWidth;
@@ -1975,13 +1975,13 @@ let placementRefreshRaf: number | null = null;
  *      and above the trigger button (within the viewport).
  *   2. EXTRA RULE: if the toolbar itself is very close to the bottom edge of
  *      the editor root container AND there's a lot of space above, force the
- *      dropdown to pop UP — even if the button still has some room below.
+ *      dropdown to pop UP: even if the button still has some room below.
  *      This prevents the dropdown from overflowing the container.
  *   3. Otherwise: if the natural height fits below → below; else pick the
  *      side with more space.
  *   4. Clamp maxHeight to [120, 360] so the dropdown never gets too tall.
  */
-const NEAR_BOTTOM_THRESHOLD = 200; // px — toolbar within this distance of container bottom is "near"
+const NEAR_BOTTOM_THRESHOLD = 200; // px: toolbar within this distance of container bottom is "near"
 
 function positionActiveDropdown(): void {
   const kind = openDropdown.value;
@@ -2011,7 +2011,7 @@ function positionActiveDropdown(): void {
   // Inline mode: the toolbar is pinned to either the viewport top or
   // bottom (FixedToolbar). Use the injected `fixedToolbarBottomKey` flag
   // (provided by FixedToolbar based on its `position` prop) to decide which
-  // way dropdowns pop — bottom bar → UPWARD, top bar → downward.
+  // way dropdowns pop: bottom bar → UPWARD, top bar → downward.
   // Dropdowns are teleported to <body>, so we compute position:fixed coords
   // using the viewport-relative button rect (escapes the .fixed-toolbar
   // overflow:hidden clip).
@@ -2020,7 +2020,7 @@ function positionActiveDropdown(): void {
     const VIEWPORT_GAP = 10; // keep 10px from the viewport edge the dropdown grows toward
     const popUpward = isFixedToolbarBottom.value;
     if (popUpward) {
-      // Fixed at bottom — pop upward. Reserve VIEWPORT_GAP at the viewport top.
+      // Fixed at bottom: pop upward. Reserve VIEWPORT_GAP at the viewport top.
       dropdownAbove.value = true;
       dropdownMaxHeight.value = Math.max(120, spaceAbove - VIEWPORT_GAP);
       const bottomVal = vh - btnRect.top + margin;
@@ -2037,7 +2037,7 @@ function positionActiveDropdown(): void {
         };
       }
     } else {
-      // Fixed at top — pop downward. Reserve VIEWPORT_GAP at the viewport bottom.
+      // Fixed at top: pop downward. Reserve VIEWPORT_GAP at the viewport bottom.
       dropdownAbove.value = false;
       dropdownMaxHeight.value = Math.max(120, spaceBelow - VIEWPORT_GAP);
       const topVal = btnRect.bottom + margin;
@@ -2601,7 +2601,7 @@ function onToggleMark(markType: string): void {
   });
   // toggleMark rewrites the block's innerHTML (to render the new tags),
   // which used to destroy the native selection and cause us to blindly
-  // close the HoverToolbar — leading the user to think the click had no
+  // close the HoverToolbar: leading the user to think the click had no
   // effect. BlockContent.vue now restores the character selection after
   // the write, and our state-based fallback paths also kick in.
   nextTick(() => {
@@ -2628,7 +2628,7 @@ function onToggleMark(markType: string): void {
 function onLinkClick(): void {
   emit('interacting');
   // Close any already-open dropdown menus (color / type / align) before
-  // opening LinkPopover — otherwise they stack visually on top of each other.
+  // opening LinkPopover: otherwise they stack visually on top of each other.
   openDropdown.value = null;
   // Cell edit mode: emit linkClick with dummy offsets. The TableBlock
   // renderer reads the selection directly from window.getSelection() to
@@ -2674,7 +2674,7 @@ defineExpose({});
 // Reposition on scroll/resize.
 async function onScrollOrResize(): Promise<void> {
   if (props.inline) {
-    // Inline mode: no floating placement to refresh — just re-measure overflow
+    // Inline mode: no floating placement to refresh: just re-measure overflow
     // and update dropdown position if one is open.
     if (props.visible) measureHtOverflow();
     if (openDropdown.value) positionActiveDropdown();
@@ -2738,7 +2738,7 @@ function onWindowMouseDown(e: MouseEvent): void {
   // If the click was on the toolbar itself (including the left/right nav buttons
   // for horizontal scroll), do NOT close the toolbar. Also preventDefault so the
   // browser's default mousedown action (moving focus / clearing the selection)
-  // never fires — otherwise in table cell-edit mode the selected text loses its
+  // never fires: otherwise in table cell-edit mode the selected text loses its
   // selection state and the toolbar disappears. This capture-phase handler runs
   // before the individual buttons' own `@mousedown.prevent`, guaranteeing the
   // selection is preserved even if a control forgets to preventDefault.

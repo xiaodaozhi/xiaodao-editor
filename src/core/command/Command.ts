@@ -72,7 +72,7 @@ export class CommandRegistry {
         get: (_t, prop: string) => {
           if (!target.has(prop)) {
             return () => {
-              // Unknown command — treat as "not handled".
+              // Unknown command: treat as "not handled".
               return false;
             };
           }

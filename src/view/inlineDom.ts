@@ -69,7 +69,7 @@ export function inlineToHtml(seq: InlineSeq): string {
       // Wrap outer-to-inner in a fixed order.
       // Color/bgColor spans go outermost (they are visual-only wrappers).
       // NOTE: `marks.find(colorKey)` returns the MARK OBJECT, not the key
-      // string — we must extract the attrs value separately. Using the mark
+      // string: we must extract the attrs value separately. Using the mark
       // object directly in the template literal would produce
       // `class="be-color-[object Object]"` and the color would silently
       // not apply (no matching CSS rule).
@@ -134,19 +134,19 @@ export function inlineFromDom(el: HTMLElement): InlineSeq {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const elem = node as HTMLElement;
     const tag = elem.tagName.toLowerCase();
-    // <br> is layout-only — skip it (it contributes no text).
+    // <br> is layout-only: skip it (it contributes no text).
     if (tag === 'br') return;
     const markType = TAG_TO_MARK[tag];
     let marks = inheritedMarks;
     if (markType === 'link') {
-      // <a> tags carry an href attribute — store it as mark attrs.
+      // <a> tags carry an href attribute: store it as mark attrs.
       // Sanitize the href to block dangerous schemes.
       const rawHref = elem.getAttribute('href') ?? '';
       const safeHref = sanitizeUrl(rawHref);
       if (safeHref) {
         marks = [...inheritedMarks, { type: 'link', attrs: { href: safeHref } as Attrs }];
       } else {
-        // If href is empty or dangerous, don't add a link mark — treat
+        // If href is empty or dangerous, don't add a link mark: treat
         // the <a> as a plain wrapper.
         marks = inheritedMarks;
       }

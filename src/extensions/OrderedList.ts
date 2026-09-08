@@ -4,7 +4,7 @@
  * Numbering rules (consistent across the renderer and document model):
  *
  *   1. If the block has `attrs.startNumber = N` (a positive integer), its
- *      ordinal is exactly N — this is an *explicit override* set via the
+ *      ordinal is exactly N: this is an *explicit override* set via the
  *      number click menu ("Start new list" or "Modify number value").
  *
  *   2. Otherwise, walk backwards in flat document order:
@@ -47,7 +47,7 @@ const START_NUMBER_ATTR = {
  * chain; an explicit `attrs.startNumber` acts as a reset anchor.
  *
  * This is strictly narrower than the old flat-indent model: blocks under a
- * DIFFERENT parent (even at the same depthOf) never share a counter —
+ * DIFFERENT parent (even at the same depthOf) never share a counter:
  * crossing any parent boundary resets numbering by design. This matches the
  * rendering (BlockList nests children) and user intuition.
  */

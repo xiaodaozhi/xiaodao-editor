@@ -14,7 +14,7 @@
 
 /**
  * A stable, opaque identifier for a block. Branded so that a plain `string`
- * cannot be passed where a `BlockId` is expected — this catches an entire
+ * cannot be passed where a `BlockId` is expected: this catches an entire
  * class of bugs at compile time.
  */
 export type BlockId = string & { readonly __brand: 'BlockId' };
@@ -108,7 +108,7 @@ export type Selection
     | { readonly kind: 'blocks'; readonly blockIds: readonly BlockId[] };
 
 // ---------------------------------------------------------------------------
-// Serializable JSON forms (import / export only — never the source of truth)
+// Serializable JSON forms (import / export only: never the source of truth)
 // ---------------------------------------------------------------------------
 
 export interface BlockData {

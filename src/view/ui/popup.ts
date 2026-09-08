@@ -107,14 +107,14 @@ export function placeBelowSelection(
   popupSize: { readonly width: number; readonly height: number },
   margin = 8,
 ): PopupPlacement {
-  // Use clientWidth/clientHeight — these are the VISIBLE viewport dimensions
+  // Use clientWidth/clientHeight: these are the VISIBLE viewport dimensions
   // EXCLUDING scrollbars.  innerWidth includes the scrollbar (~15px), which
   // makes the horizontal right-clamp too loose and the toolbar right edge
   // ends up covered by the scrollbar or the very edge of the viewport.
   const viewportHeight = document.documentElement.clientHeight;
   const viewportW = document.documentElement.clientWidth;
 
-  // Viewport-relative coordinates — no rootRect subtraction.
+  // Viewport-relative coordinates: no rootRect subtraction.
   const centerLeft = selectionRect.left + (selectionRect.width - popupSize.width) / 2;
   const left = Math.max(margin, Math.min(viewportW - popupSize.width - margin, centerLeft));
 
@@ -140,7 +140,7 @@ export function placeBelowSelection(
   return { top, left, above, availableHeight, bottom, topBaseline };
 }
 
-/** Kept for backward compatibility — delegates to placeBelowSelection. */
+/** Kept for backward compatibility: delegates to placeBelowSelection. */
 export function placeAboveSelection(
   root: HTMLElement,
   selectionRect: DOMRect,

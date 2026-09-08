@@ -50,7 +50,7 @@ export function keyNameFromEvent(event: KeyboardEvent): string {
   if (event.shiftKey) parts.push('Shift');
 
   let key = event.key;
-  if (key === 'Meta' || key === 'Control') return ''; // modifier alone — not a binding
+  if (key === 'Meta' || key === 'Control') return ''; // modifier alone: not a binding
   // Letter keys normalized to uppercase for stable matching.
   if (key.length === 1) key = key.toUpperCase();
   key = ALIASES[key] ?? key;

@@ -489,7 +489,7 @@ export interface I18nBundle {
 /**
  * Reactive refs for locale and theme.  These are provided directly (not
  * wrapped in an object) so that each consumer's `t()` function accesses
- * `localeRef.value` — a plain ref read — which Vue's reactivity system
+ * `localeRef.value` (a plain ref read), which Vue's reactivity system
  * tracks reliably across <Teleport> boundaries.
  */
 export const localeKey: InjectionKey<Ref<Locale>> = Symbol('be-locale');
@@ -503,7 +503,7 @@ export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void {
 /**
  * Access the i18n/theme bundle within a child component.  Each call
  * injects the raw locale/theme refs and builds a fresh `t()` that reads
- * `localeRef.value` directly — no computed, no closure-over-computed.
+ * `localeRef.value` directly: no computed, no closure-over-computed.
  *
  * When the parent updates `localeRef.value`, every template or computed
  * that called `t('key')` re-renders because the ref read was tracked

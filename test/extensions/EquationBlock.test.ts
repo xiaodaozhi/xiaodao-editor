@@ -51,7 +51,7 @@ describe('EquationBlock component', () => {
 
   it('opens the editor directly for an empty editable block (no view placeholder)', () => {
     const { wrapper } = mountEquation('');
-    // An empty equation has no "view" mode — it opens straight in edit mode.
+    // An empty equation has no "view" mode: it opens straight in edit mode.
     expect(wrapper.find('textarea.equation-edit-input').exists()).toBe(true);
     // The view-mode placeholder span must NOT be present for an empty block.
     expect(wrapper.find('.equation-placeholder').exists()).toBe(false);

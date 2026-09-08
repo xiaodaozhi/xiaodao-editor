@@ -312,7 +312,7 @@ watch(
   (v) => {
     if (v) {
       shouldRender.value = true;
-      // Read-only: a link popover may only open in view mode — the user can
+      // Read-only: a link popover may only open in view mode: the user can
       // view/copy/open the URL but never edit or delete the link.
       mode.value = props.readonly ? 'view' : (props.initialMode ?? (props.href ? 'view' : 'edit'));
       editUrl.value = props.href;
@@ -377,7 +377,7 @@ function onSave(): void {
   const normalized = normalizeUrl(editUrl.value);
   const safe = sanitizeUrl(normalized);
   if (!safe) {
-    // Invalid URL — show error, focus the input and keep the popover open.
+    // Invalid URL: show error, focus the input and keep the popover open.
     urlError.value = t('link.invalidUrl');
     urlInputEl.value?.focus();
     return;
@@ -401,26 +401,26 @@ function onSave(): void {
 
   // After saving, switch to view mode (or close if the popover was for creation).
   if (props.href) {
-    // Was editing an existing link — switch to view mode.
+    // Was editing an existing link: switch to view mode.
     mode.value = 'view';
     // Update props-like state from the command result.
     nextTick(() => {
       updatePosition();
     });
   } else {
-    // Was creating a new link — close the popover.
+    // Was creating a new link: close the popover.
     emit('close');
   }
 }
 
 function onCancelEdit(): void {
   if (props.href) {
-    // Was editing an existing link — go back to view mode.
+    // Was editing an existing link: go back to view mode.
     mode.value = 'view';
     editUrl.value = props.href;
     editText.value = props.text;
   } else {
-    // Was creating a new link — close.
+    // Was creating a new link: close.
     emit('close');
   }
 }

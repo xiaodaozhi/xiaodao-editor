@@ -15,7 +15,7 @@
  *
  * Listeners are attached to whichever element the `scrollEl` ref currently
  * points to, and are cleaned up when the ref changes or the component
- * unmounts — so it is safe to use with `v-if` menus.
+ * unmounts, so it is safe to use with `v-if` menus.
  */
 import { type Ref, watch, onBeforeUnmount } from 'vue';
 

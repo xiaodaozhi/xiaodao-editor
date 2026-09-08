@@ -3,7 +3,7 @@
   children as a nested `<BlockList class="block-children">` container.
 
   The authoritative nesting structure comes from
-  `Block.children` (and `DocState.parent`) — `attrs.indent` is a derived
+  `Block.children` (and `DocState.parent`): `attrs.indent` is a derived
   shadow kept for backward compatibility with the CSS indent class pipeline.
 
   Passes hoveredBlockId and focusedBlockId to each BlockHost so handles
@@ -88,7 +88,7 @@ type DropPosition = 'before' | 'after' | 'first' | 'last' | 'into';
 
 const props = defineProps<{
   items: readonly BlockRenderItem[];
-  /** Readonly Map<BlockId, Block> view of DocState.blocks — used by nested
+  /** Readonly Map<BlockId, Block> view of DocState.blocks: used by nested
    *  lists to resolve children block snapshots for the recursive items. */
   blocksMap: ReadonlyMap<BlockId, Block>;
   firstBlockPlaceholder?: string;
@@ -166,7 +166,7 @@ function onHoverChange(blockId: BlockId | null): void {
   emit('hoverChange', blockId);
 }
 function onListMouseLeave(): void {
-  // Only clear hover on mouseleave of the OUTER (non-nested) list — the
+  // Only clear hover on mouseleave of the OUTER (non-nested) list: the
   // inner lists' @mouseleave events bubble up but the pointer is still
   // inside the tree; not clearing here avoids a flicker when moving from
   // a parent host into its nested children gutter.

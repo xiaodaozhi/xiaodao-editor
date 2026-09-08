@@ -40,7 +40,7 @@ function mockEditorFor(block: Partial<Block> & { id: BlockId }) {
 }
 
 // ---------------------------------------------------------------------------
-// renderEquation — pure render layer (no Vue / no DOM requirement)
+// renderEquation: pure render layer (no Vue / no DOM requirement)
 // ---------------------------------------------------------------------------
 
 describe('renderEquation', () => {
@@ -118,7 +118,7 @@ describe('renderEquation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Schema — content model & persistence shape
+// Schema: content model & persistence shape
 // ---------------------------------------------------------------------------
 
 describe('EquationExtension.schema', () => {
@@ -198,7 +198,7 @@ describe('turn-into helpers', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Serialization — HTML / Markdown (only the raw expression is persisted)
+// Serialization: HTML / Markdown (only the raw expression is persisted)
 // ---------------------------------------------------------------------------
 
 describe('serialize', () => {

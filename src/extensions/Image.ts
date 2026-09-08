@@ -3,12 +3,12 @@
  *
  * Image is a first-class block with content: 'none' (no inline text editing).
  * The document attrs carry ONLY the final, persisted image state:
- *   src     — the final, uploaded image URL. Empty means "not yet uploaded".
- *   alt     — optional accessibility text.
- *   title   — optional tooltip.
- *   width   — display width in px. Missing means "use natural size".
- *   height  — display height in px.
- *   caption — optional caption text (stored as attr; rendered under the image).
+ *   src    : the final, uploaded image URL. Empty means "not yet uploaded".
+ *   alt    : optional accessibility text.
+ *   title  : optional tooltip.
+ *   width  : display width in px. Missing means "use natural size".
+ *   height : display height in px.
+ *   caption: optional caption text (stored as attr; rendered under the image).
  *
  * UPLOAD STATUS IS NOT STORED IN ATTRS. Pending / progress / error state
  * lives in the view-side imageUpload.ts transient map. This guarantee:
@@ -23,7 +23,7 @@
  *   4. Programmatically via the `startImageUpload` async command exposed
  *      via `editor.getExtensionMethod('startImageUpload')`.
  *
- * The upload handler is supplied via `createImageExtension({ upload })` —
+ * The upload handler is supplied via `createImageExtension({ upload })`:
  * the host application injects a real upload function at extension creation
  * time. If omitted, an in-memory mock upload is used (suitable for demos;
  * NOT for persisted documents because `blob:` URLs do not survive reload).
@@ -63,7 +63,7 @@ import { defaultAttrs } from '../core/schema/BlockSchema';
 export const CANCEL_IMAGE_UPLOAD_COMMAND = 'cancelImageUpload';
 
 // ---------------------------------------------------------------------------
-// Schema attrs (persisted — nothing transient here)
+// Schema attrs (persisted: nothing transient here)
 // ---------------------------------------------------------------------------
 
 export interface ImageAttrs {
@@ -347,7 +347,7 @@ const ImageBlock = defineComponent({
       // Effective DISPLAY width: the wrapper and <img> must hug the image's
       // actual on-screen width, not the raw attr width. CSS caps the img at
       // max-height: MAX_IMAGE_HEIGHT, so a tall image (e.g. 800×1600) renders
-      // 300×600 — using the raw 800px attr width here would stretch the
+      // 300×600: using the raw 800px attr width here would stretch the
       // wrapper to ~100% of the container with empty side gutters, until a
       // resize drag (which enforces the same cap) snaps it back.
       let displayW = imageW;
@@ -362,7 +362,7 @@ const ImageBlock = defineComponent({
 
       // Toolbar overlay (shown always on hover; forced-visible when the
       // block has a pending/error upload state). Hidden entirely in
-      // read-only mode — replace/remove are editing actions.
+      // read-only mode: replace/remove are editing actions.
       // Selection is shown by the SAME generic block-focus mechanism as every
       // other non-text block (image / table / divider / equation): the host's
       // `.block-host.block-focused` class, set by `setFocusedBlock`, drives the
@@ -483,7 +483,7 @@ const ImageBlock = defineComponent({
             },
           }),
         ];
-        // Resize handle — only when natural size is known AND editable.
+        // Resize handle: only when natural size is known AND editable.
         if (naturalSize.value && editable.value) {
           imageArea.push(
             h('div', {
@@ -500,7 +500,7 @@ const ImageBlock = defineComponent({
 
       // --- Caption (attr, persisted) ---
       // Always render the caption so users can click the placeholder to add
-      // text, but hide it when the upload has failed — there is no image to
+      // text, but hide it when the upload has failed: there is no image to
       // caption yet and the error card already fills the block area.
       const caption = (attrs.caption as string) || '';
       const isError = us?.status === 'error';
@@ -564,7 +564,7 @@ const ImageBlock = defineComponent({
 export interface ImageExtensionOptions {
   /**
    * Real upload handler. When omitted the extension falls back to an
-   * in-memory mock upload that stores the file as an object URL — fine
+   * in-memory mock upload that stores the file as an object URL: fine
    * for demos but NOT for persisted documents (object URLs do not
    * survive reload).
    */
@@ -651,7 +651,7 @@ export const START_IMAGE_UPLOAD_METHOD = 'startImageUpload';
  * in `BlockEditor.vue`. Now lives on the ImageExtension side of the
  * boundary; `BlockEditor.vue` simply forwards to it.
  *
- * Takes the `PluginEditor` handle exposed by `PluginInitContext` — that
+ * Takes the `PluginEditor` handle exposed by `PluginInitContext`: that
  * handle carries the registries, commands and dispatch surfaces that
  * image upload needs, so the orchestrator can run without the view
  * layer being involved.
@@ -856,7 +856,7 @@ function createImageUploadPlugin(
       //    extension method. The view layer (BlockEditor) reads it via
       //    `editor.getExtensionMethod('startImageUpload')` and forwards
       //    to Vue components through the existing useBeginImageUpload()
-      //    injection key — no Image-specific knowledge in BlockEditor.
+      //    injection key: no Image-specific knowledge in BlockEditor.
       unregisterStartMethod = ctx.editor.registerExtensionMethod(
         START_IMAGE_UPLOAD_METHOD,
         (fileOrSrc: File | string, beginOpts?: BeginImageUploadOpts) =>
@@ -928,7 +928,7 @@ function createImageUploadPlugin(
  *   new Editor({ extensions: [...BuiltinExtensions.filter(e => e.name !== 'image'), myExt] });
  *   ```
  *
- * `BlockEditor.vue` itself does NOT know about upload or file cleanup —
+ * `BlockEditor.vue` itself does NOT know about upload or file cleanup:
  * it only forwards the existing `useBeginImageUpload()` Vue injection to
  * the async command this extension registers on the editor.
  */

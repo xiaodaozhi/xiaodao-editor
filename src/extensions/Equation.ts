@@ -3,14 +3,14 @@
  *
  * Design notes:
  *  - The block stores ONLY the raw LaTeX *source* string in `attrs.expression`.
- *    Renderer output (HTML/VNode/AST) is NEVER persisted — it is recomputed on
+ *    Renderer output (HTML/VNode/AST) is NEVER persisted: it is recomputed on
  *    the fly from `expression`. This keeps the document serializable and free
  *    of volatile render output.
  *  - Rendering goes through an injectable `EquationRenderer`. The default is
  *    the built-in, zero-dependency math engine (see `./math`), which supports
  *    a lightweight LaTeX subset. Consumers swap in KaTeX / MathJax / any
  *    engine by composing `createEquationExtension({ renderer })` AFTER the
- *    built-in `EquationExtension` in `:extensions` — name-based deduplication
+ *    built-in `EquationExtension` in `:extensions`: name-based deduplication
  *    makes the later entry win. BlockEditor itself never carries an equation
  *    renderer (it has no `equationRenderer` prop); the boundary is at the
  *    extension layer.
@@ -141,7 +141,7 @@ export function renderEquation(expression: string): RenderResult {
 }
 
 // ---------------------------------------------------------------------------
-// Schema attrs (persisted — ONLY the raw LaTeX source)
+// Schema attrs (persisted: ONLY the raw LaTeX source)
 // ---------------------------------------------------------------------------
 
 export interface EquationAttrs {
@@ -345,7 +345,7 @@ export function createEquationBlock(renderer: EquationRenderer) {
         enterEdit();
       }
 
-      // An empty equation has no separate "view" state — it always opens in
+      // An empty equation has no separate "view" state: it always opens in
       // edit mode. We re-enter edit if the expression is cleared back to empty.
       watch(
         isEmpty,
@@ -370,7 +370,7 @@ export function createEquationBlock(renderer: EquationRenderer) {
       return () => {
         const placeholder = props.placeholder ?? i18n.t('equation.placeholder');
 
-        // An empty equation never has a "view" mode — it renders the editor
+        // An empty equation never has a "view" mode: it renders the editor
         // directly.
         if (editing.value || (editable.value && isEmpty.value)) {
           const previewVNode = preview.value.vnode;
@@ -489,7 +489,7 @@ export function createEquationExtension(options: EquationExtensionOptions = {}):
     name: 'equation',
     schema: {
       type: 'equation',
-      // Equations carry no inline text — the LaTeX source lives in `attrs`.
+      // Equations carry no inline text: the LaTeX source lives in `attrs`.
       // `isolating` keeps Enter/Backspace from merging with neighbours, and
       // `nestable: false` because a formula has no children.
       content: 'none',
@@ -515,7 +515,7 @@ export function createEquationExtension(options: EquationExtensionOptions = {}):
       },
     ],
     serialize: {
-      // Renderer output derived from the raw expression — never stored in the doc.
+      // Renderer output derived from the raw expression: never stored in the doc.
       toHTML: (block: Block): string => {
         const e = block.attrs.expression;
         const src = typeof e === 'string' ? e : '';

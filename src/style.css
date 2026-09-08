@@ -1,5 +1,5 @@
 /* ===========================================================================
- * Block Editor — internal stylesheet
+ * Block Editor: internal stylesheet
  *
  * All CSS rules needed by the Block Editor component (BlockEditor.vue and
  * the Vue components under src/view/ui/ + block renderers under src/view/).
@@ -26,7 +26,7 @@
   --be-radius: 6px;
   --be-fg: #1f2328;
 
-  /* Text color presets — light mode */
+  /* Text color presets: light mode */
   --be-color-gray: #6e7781;
   --be-color-brown: #9a6744;
   --be-color-orange: #d97706;
@@ -37,7 +37,7 @@
   --be-color-pink: #d63384;
   --be-color-red: #e03131;
 
-  /* Background swatch presets — light mode (semi-transparent tints) */
+  /* Background swatch presets: light mode (semi-transparent tints) */
   --be-swatch-bg-gray: rgba(110, 120, 130, 0.14);
   --be-swatch-bg-brown: rgba(140, 100, 65, 0.16);
   --be-swatch-bg-orange: rgba(220, 130, 30, 0.16);
@@ -48,7 +48,7 @@
   --be-swatch-bg-pink: rgba(210, 60, 130, 0.16);
   --be-swatch-bg-red: rgba(220, 50, 50, 0.13);
 
-  /* Display-only bg swatches — used only in color picker UI (NOT applied to
+  /* Display-only bg swatches: used only in color picker UI (NOT applied to
      text). Solid pastel versions so users can actually distinguish the hues
      in the swatch grid; the text-highlight version remains subtle via the
      --be-swatch-bg-* variables above. */
@@ -63,11 +63,11 @@
   --be-swatch-display-bg-red: #f6c2c2;
 }
 
-/* Dark mode tokens — applied when either:
+/* Dark mode tokens: applied when either:
    1. The BlockEditor root carries `.theme-dark` (for inline editor content), OR
    2. <body> carries `.theme-dark` (set by BlockEditor's watcher so that
-      Teleport-ed popovers — PlusMenu, BlockSettingsMenu, HoverToolbar —
-      which are rendered directly under <body> — also inherit the tokens).
+      Teleport-ed popovers (PlusMenu, BlockSettingsMenu, HoverToolbar),
+      which are rendered directly under <body>, also inherit the tokens).
    Light mode remains the default (inherited from :root above). */
 .block-editor.theme-dark,
 body.theme-dark {
@@ -84,7 +84,7 @@ body.theme-dark {
   --be-fg: #e6e5e1;
   color-scheme: dark;
 
-  /* Text color presets — dark mode (brighter for readability) */
+  /* Text color presets: dark mode (brighter for readability) */
   --be-color-gray: #98a1b3;
   --be-color-brown: #d8b4a0;
   --be-color-orange: #ffa94d;
@@ -95,7 +95,7 @@ body.theme-dark {
   --be-color-pink: #faa2c1;
   --be-color-red: #ff8787;
 
-  /* Background swatch presets — dark mode (brighter base, higher opacity) */
+  /* Background swatch presets: dark mode (brighter base, higher opacity) */
   --be-swatch-bg-gray: rgba(150, 160, 170, 0.22);
   --be-swatch-bg-brown: rgba(200, 150, 110, 0.24);
   --be-swatch-bg-orange: rgba(240, 160, 60, 0.22);
@@ -106,7 +106,7 @@ body.theme-dark {
   --be-swatch-bg-pink: rgba(230, 90, 160, 0.22);
   --be-swatch-bg-red: rgba(240, 80, 80, 0.20);
 
-  /* Display-only bg swatches — dark mode (more saturated pastels) */
+  /* Display-only bg swatches: dark mode (more saturated pastels) */
   --be-swatch-display-bg-gray: #4a4d53;
   --be-swatch-display-bg-brown: #5c4a3c;
   --be-swatch-display-bg-orange: #6e4a22;
@@ -118,7 +118,7 @@ body.theme-dark {
   --be-swatch-display-bg-red: #6b3131;
 }
 
-/* Explicit light class — same as :root but pinned to the body/editor so
+/* Explicit light class: same as :root but pinned to the body/editor so
    that switching back from dark does not leave stale variables. */
 body.theme-light {
   --be-bg: #ffffff;
@@ -132,7 +132,7 @@ body.theme-light {
   --be-fg: #1f2328;
   color-scheme: light;
 
-  /* Text color presets — light mode */
+  /* Text color presets: light mode */
   --be-color-gray: #6e7781;
   --be-color-brown: #9a6744;
   --be-color-orange: #d97706;
@@ -143,7 +143,7 @@ body.theme-light {
   --be-color-pink: #d63384;
   --be-color-red: #e03131;
 
-  /* Background swatch presets — light mode */
+  /* Background swatch presets: light mode */
   --be-swatch-bg-gray: rgba(110, 120, 130, 0.14);
   --be-swatch-bg-brown: rgba(140, 100, 65, 0.16);
   --be-swatch-bg-orange: rgba(220, 130, 30, 0.16);
@@ -154,7 +154,7 @@ body.theme-light {
   --be-swatch-bg-pink: rgba(210, 60, 130, 0.16);
   --be-swatch-bg-red: rgba(220, 50, 50, 0.13);
 
-  /* Display-only bg swatches — light mode */
+  /* Display-only bg swatches: light mode */
   --be-swatch-display-bg-gray: #d9dde1;
   --be-swatch-display-bg-brown: #e9d5c3;
   --be-swatch-display-bg-orange: #fbd7a8;
@@ -550,7 +550,7 @@ body.theme-light {
 
 /* --- Block type styles --------------------------------------------------- */
 
-/* .block-paragraph intentionally has no styles — it inherits defaults. */
+/* .block-paragraph intentionally has no styles: it inherits defaults. */
 
 .block-heading {
   font-weight: 600;
@@ -832,7 +832,7 @@ body.theme-light {
   z-index: 2;
 }
 
-/* highlight.js token palette — mapped to the editor's semantic color
+/* highlight.js token palette: mapped to the editor's semantic color
    tokens so it adapts to light/dark themes automatically. */
 .block-code-highlight .hljs-comment,
 .block-code-highlight .hljs-quote,
@@ -943,7 +943,7 @@ body.theme-light {
   gap: 2px;
   padding: 4px;
   user-select: none;
-  /* The TOC is a computed view, never editable text — no caret. */
+  /* The TOC is a computed view, never editable text: no caret. */
   cursor: default;
   box-sizing: border-box;
 }
@@ -1001,7 +1001,7 @@ body.theme-light {
   position: fixed;
   /* Sits above the FixedToolbar (z-index 60) so when the menu is anchored
      to a button inside the bar (or otherwise overlaps it), it never
-     passes UNDER the bar's buttons. Previously 50 — too low, the
+     passes UNDER the bar's buttons. Previously 50: too low, the
      toolbar visually covered the menu whenever they overlapped (e.g.
      upward-pop scenarios triggered from near the viewport top). Matches
      .number-picker / .code-lang-picker (70). */
@@ -1492,7 +1492,7 @@ body.theme-light {
   border-color: var(--be-accent);
 }
 
-/* Visual indicator for "no color / clear" swatches — draws a muted diagonal
+/* Visual indicator for "no color / clear" swatches: draws a muted diagonal
    slash through the circle so users can tell it apart from a pale gray. */
 .bsm-swatch--none {
   position: relative;
@@ -1518,7 +1518,7 @@ body.theme-light {
 .be-align-right   { text-align: right; }
 .be-align-justify { text-align: justify; }
 
-/* Text color presets — uses theme-aware CSS variables */
+/* Text color presets: uses theme-aware CSS variables */
 .be-color-gray    { color: var(--be-color-gray); }
 .be-color-brown   { color: var(--be-color-brown); }
 .be-color-orange  { color: var(--be-color-orange); }
@@ -1529,7 +1529,7 @@ body.theme-light {
 .be-color-pink    { color: var(--be-color-pink); }
 .be-color-red     { color: var(--be-color-red); }
 
-/* Background color presets — uses theme-aware CSS variables with opacity */
+/* Background color presets: uses theme-aware CSS variables with opacity */
 .be-bg-gray    { background-color: var(--be-swatch-bg-gray); border-radius: 2px; }
 .be-bg-brown   { background-color: var(--be-swatch-bg-brown); border-radius: 2px; }
 .be-bg-orange  { background-color: var(--be-swatch-bg-orange); border-radius: 2px; }
@@ -1585,7 +1585,7 @@ body.theme-light {
   transition-delay: 0s;
 }
 
-/* Scrollable content area — wraps all buttons. overflow: hidden by default;
+/* Scrollable content area: wraps all buttons. overflow: hidden by default;
    when a dropdown is open we switch to overflow: visible so the dropdown
    isn't clipped. */
 .ht-content {
@@ -2464,7 +2464,7 @@ body.theme-dark .image-block-toolbar {
   color: var(--be-accent);
 }
 
-/* Upload pending overlay — covers the entire wrapper with a semi-transparent
+/* Upload pending overlay: covers the entire wrapper with a semi-transparent
    card that shows spinner + progress bar + percent. */
 .image-block-upload-overlay {
   position: absolute;
@@ -2650,7 +2650,7 @@ body.theme-dark .image-block-error-overlay {
   box-sizing: border-box;
 }
 
-/* Container for <img> + resize handle — gives the handle a positioning
+/* Container for <img> + resize handle: gives the handle a positioning
    context that matches the image's own bounds, not the whole wrapper. */
 .image-block-main {
   position: relative;
@@ -2716,7 +2716,7 @@ body.theme-dark .image-block-error-overlay {
    the overlay handles are not clipped. */
 .block-table-container {
   position: relative;
-  /* No padding — .table-wrapper uses margin-left:20px to create the left
+  /* No padding: .table-wrapper uses margin-left:20px to create the left
      gutter for row handles, and padding-top:20px for the top col-handles
      area. This keeps the container's overflow simple. */
   padding: 0;
@@ -2786,19 +2786,19 @@ body.theme-dark .image-block-error-overlay {
  * handles (col-handles, row-handles) live OUTSIDE this wrapper as direct
  * children of .block-table-container, so they stay fixed during scroll.
  *
- * The wrapper has NO padding — it sits directly inside the container's
+ * The wrapper has NO padding: it sits directly inside the container's
  * gutters (padding-left:20px, padding-top:20px), with its top-left at
  * (20px, 20px) relative to the container.
  *
- *   .table-col-resizers  — absolute, overlay the table (scrolls with it)
- *   <table>              — absolute or max-content inside wrapper
+ *   .table-col-resizers : absolute, overlay the table (scrolls with it)
+ *   <table>             : absolute or max-content inside wrapper
  */
 .table-wrapper {
   position: relative;
   /* margin-left creates the left gutter for row-handles (20px wide).
      padding-top creates space at the top for col-handles (20px tall),
      which live INSIDE this wrapper so they scroll horizontally with
-     the table — like Arco Design's table header. */
+     the table: like Arco Design's table header. */
   margin-left: 20px;
   padding: 0;
   padding-top: 20px;
@@ -2814,8 +2814,8 @@ body.theme-dark .image-block-error-overlay {
 
 /* --- Top gutter (column selection strips + column dots) ---------
  *
- * Lives INSIDE .table-wrapper so it scrolls horizontally with the table
- * — like Arco Design's table header. Positioned at top:0 (in the
+ * Lives INSIDE .table-wrapper so it scrolls horizontally with the table,
+ * like Arco Design's table header. Positioned at top:0 (in the
  * wrapper's padding-top area), left:0.
  * Width is dynamically set via inline style to match tableTotalWidth.
  */
@@ -3014,7 +3014,7 @@ body.theme-dark .image-block-error-overlay {
  * left:20px / right:0 mirrors the wrapper's box (margin-left:20px,
  * width:calc(100% - 20px)) so the overlay's coordinate origin aligns with
  * the wrapper's visible left edge. Each dot's inline `left` is a viewport-x
- * (content-x − scrollLeft) computed in JS — the overlay itself never scrolls.
+ * (content-x − scrollLeft) computed in JS: the overlay itself never scrolls.
  *
  * The overlay fades out while the wrapper is actively scrolling and fades
  * back in once scrolling is stationary, so the dots never visibly chase
@@ -3035,7 +3035,7 @@ body.theme-dark .image-block-error-overlay {
   opacity: 0;
 }
 
-/* While scrolling the dots are invisible — disable hit-testing so a stray
+/* While scrolling the dots are invisible: disable hit-testing so a stray
    click can never fire a column insert against a stale position. */
 .table-col-insert-dots.is-scrolling .table-insert-dot {
   pointer-events: none;
@@ -3111,7 +3111,7 @@ body.theme-dark .image-block-error-overlay {
   text-align: left;
 }
 
-/* Table cell alignment overrides — must take priority over .table-cell-header
+/* Table cell alignment overrides: must take priority over .table-cell-header
    so that be-align-* classes work on header (<th>) cells. Higher specificity
    (two classes) beats .table-cell-header (one class). */
 .table-cell.be-align-left   { text-align: left; }
@@ -3160,7 +3160,7 @@ body.theme-dark .image-block-error-overlay {
   font-size: 1.05em;
 }
 
-/* Heading levels — mirror .block-heading-hN but without margins
+/* Heading levels: mirror .block-heading-hN but without margins
  * (margins would break table cell layout). */
 .table-cell-inner.table-cell-h1 { font-size: 2rem; font-weight: 600; line-height: 1.3; }
 .table-cell-inner.table-cell-h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.3; }
@@ -3195,7 +3195,7 @@ body.theme-dark .image-block-error-overlay {
 
 /* Ordered list cell: flex wrapper + clickable marker element (NOT ::before,
    because the number needs to be clickable in both select and edit states
-   to open the ordered-list menu — continue / start new / modify number).
+   to open the ordered-list menu: continue / start new / modify number).
    The wrapper is .block-ordered-list-wrapper so it reuses global styles
    (display: flex, align-items: flex-start); we only need to compensate
    for the .table-cell-inner padding-top: 6px which pushes the text down
@@ -3211,7 +3211,7 @@ body.theme-dark .image-block-error-overlay {
   width: calc(1.9em + 1px);
 }
 
-/* Remove old ::before rule — ordered list cells no longer use ::before. */
+/* Remove old ::before rule: ordered list cells no longer use ::before. */
 /* .table-cell-inner.table-cell-ordered { */
   /* No extra padding; wrapper handles the marker width through flex. */
 /* } */
@@ -3266,7 +3266,7 @@ body.theme-dark .image-block-error-overlay {
   font-style: italic;
 }
 
-/* Code block cell: monospace font + background — mirror .block-code */
+/* Code block cell: monospace font + background: mirror .block-code */
 .table-cell-inner.table-cell-code {
   font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
     "Liberation Mono", -apple-system, BlinkMacSystemFont,
@@ -3280,7 +3280,7 @@ body.theme-dark .image-block-error-overlay {
   margin: 3px;
 }
 
-/* Cell-level background color should NOT have rounded corners — it covers
+/* Cell-level background color should NOT have rounded corners: it covers
    the whole td/th area. Override the .be-bg-* border-radius for table cells. */
 .table-cell.be-bg-gray,
 .table-cell.be-bg-brown,
@@ -3294,7 +3294,7 @@ body.theme-dark .image-block-error-overlay {
   border-radius: 0;
 }
 
-/* Inline code in table cells — mirror .block-content code styles */
+/* Inline code in table cells: mirror .block-content code styles */
 .table-cell-inner code {
   font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
     "Liberation Mono", -apple-system, BlinkMacSystemFont,
@@ -3310,7 +3310,7 @@ body.theme-dark .image-block-error-overlay {
   background: var(--be-active);
 }
 
-/* Link styles in table cells — mirror .block-content a */
+/* Link styles in table cells: mirror .block-content a */
 .table-cell-inner a {
   color: var(--be-accent);
   text-decoration: underline;
@@ -3401,12 +3401,12 @@ body.theme-dark .table-cell-inner {
 }
 
 /* --- Fixed toolbar (FixedToolbar.vue) ---------------------------------- */
-/* Persistent action bar — always visible, not limited to mobile mode.
+/* Persistent action bar: always visible, not limited to mobile mode.
    Position can be top (default on desktop) or bottom (default on mobile).
    Uses CSS variables so it adapts to light/dark theme automatically. */
 
 /* On mobile: hide the left handle gutter so content is flush-left, and
-   hide the block handle (plus/grip) — those actions move to FixedToolbar. */
+   hide the block handle (plus/grip): those actions move to FixedToolbar. */
 .block-editor.is-mobile .block-host {
   padding-left: 0;
 }
@@ -3415,7 +3415,7 @@ body.theme-dark .table-cell-inner {
   display: none !important;
 }
 
-/* The FixedToolbar component itself — a horizontal bar pinned to the top or
+/* The FixedToolbar component itself: a horizontal bar pinned to the top or
    bottom of the editor, part of the flex layout (not fixed to the viewport). */
 .fixed-toolbar {
   position: relative;
@@ -3428,7 +3428,7 @@ body.theme-dark .table-cell-inner {
   background: var(--be-bg, #ffffff);
   border-bottom: 1px solid var(--be-border, #e0e0e0);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.06);
-  /* Prevent horizontal overflow — the inner scroll area handles button
+  /* Prevent horizontal overflow: the inner scroll area handles button
      overflow instead of the page. */
   overflow: hidden;
   max-width: 100%;
@@ -3567,7 +3567,7 @@ body.theme-dark .table-cell-inner {
 }
 
 /* In inline mode this is a static top bar, not a floating toolbar
-   anchored to a selection — hide the selection-pointer arrow entirely. */
+   anchored to a selection: hide the selection-pointer arrow entirely. */
 .hover-toolbar.inline-mode.above::after,
 .hover-toolbar.inline-mode.below::after {
   display: none;
@@ -3655,7 +3655,7 @@ body.theme-dark .table-cell-inner {
   bottom: calc(100% + 6px);
 }
 
-/* The scrollable content area — takes remaining height in the flex layout.
+/* The scrollable content area: takes remaining height in the flex layout.
    Always scrolls internally. */
 .editor-content {
   flex: 1;
@@ -3696,7 +3696,7 @@ body.theme-dark .table-cell-inner {
    as every other non-text block (image / table / divider / …): when the host
    carries `.block-host.block-focused`, the block is selected. Previously this
    was a per-component `.equation-selected` class toggled by a bespoke
-   `isSelected` computed that read `editor.getState().selection` directly —
+   `isSelected` computed that read `editor.getState().selection` directly;
    that desynced from the real selection and from `block-focused`. */
 .block-host.block-focused .equation-block {
   /* Match the table / image block selected outline: a light blue 2px ring at
@@ -4015,7 +4015,7 @@ body.theme-dark .equation-error-badge {
    instead of a "√" text glyph: glyph metrics differ per font stack and can
    never be aligned with the bar reliably. Because the bar and the diagonal
    are polygons in the SAME shape, their junction is guaranteed by
-   construction — the bar starts exactly at the diagonal's top edge. */
+   construction: the bar starts exactly at the diagonal's top edge. */
 .math-root-sign {
   position: relative;
   flex: none;

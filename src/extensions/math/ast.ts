@@ -114,7 +114,7 @@ export interface MathSymbolNode extends MathSpan {
   readonly command: string;
 }
 
-/** `\sum`, `\prod`, `\int` — carries its own limits for above/below layout. */
+/** `\sum`, `\prod`, `\int`: carries its own limits for above/below layout. */
 export interface MathLargeOperatorNode extends MathSpan {
   readonly type: 'largeOperator';
   readonly symbol: string;

@@ -213,7 +213,7 @@ export class Editor {
     const next = createState(docWithContent, selection, pluginState);
     // `adoptDoc` is a reset (think: load new doc from the server), so
     // any extension methods that the previous doc's plugins registered
-    // must be torn down before we re-run `init` — otherwise we'd
+    // must be torn down before we re-run `init`: otherwise we'd
     // collide on names. Plugins' own `onDestroy` hooks get their chance
     // to release resources first, just like `destroy()` does.
     for (const plugin of this.registries.plugins) plugin.onDestroy?.();
@@ -238,13 +238,13 @@ export class Editor {
 
   /**
    * Register a callable under a string key. Throws if the key is already
-   * taken — there is no implicit override because extension authors
+   * taken: there is no implicit override because extension authors
    * should be explicit about who wins when two extensions want the same
    * name. Returns an unregister function.
    *
    * `T` is inferred from the call site so concrete functions with
-   * specific parameter / return types — e.g. `(file: File) => Promise<…>`
-   * — are stored verbatim. The runtime map's value type is `unknown`
+   * specific parameter / return types (e.g. `(file: File) => Promise<…>`)
+   * are stored verbatim. The runtime map's value type is `unknown`
    * (any value is structurally assignable to it); callers retrieve a
    * typed function via `getExtensionMethod<T>(name)`.
    */
@@ -382,7 +382,7 @@ export function hasBlock(editor: Editor, id: BlockId): boolean {
 // These are the editor's own Markdown serialization / parsing routines, kept
 // module-private. They operate directly on the editor's document state
 // (`DocState`), so conversion only ever happens through the `Editor` methods
-// `toMarkdown()` / `setDocFromMarkdown()` — there is no standalone converter
+// `toMarkdown()` / `setDocFromMarkdown()`: there is no standalone converter
 // API and no intermediate data round-trip for the caller to chain.
 //
 // Supported block types: paragraph, heading, quote, codeBlock, bulletList,
@@ -1035,7 +1035,7 @@ function markdownToDoc(md: string): DocState {
   // Only INDENTABLE_TYPES (paragraph, heading, list kinds) can serve as a
   // PARENT; non-nestable blocks (codeBlock, table, image, divider, …) are
   // never pushed onto the stack, so no block can ever end up nested under a
-  // non-nestable parent. However, ANY block type can BE a child — the
+  // non-nestable parent. However, ANY block type can BE a child: the
   // `supportsIndent` flag only controls stack-push (being a parent), not
   // whether the block's own indent level is honoured.
   const blocks = new Map<BlockId, Block>();
@@ -1048,7 +1048,7 @@ function markdownToDoc(md: string): DocState {
   /** Block types that can serve as a PARENT (i.e. accept children). This
    *  mirrors `schema.nestable` but is hard-coded here because `markdownToDoc`
    *  runs before the schema registry is available. Any block type NOT in this
-   *  set can still BE a child — it just can't have children of its own. */
+   *  set can still BE a child: it just can't have children of its own. */
   const PARENTABLE_TYPES = new Set([
     'paragraph', 'heading', 'bulletList', 'orderedList', 'todoList',
   ]);
@@ -1065,7 +1065,7 @@ function markdownToDoc(md: string): DocState {
     }
     const p = blocks.get(parentId);
     if (!p) {
-      // Fallback (shouldn't happen) — re-root to top level so we don't drop.
+      // Fallback (shouldn't happen): re-root to top level so we don't drop.
       root.push(id);
       parent.set(id, null);
       return;
@@ -1080,12 +1080,12 @@ function markdownToDoc(md: string): DocState {
     let logical = Math.floor(item.indent / 2);
     if (logical < 0) logical = 0;
     if (logical > MAX_INDENT) logical = MAX_INDENT;
-    // NOTE: we do NOT clamp logical to 0 for non-PARENTABLE types — any block
+    // NOTE: we do NOT clamp logical to 0 for non-PARENTABLE types: any block
     // type can be a CHILD. `canBeParent` only governs whether this block
     // can be a PARENT (i.e. be pushed onto the indent stack).
 
     // Pop until the stack top has strictly smaller indent. If the top block
-    // is non-nestable (shouldn't be on the stack anyway), also pop it — the
+    // is non-nestable (shouldn't be on the stack anyway), also pop it: the
     // canBeParent guard on push ensures this is belt-and-suspenders.
     while (stack.length > 0 && stack[stack.length - 1]!.indent >= logical) {
       stack.pop();
@@ -1096,7 +1096,7 @@ function markdownToDoc(md: string): DocState {
     // NOTE: indent is NOT written from logical here; we sync attrs.indent
     // from depthOf() AFTER the entire tree is built. That way both attrs and
     // the parent chain are guaranteed consistent (same rule as every other
-    // transaction in the system — single source of truth = parent chain).
+    // transaction in the system: single source of truth = parent chain).
 
     const freshBlock: Block = {
       id,

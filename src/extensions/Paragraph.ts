@@ -30,7 +30,7 @@ const ParagraphBlock = defineComponent({
   },
 });
 
-/** Slash-menu icon — SVG string from shared icons module. */
+/** Slash-menu icon: SVG string from shared icons module. */
 
 export const ParagraphExtension: Extension = {
   name: 'paragraph',
@@ -60,7 +60,7 @@ export const ParagraphExtension: Extension = {
   ],
   inputRules: [
     {
-      // ` ` after `< / >` etc. — paragraph exits a styled block when the user
+      // ` ` after `< / >` etc.: paragraph exits a styled block when the user
       // clears and types a space. For paragraph specifically we keep the
       // pattern free for other uses but still expose an empty-string trigger
       // as a no-op so the rule list is never empty in tests.

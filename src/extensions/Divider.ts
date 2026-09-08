@@ -6,8 +6,8 @@
  * Markdown `---` / `***` / `___` thematic breaks.
  *
  * Characteristics:
- *   - `content: 'none'` — no inline text region
- *   - `inlineMarks: false` — no marks, no colors (no attrs besides defaults)
+ *   - `content: 'none'`: no inline text region
+ *   - `inlineMarks: false`: no marks, no colors (no attrs besides defaults)
  *   - Supports block selection, backspace/delete removal, undo/redo via the
  *     core commands (no special handling needed)
  *   - Serializes to `<hr>` in HTML and `---` in Markdown
@@ -52,7 +52,7 @@ export const DividerExtension: Extension = {
     content: 'none',
     nestable: false,
     // Backspace at the start of a divider does NOT merge it into the previous
-    // block's text — instead it deletes the divider itself (same behavior as
+    // block's text: instead it deletes the divider itself (same behavior as
     // Notion). This is achieved by NOT setting isolating=true; the core will
     // use the standard merge/delete path which correctly handles non-text
     // blocks as "remove the block, don't merge text".
@@ -61,7 +61,7 @@ export const DividerExtension: Extension = {
     // its nesting depth and render the be-indent-N class. (nestable=false only
     // means it can't be a parent.)
     attrs: { indent: COMMON_ATTRS.indent },
-    // A divider is never "empty" in the placeholder sense — it always shows
+    // A divider is never "empty" in the placeholder sense: it always shows
     // its line. Return false so Enter handling doesn't try to exit it.
     empty: (): boolean => false,
   },

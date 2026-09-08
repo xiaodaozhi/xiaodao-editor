@@ -4,7 +4,7 @@
  * Plugins differ from extensions: extensions *declare* blocks/commands/
  * keymaps; plugins *react* to editor lifecycle and events. Plugin state is
  * stored inside `EditorState` (keyed by name) so it is part of the immutable,
- * versioned state — this is what makes undo/redo correct across plugin
+ * versioned state: this is what makes undo/redo correct across plugin
  * effects.
  *
  * See docs/architecture.md §9.

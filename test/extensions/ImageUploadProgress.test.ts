@@ -10,7 +10,7 @@ import { START_IMAGE_UPLOAD_METHOD } from '@/extensions/Image';
  * Live progress-bar regression tests.
  *
  * Verifies that the upload overlay's progress display tracks the
- * onProgress callbacks while the upload is in flight — the symptom
+ * onProgress callbacks while the upload is in flight: the symptom
  * under test is "bar jumps to 1% and freezes until the upload
  * completes".
  */
@@ -98,7 +98,7 @@ describe('image upload live progress UI', () => {
 
     const wrapper = await mountAndStartUpload(upload);
 
-    // Host reports event.loaded / event.total (0–1) — the editor divides
+    // Host reports event.loaded / event.total (0–1); the editor divides
     // by 100 again, so the display rounds to 0–1% for the whole upload.
     report(0.4);
     await nextTick();

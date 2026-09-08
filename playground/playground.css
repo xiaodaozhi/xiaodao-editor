@@ -1,5 +1,5 @@
 /* ===========================================================================
- * Playground chrome — layout, title bar, debug panel.
+ * Playground chrome: layout, title bar, debug panel.
  *
  * Styles for the Block Editor component itself now live in src/style.css
  * (imported by BlockEditor.vue). Only page-level (non-editor) styles.

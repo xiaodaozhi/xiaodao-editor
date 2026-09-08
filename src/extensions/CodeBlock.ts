@@ -20,7 +20,7 @@
  *       transparent by default (only the caret stays visible) so the
  *       highlight layer shows through. While the block is focused, the text
  *       layer becomes visible again (plain text, like Notion) and the
- *       highlight layer fades out — no visual overlap, and the editor model
+ *       highlight layer fades out: no visual overlap, and the editor model
  *       keeps plain text at all times.
  */
 
@@ -189,7 +189,7 @@ const CodeBlock = defineComponent({
         lang.toUpperCase(),
       );
       // Static "code block" label pinned to the top-left corner, sharing the
-      // typography of the language label (top-right). Purely decorative —
+      // typography of the language label (top-right). Purely decorative:
       // clicks pass through to the editable area (pointer-events: none).
       const titleLabel = h('div', { class: 'block-code-title' }, i18n.t('codeBlock.title'));
       // Highlight layer: absolutely positioned under the editable text layer.
@@ -248,7 +248,7 @@ export const CodeBlockExtension: Extension = {
       command: 'convertBlock',
       args: (m: RegExpExecArray | null): unknown => {
         const text = m?.input ?? '';
-        // Extract language if user typed ```js — the pattern's $ ensures it's
+        // Extract language if user typed ```js: the pattern's $ ensures it's
         // just ``` plus optional trailing space, so language defaults to plain.
         void text;
         return {

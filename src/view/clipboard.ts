@@ -40,14 +40,14 @@ const SKIP_TAGS = new Set(['meta', 'style', 'script', 'head', 'title', 'link', '
 function extractImageAttrs(img: HTMLImageElement): { src: string; alt: string; title: string } | null {
   const rawSrc = (img.getAttribute('src') ?? '').trim();
   if (!rawSrc) return null;
-  // Skip "cid:" Content-ID URIs used by Word/Outlook — these reference an
+  // Skip "cid:" Content-ID URIs used by Word/Outlook: these reference an
   // embedded MIME part that the browser cannot resolve and would produce a
   // permanent dead image block.
   if (/^cid:/i.test(rawSrc)) return null;
   // Skip obviously dangerous pseudo-protocols (browsers generally don't load
   // these in <img> anyway, but defensive filtering is cheap).
   if (/^(javascript|vbscript|data:text\/)/i.test(rawSrc)) return null;
-  // Skip extremely long data URIs (> 10 MB) — these are rare in clipboard,
+  // Skip extremely long data URIs (> 10 MB): these are rare in clipboard,
   // would balloon the document size, and are typically not real images.
   if (rawSrc.length > 10_000_000) return null;
   return {
@@ -108,7 +108,7 @@ function parseCustomPayload(html: string): ParsedBlock[] {
       });
     } else {
       // Block has no text content (e.g. image). Return it as a block
-      // with no content — the paste handler will treat it specially.
+      // with no content: the paste handler will treat it specially.
       textBlocks.push({
         type,
         attrs: attrs ?? {},
@@ -166,13 +166,13 @@ function trimInlineSeqEdges(seq: InlineSeq): InlineSeq {
 
 /**
  * Trim leading/trailing whitespace from each block's inline content.
- * Code blocks are skipped — whitespace is significant there.
+ * Code blocks are skipped: whitespace is significant there.
  */
 function trimBlockEdges(blocks: ParsedBlock[]): void {
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]!;
     // Non-text blocks (code / image / table / divider) carry structural meaning
-    // in their attrs rather than in their inline content — never trim them.
+    // in their attrs rather than in their inline content: never trim them.
     if (b.type === 'codeBlock' || b.type === 'image' || b.type === 'table' || b.type === 'divider') continue;
     blocks[i] = { ...b, content: trimInlineSeqEdges(b.content) };
   }
@@ -211,7 +211,7 @@ function parsePlainText(text: string): ParsedBlock[] {
 function compactEmptyBlocks(blocks: ParsedBlock[]): void {
   // Step 1: collapse multiple consecutive empties into one.
   // Image / Table / Divider / Code / Equation blocks are NEVER considered
-  // "empty" — they carry structural meaning in their attrs even without
+  // "empty": they carry structural meaning in their attrs even without
   // inline text (an equation's LaTeX source lives in attrs.expression).
   const STRUCTURAL_TYPES = new Set(['image', 'table', 'divider', 'codeBlock', 'equation']);
   const collapsed: ParsedBlock[] = [];
@@ -336,7 +336,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       const text = child.textContent ?? '';
       // Skip whitespace-only text nodes that are just structural formatting
       // from browser clipboard wrappers (e.g. "\r\n" between <!--StartFragment-->
-      // and actual content). These are NOT meaningful line breaks — they're
+      // and actual content). These are NOT meaningful line breaks: they're
       // HTML serialization noise that would otherwise inject stray newlines
       // into the pasted content.
       if (text.length > 0 && text.trim().length === 0) continue;
@@ -373,7 +373,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
 
     if (tag === 'pre') {
       flushInline();
-      // Keep all lines in a single code block — splitting by '\n' produces
+      // Keep all lines in a single code block: splitting by '\n' produces
       // one codeBlock per line, which breaks multi-line code pastes.
       // Trim leading/trailing newlines (often injected by the browser)
       // but preserve internal line breaks.
@@ -465,7 +465,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
         processChildren(elem.childNodes, doc, blocks);
         consecutiveBr = 0;
       } else {
-        // Leaf div/span — treat as inline content. For <div> (which browsers
+        // Leaf div/span: treat as inline content. For <div> (which browsers
         // use to wrap individual lines when copying from VSCode, textareas,
         // etc.), insert a line break before its content so that multi-line
         // text is preserved within a single block rather than being merged
@@ -479,7 +479,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       continue;
     }
 
-    // <img> — extract as an image block (flushed from inline buffer first).
+    // <img>: extract as an image block (flushed from inline buffer first).
     if (tag === 'img') {
       const imgAttrs = extractImageAttrs(elem as HTMLImageElement);
       if (imgAttrs) {
@@ -494,7 +494,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
       continue;
     }
 
-    // <table> — parse entire table into a single table block.
+    // <table>: parse entire table into a single table block.
     if (tag === 'table') {
       const tattrs = parseHtmlTable(elem as HTMLTableElement);
       if (tattrs) {
@@ -511,7 +511,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
 
     // All other inline elements (b, i, u, s, code, a, etc.)
     // If any descendant is an <img>, recurse via processChildren so the img
-    // branch above fires and produces a real image block — otherwise the img
+    // branch above fires and produces a real image block: otherwise the img
     // would disappear inside inlineFromDom() during flushInline.
     if ((elem as HTMLElement).querySelector?.('img')) {
       flushInline();
@@ -529,7 +529,7 @@ function processChildren(children: NodeListOf<ChildNode> | ChildNode[], doc: Doc
 /**
  * Split an element's inline content at <br> boundaries into multiple
  * paragraph blocks. Trailing empty segments (from the browser's final
- * appended <br>) are skipped — compactEmptyBlocks handles edge cases.
+ * appended <br>) are skipped: compactEmptyBlocks handles edge cases.
  */
 function splitInlineByBr(elem: HTMLElement, doc: Document, blocks: ParsedBlock[]): void {
   const segments: Node[][] = [[]];

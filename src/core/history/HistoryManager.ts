@@ -75,7 +75,7 @@ export class HistoryManager {
   /** Record a transaction against the state that preceded it. */
   record(tr: Transaction, prevSelection: Selection, prevDoc: DocState): void {
     if (tr.meta.addToHistory === false) return;
-    if (tr.steps.length === 0) return; // pure selection change — nothing to undo
+    if (tr.steps.length === 0) return; // pure selection change: nothing to undo
 
     const item: HistoryItem = {
       original: tr.steps,

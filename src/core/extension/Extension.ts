@@ -4,7 +4,7 @@
  * a factory) contributed to the editor at construction. The core never imports
  * extensions; it only processes their specs into registries.
  *
- * Each field is optional — an extension contributes only what it needs. A
+ * Each field is optional: an extension contributes only what it needs. A
  * block-type extension (e.g. `Heading`) provides `schema` + `renderer` +
  * `serialize`/`deserialize`; a behavior extension (e.g. `History`) provides
  * only `plugins`.

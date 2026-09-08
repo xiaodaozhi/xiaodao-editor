@@ -16,7 +16,7 @@ import {
 /**
  * Tests for `createImageExtension({ upload, onFileCleanup })`.
  *
- * The host (BlockEditor) no longer couples to the Image extension — it
+ * The host (BlockEditor) no longer couples to the Image extension: it
  * only forwards the extension's commands and the on-cleanup callback
  * via `:extensions`. This file verifies the public surface that the
  * host actually relies on stays correct:
@@ -183,11 +183,11 @@ describe('onFileCleanup ref-count tracking', () => {
     const ids = Array.from(editor.getState().doc.root).map((s) => s as unknown as string);
     expect(ids.length).toBe(2);
 
-    // Remove ONE — ref-count drops 2 → 1; onFileCleanup must NOT fire.
+    // Remove ONE: ref-count drops 2 → 1; onFileCleanup must NOT fire.
     editor.commands.removeBlock?.({ id: ids[0]! });
     expect(onFileCleanup).not.toHaveBeenCalled();
 
-    // Remove the LAST — ref-count drops 1 → 0; onFileCleanup fires.
+    // Remove the LAST: ref-count drops 1 → 0; onFileCleanup fires.
     editor.commands.removeBlock?.({ id: ids[1]! });
     expect(onFileCleanup).toHaveBeenCalledTimes(1);
     expect(onFileCleanup).toHaveBeenCalledWith(42);

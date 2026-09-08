@@ -6,11 +6,11 @@
 
   Contains TWO distinct click targets:
     • [+]  INSERT button (openPlusMenu)
-    • [⋮⋮] GRIP (openSettingsMenu) — six-dot drag handle
+    • [⋮⋮] GRIP (openSettingsMenu): six-dot drag handle
 
   The grip is also a drag source: pressing and dragging it emits a custom
   gripDragStart event that the parent uses to move the block.  The handle
-  itself does NOT manage the document-level drag loop — that's handled in
+  itself does NOT manage the document-level drag loop: that's handled in
   BlockEditor so the ghost / drop calculation can access the full document.
 -->
 
@@ -140,7 +140,7 @@ const dragging = ref(false);
  * block's top/bottom margins. `top: 50%` of `.block-host` (and
  * `.block-host-content`'s offsetHeight) both INCLUDE the heading's
  * margin-top/bottom, because a flex item establishes a block formatting
- * context and contains its child's margins — so the host's height grows by
+ * context and contains its child's margins: so the host's height grows by
  * the margin, pushing the geometric center off the visible content center.
  *
  * Fix: measure the renderer's root element (the first element child of
@@ -218,7 +218,7 @@ function onPlusClick(): void {
 //      emit gripPointerDown to the parent. The PARENT is in charge of the
 //      full drag lifecycle (threshold detection, ghost, drop calculation,
 //      drop execution) using its own document-level capture listeners, so
-//      there is exactly ONE drag-loop in the whole app — no races.
+//      there is exactly ONE drag-loop in the whole app: no races.
 //   2. Locally we just mark `potentiallyDragging = true` so the click
 //      handler can no-op if the parent later confirms a drag happened,
 //      OR if too much time elapsed / pointer moved past threshold.

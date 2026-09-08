@@ -1,7 +1,7 @@
 /**
  * Table block data structures (stored in block attrs).
  *
- * We use the "attrs storage" pattern exactly like the Image extension — the
+ * We use the "attrs storage" pattern exactly like the Image extension: the
  * table block declares `content: 'none'` so the editor core never looks at
  * inline text for this block. Everything (cells, row count, column count,
  * header flag, merged cells, column widths) lives in attrs as plain JSON
@@ -20,7 +20,7 @@
  *   - rows/cols define the logical grid dimensions.
  *   - `cells[i]` stores the i-th row's cells, so the grid is
  *     `cells[row][col]`. Every logical cell is explicitly present (even
- *     cells covered by a rowspan/colspan span — their `covered` flag is
+ *     cells covered by a rowspan/colspan span: their `covered` flag is
  *     true). Rendering, serialization and structural operations always
  *     iterate rows × cols so we never get out-of-sync.
  *   - `colWidths` stores per-column widths in CSS pixels. 0 means
@@ -62,7 +62,7 @@ const VALID_CELL_BG_COLORS: readonly string[] = [
   'gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red',
 ];
 
-/** Marks that are incompatible with inline code — mirrors the
+/** Marks that are incompatible with inline code: mirrors the
  *  CODE_INCOMPATIBLE list in primitiveCommands.ts. When a text run has
  *  the `code` mark, all of these must be stripped. */
 const CODE_INCOMPATIBLE_MARKS: readonly string[] = [
@@ -80,7 +80,7 @@ const VALID_MARK_TYPES: readonly string[] = [
 // ---------------------------------------------------------------------------
 
 export interface TableCellData {
-  /** Cell content — reuses the editor's InlineSeq so rich inline marks
+  /** Cell content: reuses the editor's InlineSeq so rich inline marks
    *  (bold/italic/link/code) are first-class inside cells. */
   readonly content: InlineSeq;
   /** How many rows this cell spans (≥ 1). 1 = no row span. */
@@ -139,7 +139,7 @@ function makeEmptyCell(): MutableCell {
  *      - codeBlock cells: no inline marks at all (plain text only).
  *      - quote cells: no italic (the quote style itself is italic).
  *
- * Returns a new InlineSeq — the input is not mutated.
+ * Returns a new InlineSeq: the input is not mutated.
  */
 function sanitizeCellContent(seq: InlineSeq, cellType?: string): InlineNode[] {
   const isCodeBlockCell = cellType === 'codeBlock';
@@ -196,7 +196,7 @@ function cloneCell(c: TableCellData): MutableCell {
 }
 
 // ---------------------------------------------------------------------------
-// Selection rect expansion — close over merged cell footprints
+// Selection rect expansion: close over merged cell footprints
 // ---------------------------------------------------------------------------
 
 /**
@@ -425,7 +425,7 @@ export function coerceTableAttrs(raw: Readonly<Record<string, unknown>>): TableA
   }
   if (cells.length > rows) cells = cells.slice(0, rows);
 
-  // Rebuild covered flags — ensures merges are internally consistent even
+  // Rebuild covered flags: ensures merges are internally consistent even
   // if the source JSON was inconsistent.
   cells = recomputeCovered(cells, rows, cols);
 
@@ -436,7 +436,7 @@ function coerceCell(v: unknown): TableCellData {
   if (!v || typeof v !== 'object') return makeEmptyCell();
   const obj = v as Record<string, unknown>;
   const rawContent = Array.isArray(obj.content) ? (obj.content as InlineSeq) : [];
-  // Validate cellType — must be in VALID_CELL_TYPES. Resolve it first so
+  // Validate cellType: must be in VALID_CELL_TYPES. Resolve it first so
   // sanitizeCellContent can enforce cell-type-specific mark restrictions.
   const rawCellType = typeof obj.cellType === 'string' ? obj.cellType : undefined;
   const cellType = rawCellType && VALID_CELL_TYPES.includes(rawCellType) ? rawCellType : undefined;
@@ -446,19 +446,19 @@ function coerceCell(v: unknown): TableCellData {
   const rowspan = typeof obj.rowspan === 'number' && Number.isInteger(obj.rowspan) && obj.rowspan >= 1 ? obj.rowspan : 1;
   const colspan = typeof obj.colspan === 'number' && Number.isInteger(obj.colspan) && obj.colspan >= 1 ? obj.colspan : 1;
   const covered = typeof obj.covered === 'boolean' ? obj.covered : false;
-  // Validate align — only 'left', 'center', 'right' (no 'justify').
+  // Validate align: only 'left', 'center', 'right' (no 'justify').
   const rawAlign = typeof obj.align === 'string' ? obj.align : undefined;
   const align = rawAlign && VALID_CELL_ALIGN.includes(rawAlign) ? rawAlign : undefined;
-  // Validate verticalAlign — only 'top', 'middle', 'bottom'.
+  // Validate verticalAlign: only 'top', 'middle', 'bottom'.
   const rawVerticalAlign = typeof obj.verticalAlign === 'string' ? obj.verticalAlign : undefined;
   const verticalAlign = rawVerticalAlign && VALID_CELL_VERTICAL_ALIGN.includes(rawVerticalAlign) ? rawVerticalAlign : undefined;
-  // Validate bgColor — must be a known preset key.
+  // Validate bgColor: must be a known preset key.
   const rawBgColor = typeof obj.bgColor === 'string' ? obj.bgColor : undefined;
   const bgColor = rawBgColor && VALID_CELL_BG_COLORS.includes(rawBgColor) ? rawBgColor : undefined;
-  // Validate checked — only meaningful for todoList cells.
+  // Validate checked: only meaningful for todoList cells.
   const rawChecked = typeof obj.checked === 'boolean' ? obj.checked : false;
   const checked = cellType && CHECKED_CELL_TYPES.includes(cellType) ? rawChecked : undefined;
-  // Validate startNumber — only meaningful for orderedList cells (≥ 1).
+  // Validate startNumber: only meaningful for orderedList cells (≥ 1).
   const rawStartNumber = typeof obj.startNumber === 'number' && Number.isInteger(obj.startNumber) && obj.startNumber >= 1 ? obj.startNumber : undefined;
   const startNumber = cellType && START_NUMBER_CELL_TYPES.includes(cellType) ? rawStartNumber : undefined;
   return { content, rowspan, colspan, covered, cellType, align, verticalAlign, bgColor, checked, startNumber };
@@ -469,7 +469,7 @@ function coerceCell(v: unknown): TableCellData {
  * rowspan/colspan > 1 we mark the covered cells accordingly (setting
  * content=[], rowspan=colspan=1, covered=true so the renderer skips).
  *
- * Clamps out-of-bounds spans to the actual grid — this prevents malformed
+ * Clamps out-of-bounds spans to the actual grid: this prevents malformed
  * input from ever producing a cell with a span larger than the grid.
  */
 export function recomputeCovered(
@@ -499,13 +499,13 @@ export function recomputeCovered(
 }
 
 // ---------------------------------------------------------------------------
-// Structural operations — pure functions that produce a new TableAttrs.
+// Structural operations: pure functions that produce a new TableAttrs.
 // Callers (commands) feed the result into editor.commands.setAttrs.
 // ---------------------------------------------------------------------------
 
 /** Insert a new row before `beforeRow` (0 ≤ beforeRow ≤ rows). When
  *  beforeRow === rows appends at the bottom. New row cells are empty
- *  clones of the row above (same column spans — but only if they start
+ *  clones of the row above (same column spans: but only if they start
  *  on the row being cloned). Otherwise plain empty cells. */
 export function insertRow(attrs: TableAttrs, beforeRow: number): TableAttrs {
   const { rows, cols, cells, colWidths, headerRow } = attrs;
@@ -885,8 +885,8 @@ export function toggleCellsMark(
  * always the top-left. Existing merges inside the rect are flattened.
  *
  * Content policy: ONLY the cell that originally occupied the top-left
- * anchor position (rs, cs) — or the anchor of the merged block that covers
- * it — contributes its InlineSeq to the merged cell. Every other cell's
+ * anchor position (rs, cs), or the anchor of the merged block that covers
+ * it, contributes its InlineSeq to the merged cell. Every other cell's
  * content is discarded (matches Notion's "first cell wins" semantics).
  * The anchor's cell-level attrs (cellType / align / bgColor) are also
  * preserved unchanged.
@@ -920,7 +920,7 @@ export function mergeRect(
   // Locate the anchor cell for (rs, cs) BEFORE resetting so we can preserve
   // its content + cellType/align/bgColor. If (rs, cs) was a covered cell we
   // walk to the real merged anchor (which may lie outside the rect but that
-  // is OK — the first-pass reset above has already freed the logical
+  // is OK: the first-pass reset above has already freed the logical
   // position inside our rect).
   let ar = rs;
   let ac = cs;
@@ -986,7 +986,7 @@ export function splitCell(attrs: TableAttrs, row: number, col: number): TableAtt
  *  This is the operation triggered by the "Split cells" toolbar button
  *  when the user has a multi-cell selection. Each merged cell inside the
  *  (expanded) rect is split independently using the same rule as splitCell
- *  above — its data stays on its own top-left position. */
+ *  above: its data stays on its own top-left position. */
 export function splitCellsInRect(
   attrs: TableAttrs,
   r1: number,
@@ -1065,7 +1065,7 @@ export function tableToMarkdown(attrs: TableAttrs): string {
     lines.push(`| ${header.join(' | ')} |`);
     lines.push(`| ${sep.join(' | ')} |`);
   } else {
-    // No header row — emit plain table with an empty first separator row so
+    // No header row: emit plain table with an empty first separator row so
     // markdown parsers still detect a table (GFM requires header + sep).
     lines.push(`| ${header.join(' | ')} |`);
     lines.push(`| ${sep.join(' | ')} |`);
@@ -1193,7 +1193,7 @@ export function parseHtmlTable(tableEl: HTMLTableElement): TableAttrs | null {
   return { rows, cols, cells: finalCells, colWidths: widths, headerRow: hasHeader };
 }
 
-// Attrs validate helper — ensures JSONValue attrs conform to TableAttrs.
+// Attrs validate helper: ensures JSONValue attrs conform to TableAttrs.
 export function validateTableAttrs(v: unknown): boolean {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
@@ -1239,7 +1239,7 @@ export function orderedListCellNumber(attrs: TableAttrs, row: number, col: numbe
     const prev = attrs.cells[r]?.[col];
     if (!prev || prev.covered) continue;
     if (prev.cellType !== 'orderedList') break;
-    // Found a previous orderedList cell — its number + 1.
+    // Found a previous orderedList cell: its number + 1.
     return orderedListCellNumber(attrs, r, col) + 1;
   }
   // No orderedList predecessor in this column → start from 1.

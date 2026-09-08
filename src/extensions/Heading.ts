@@ -34,7 +34,7 @@ const HeadingBlock = defineComponent({
 /**
  * Markdown-shortcut input rule for headings.
  *
- * The rule pattern `/^#{1,6} $/` is shared — the engine will determine the
+ * The rule pattern `/^#{1,6} $/` is shared: the engine will determine the
  * level from the matched text. The engine (see `src/view/inputRulesEngine.ts`)
  * detects the private `__heading` hint and invokes `convertBlock` after
  * stripping the matching prefix from the block's text.

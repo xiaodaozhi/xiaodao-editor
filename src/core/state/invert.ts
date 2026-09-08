@@ -1,7 +1,7 @@
 /**
  * Step inversion: compute the steps that undo a given step list against the
  * document state *before* those steps were applied. This enables memory-light,
- * correct undo/redo without snapshotting the whole document — only the blocks
+ * correct undo/redo without snapshotting the whole document: only the blocks
  * a transaction touched are referenced by the inverse.
  *
  * See docs/architecture.md §9 (History) and §16 (undo/redo correctness).
@@ -16,7 +16,7 @@ import { indexOf, parentOf, requireBlock } from './store';
  * that, when applied to the post-state, restores the pre-state. Steps are
  * inverted in reverse order so the last-applied change is undone first.
  *
- * Important — forward-step is a sequential program:
+ * Important: forward-step is a sequential program:
  *   [ setAttrs(A, x'), insertBlock(B), replaceBlock(B), setAttrs(B) ]
  * When reversing, we may see `replaceBlock(B)` / `setAttrs(B)` BEFORE we see
  * the `insertBlock(B)` that actually added B to the document. In that case
@@ -24,7 +24,7 @@ import { indexOf, parentOf, requireBlock } from './store';
  * not the mid-transaction intermediate). Inverting B's attribute/replace
  * changes is redundant because the final `insertBlock(B)` → inverse
  * `removeBlock(B)` already erases B entirely. So these "unknown id" cases
- * are skipped — the block is handled by its matching insertBlock inverse
+ * are skipped: the block is handled by its matching insertBlock inverse
  * further up the step list.
  */
 export function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[] {

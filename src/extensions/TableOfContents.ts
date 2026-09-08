@@ -9,21 +9,21 @@
  *
  * Design notes:
  *   - `content: 'none'` + `inlineMarks: false` + renderer `editable: false`
- *     make the block non-editable by construction — no caret, no inline text.
+ *     make the block non-editable by construction: no caret, no inline text.
  *   - Headings are collected by walking only the TOP-LEVEL blocks (`doc.root`),
- *     filtering `type === 'heading'` — nested / indented headings are ignored.
+ *     filtering `type === 'heading'`: nested / indented headings are ignored.
  *     Table cells store their content in `Block.attrs` (not as blocks), so cell
- *     headings are automatically excluded — no special-casing needed.
+ *     headings are automatically excluded: no special-casing needed.
  *   - Each entry maps to the heading's stable, unique `BlockId`. Clicking an
  *     entry dispatches the editor's existing `setSelection` command (which the
  *     view layer applies via `applySelectionToDom`) and then scrolls the
- *     heading into view — reusing the existing Selection / DOM positioning
+ *     heading into view: reusing the existing Selection / DOM positioning
  *     machinery instead of mutating the document structure.
  *   - The renderer subscribes to editor state updates and recomputes the
  *     collection, so the TOC re-renders whenever the document changes.
  *   - Serialization emits nothing (empty string) for both HTML and Markdown:
  *     the generated heading list is a view, not editor content, and the real
- *     headings are already exported elsewhere — so a TOC must never be
+ *     headings are already exported elsewhere: so a TOC must never be
  *     duplicated into the export.
  */
 
@@ -109,7 +109,7 @@ const TocBlock = defineComponent({
      * Jump to a heading: use the editor's existing `setSelection` command so
      * the view layer focuses the heading via `applySelectionToDom`, then
      * scroll the heading element into view. We never touch the document
-     * structure here — only the caret/scrollport.
+     * structure here: only the caret/scrollport.
      */
     function onItemClick(id: BlockId): void {
       editor.commands.setSelection?.({
@@ -166,7 +166,7 @@ export const TableOfContentsExtension: Extension = {
   name: 'tableOfContents',
   schema: {
     type: 'tableOfContents',
-    // No editable text region — the list is a computed view, not stored content.
+    // No editable text region: the list is a computed view, not stored content.
     content: 'none',
     nestable: false,
     inlineMarks: false,
@@ -174,7 +174,7 @@ export const TableOfContentsExtension: Extension = {
     // nesting depth and render the be-indent-N class. (nestable=false only
     // means it can't be a parent.)
     attrs: { indent: COMMON_ATTRS.indent },
-    // Never "empty" in the placeholder sense — the TOC always renders its
+    // Never "empty" in the placeholder sense: the TOC always renders its
     // panel (title + list or empty state). Return false so Enter handling
     // doesn't try to exit it.
     empty: (): boolean => false,
@@ -193,7 +193,7 @@ export const TableOfContentsExtension: Extension = {
     },
   ],
   serialize: {
-    // The generated heading list is a dynamic view, not editor content — the
+    // The generated heading list is a dynamic view, not editor content: the
     // real headings are exported by their own blocks. Emit nothing so a TOC is
     // never duplicated into HTML / Markdown exports.
     toHTML: (): string => '',

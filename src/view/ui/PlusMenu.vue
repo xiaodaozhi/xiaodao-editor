@@ -330,7 +330,7 @@ const menuStyle = computed(() => {
   if (!props.rootEl) return { display: 'none' };
   // Hide the menu until the first position calculation completes. Without
   // this, the menu briefly appears at (0,0) before the watch measures its
-  // height and computes the correct placement — causing it to flash at the
+  // height and computes the correct placement, causing it to flash at the
   // top-left corner and then jump.
   //
   // IMPORTANT: also override --scroll-max-height to 100vh here. The

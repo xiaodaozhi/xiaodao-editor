@@ -5,9 +5,9 @@
   `contenteditable` element and is responsible for:
 
     1. Rendering the block's inline content as DOM text (on mount and when the
-       state changes externally — e.g. undo/redo).
+       state changes externally: e.g. undo/redo).
     2. Syncing user input back to editor state via the `setText` command.
-       Before syncing, the input-rules engine is run — if a rule matches, the
+       Before syncing, the input-rules engine is run: if a rule matches, the
        command it fires replaces the default text sync.
     3. Correctly handling IME (Chinese/Japanese/Korean) composition: during
        composition, no state sync occurs; the DOM is the source of truth.
@@ -90,7 +90,7 @@ const editor = useEditor();
 const editable = useEditable();
 const el = ref<HTMLElement | null>(null);
 
-// IME composition state. Must not sync to state during composition — the
+// IME composition state. Must not sync to state during composition: the
 // DOM contains intermediate text that the editor should not persist.
 const isComposing = shallowRef(false);
 
@@ -107,7 +107,7 @@ onMounted(() => {
   const node = el.value;
   if (!node) return;
   const text = inlineText(props.block.content);
-  // Render content on mount — plain text if no marks, HTML if marks present.
+  // Render content on mount: plain text if no marks, HTML if marks present.
   if (hasMarks(props.block.content)) {
     node.innerHTML = inlineToHtml(props.block.content);
   } else {
@@ -195,7 +195,7 @@ function restoreCharSelection(node: HTMLElement, from: number, to: number): void
 }
 
 // When the block prop changes (external mutation: undo/redo, programmatic,
-// toggleMark / setInlineMark), write the new content to the DOM — but ONLY
+// toggleMark / setInlineMark), write the new content to the DOM: but ONLY
 // if it actually differs and we're not composing. This prevents the "echo"
 // problem during typing.
 //
@@ -263,7 +263,7 @@ watch(
     //
     // IMPORTANT: only restore when the DOM was actually rewritten. If the
     // DOM was NOT rewritten (textContent already matched state), restoring
-    // the OLD captured offsets would move the caret backwards — e.g. after
+    // the OLD captured offsets would move the caret backwards: e.g. after
     // insertCodeBlockNewline sets textContent + caret at offset+1, this
     // watch fires (props.block updated), captures the caret at the NEW
     // position... but if a re-render already reset it, restoring the stale
@@ -286,7 +286,7 @@ function onKeyDownCapture(event: KeyboardEvent): void {
   //
   // Without this early preventDefault, some browsers may insert a newline
   // in the DOM even though preventDefault() is called later in the bubbling
-  // phase — the browser's native "insertParagraph" action can race with the
+  // phase: the browser's native "insertParagraph" action can race with the
   // command dispatch. Calling preventDefault here at the target ensures the
   // default is suppressed before any bubbling-phase logic runs.
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
@@ -310,7 +310,7 @@ function onInput(event: InputEvent): void {
 
   if (isComposing.value) return;
 
-  // 1. Input rules first (markdown shortcuts etc.) — a rule that fires
+  // 1. Input rules first (markdown shortcuts etc.): a rule that fires
   //    already produces a transaction, so we skip the default setText.
   const handled = runInputRules({
     editor,
@@ -410,7 +410,7 @@ function onCopy(event: ClipboardEvent): void {
   const offsets = readSelectionOffsets();
   if (!offsets) return;
   const [lo, hi] = offsets;
-  if (lo === hi) return; // collapsed selection — let browser handle
+  if (lo === hi) return; // collapsed selection: let browser handle
 
   // Extract the selected inline content: [0, lo) | [lo, hi) | [hi, end)
   const [, rest1] = splitInline(props.block.content, lo);
@@ -427,7 +427,7 @@ function onCopy(event: ClipboardEvent): void {
  * Cut = copy clean data, then delete the selected range from the block.
  */
 function onCut(event: ClipboardEvent): void {
-  // Read-only: cutting would delete content — block it entirely.
+  // Read-only: cutting would delete content: block it entirely.
   if (!editable.value) {
     event.preventDefault();
     return;
@@ -435,7 +435,7 @@ function onCut(event: ClipboardEvent): void {
   const offsets = readSelectionOffsets();
   if (!offsets) return;
   const [lo, hi] = offsets;
-  if (lo === hi) return; // collapsed — let browser handle
+  if (lo === hi) return; // collapsed: let browser handle
 
   // Extract the selected inline content and the remainder after it.
   const [before, rest1] = splitInline(props.block.content, lo);
@@ -477,7 +477,7 @@ function collectImageFilesFromClipboard(data: DataTransfer): File[] {
     }
   }
 
-  // Channel 2: `files` (fallback — sometimes only one or the other is
+  // Channel 2: `files` (fallback: sometimes only one or the other is
   // populated, depending on the browser / paste source).
   if (data.files && data.files.length > 0) {
     for (let i = 0; i < data.files.length; i++) {
@@ -494,7 +494,7 @@ function collectImageFilesFromClipboard(data: DataTransfer): File[] {
 }
 
 async function onPaste(event: ClipboardEvent): Promise<void> {
-  // Read-only: no pasting — preventDefault also stops any default browser
+  // Read-only: no pasting: preventDefault also stops any default browser
   // paste behavior on the (non-editable) element.
   if (!editable.value) {
     event.preventDefault();
@@ -503,7 +503,7 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   const data = event.clipboardData;
   if (!data) return;
 
-  // Priority 1: image files in clipboard — take these FIRST, because a
+  // Priority 1: image files in clipboard: take these FIRST, because a
   // screenshot paste has BOTH an image/file and an html/text representation
   // (e.g. `<img src="blob:...">`). We prefer the File because it lets the
   // upload pipeline handle it end-to-end (including the optional upload
@@ -647,8 +647,8 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   // --- Mixed content (text + images) ---
   //
   // Strategy: process blocks in document order. The first TEXT block is
-  // merged into the current block (with [before]). Each subsequent block —
-  // text or image — is inserted after the previous one. The [after] text
+  // merged into the current block (with [before]). Each subsequent block
+  // (text or image) is inserted after the previous one. The [after] text
   // from the current block's selection is appended to the last TEXT block,
   // or becomes a trailing paragraph if the last block is an image.
   //
@@ -659,14 +659,14 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
   // `createImageExtension({ upload })`, or the fallback mock).
 
   if (!beginImageUpload) {
-    // No upload handler available — strip image blocks and treat as
+    // No upload handler available: strip image blocks and treat as
     // text-only paste (images are silently dropped).
     const textOnly = blocks.filter((b) => b.type !== 'image');
     if (textOnly.length === 0) return;
     // Re-run with text-only blocks by recursively calling without images.
     // Simplest: just insert text blocks using the multi-block path above.
     // We do this by setting blocks to textOnly and falling through.
-    // (This is a rare edge case — typically beginImageUpload is always
+    // (This is a rare edge case: typically beginImageUpload is always
     // provided when image extension is active.)
     blocks.splice(0, blocks.length, ...textOnly);
     // Fall through to the text-only path by re-checking.
@@ -695,7 +695,7 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
     }
   }
 
-  // Process first block — it merges into the current block if it's text.
+  // Process first block: it merges into the current block if it's text.
   let prevId: BlockId | null = props.block.id;
   const firstBlock = blocks[0]!;
 
@@ -895,7 +895,7 @@ function onClick(event: MouseEvent): void {
 
   // Calculate the character offset of the click within the block.
   //
-  // Only trust the DOM selection when it lies INSIDE the clicked <a> —
+  // Only trust the DOM selection when it lies INSIDE the clicked <a>;
   // only then was it produced by this very click. A stale selection from a
   // previous edit session (common in read-only mode: clicking a link inside
   // contenteditable=false creates no new selection) may sit anywhere in the

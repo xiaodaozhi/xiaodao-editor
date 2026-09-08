@@ -139,7 +139,7 @@ export function docFromData(json: DocumentData): DocBuildResult {
 }
 
 /**
- * Rebuild the parent/children tree of a legacy document — one where every
+ * Rebuild the parent/children tree of a legacy document: one where every
  * block is a root sibling and depth is encoded in `attrs.indent`. The order
  * of blocks in doc.root (flat, document order) is preserved as the
  * depth-first walk order of the rebuilt tree.
@@ -308,7 +308,7 @@ function depthOfMap(parent: ReadonlyMap<BlockId, BlockId | null>, id: BlockId): 
   // just in case corrupted state arrives via a future JSON import.
   const seen = new Set<BlockId | null | undefined>();
   while (cur !== undefined && cur !== null) {
-    if (seen.has(cur)) break; // cycle detected — stop counting.
+    if (seen.has(cur)) break; // cycle detected: stop counting.
     seen.add(cur);
     depth++;
     cur = parent.get(cur);

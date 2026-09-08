@@ -135,7 +135,7 @@ import {
  *    formula blocks below render as real math by default. To swap in
  *    KaTeX / MathJax, build a custom extension via
  *    `createEquationExtension({ renderer })` and append it AFTER
- *    `BuiltinExtensions` — name-based de-duplication makes the later
+ *    `BuiltinExtensions`: name-based de-duplication makes the later
  *    entry win. (Not enabled here so the demo shows the built-in
  *    renderer.)
  *
@@ -282,7 +282,7 @@ const doc = ref<DocumentData>({
         { type: 'text', text: '斜体+删除线', marks: [{ type: 'italic' }, { type: 'strikethrough' }] },
         { type: 'text', text: '、' },
         { type: 'text', text: '加粗+斜体+下划线+删除线', marks: [{ type: 'bold' }, { type: 'italic' }, { type: 'underline' }, { type: 'strikethrough' }] },
-        { type: 'text', text: '。注意：行内代码与加粗/斜体/下划线/删除线/颜色/链接互斥——添加 code 标记时会自动剥离其他标记。' },
+        { type: 'text', text: '。注意：行内代码与加粗/斜体/下划线/删除线/颜色/链接互斥，添加 code 标记时会自动剥离其他标记。' },
       ],
     },
     {
@@ -654,7 +654,7 @@ const doc = ref<DocumentData>({
       type: 'quote',
       content: [
         { type: 'text', text: '好的代码是其自己最好的文档。当你需要添加注释时，你应该重新思考你的命名。' },
-        { type: 'text', text: '—— Steve McConnell' },
+        { type: 'text', text: '- Steve McConnell' },
       ],
     },
     {

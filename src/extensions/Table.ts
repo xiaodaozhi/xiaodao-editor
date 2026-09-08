@@ -43,10 +43,10 @@
  *    - Backspace at the start of a table does NOT merge with the previous
  *      block (the table-as-a-whole must be removed via the toolbar).
  *    - Enter at end-of-block (not relevant, since content:'none') is a no-op.
- *  `inlineMarks: true` — but cell content uses its own contenteditable so
+ *  `inlineMarks: true`: but cell content uses its own contenteditable so
  *   the core never attempts to apply marks to attrs (the per-cell InlineSeq
  *   stores marks independently through inlineFromDom in the cell blur sync).
- *  Note: marks in cells are deliberately limited in Phase 1 — only plain
+ *  Note: marks in cells are deliberately limited in Phase 1: only plain
  *  text is stored for simplicity, and the cell edit surfaces strip marks
  *  on paste. This matches typical "spreadsheet cell" expectations. A
  *  future phase can reuse inlineDom.inlineFromDom for rich cells.
@@ -143,7 +143,7 @@ const ICON_DELETE_TABLE = `<svg viewBox="0 0 1024 1024" width="14" height="14" f
 //
 // Tables use content:'none' and keep all state in attrs. Like code blocks,
 // the table-as-a-whole does not participate in align/color/bgColor/indent
-// plumbing — the BlockSettingsMenu reads `schema.attrs` and disables UI
+// plumbing: the BlockSettingsMenu reads `schema.attrs` and disables UI
 // sections when a key is absent. Cell-level styling lives in cell data
 // (not used yet) or is handled directly by the renderer (header rows, etc.).
 
@@ -204,7 +204,7 @@ const TableBlock = defineComponent({
     const editable = useEditable();
     const i18n = useI18n();
     const blockId = props.block.id;
-    // Mobile detection + bridge — on touch devices the table does NOT render
+    // Mobile detection + bridge: on touch devices the table does NOT render
     // its own HoverToolbar. Instead it publishes a descriptor (props + handlers)
     // to the bridge so FixedToolbar can render a single HoverToolbar in inline mode.
     const fixedToolbarBridge = inject(fixedToolbarBridgeKey, null);
@@ -216,7 +216,7 @@ const TableBlock = defineComponent({
     // function: assigning a fresh descriptor object on every render makes
     // FixedToolbar re-render (its `descriptor` computed depends on the
     // bridge), which can re-trigger this table's render via ResizeObserver /
-    // measureOffsets — an infinite render loop. In dev builds Vue's
+    // measureOffsets: an infinite render loop. In dev builds Vue's
     // RECURSION_LIMIT=100 guard stops it (only a warning); in production
     // builds that guard is compiled out, so the page freezes.
     //
@@ -260,7 +260,7 @@ const TableBlock = defineComponent({
 
     /**
      * Defer a bridge publish until after the current render flush. Safe to
-     * call from inside the render function — it never writes a reactive ref
+     * call from inside the render function: it never writes a reactive ref
      * synchronously, so it cannot feed a render loop.
      */
     function scheduleBridgePublish(d: FixedToolbarDescriptor | null): void {
@@ -270,7 +270,7 @@ const TableBlock = defineComponent({
       });
     }
 
-    // Live attrs — coerced once per render.
+    // Live attrs: coerced once per render.
     const tattrs = computed<TableAttrs>(() => attrsToTable(props.block.attrs));
 
     // DOM refs: keyed by `row-col` for non-covered cells.
@@ -303,7 +303,7 @@ const TableBlock = defineComponent({
       }
     }
     function onDocMouseUpForHoverToolbar(): void {
-      // Refresh timestamp on mouseup too — a click is mousedown+mouseup,
+      // Refresh timestamp on mouseup too: a click is mousedown+mouseup,
       // and the resulting scroll/selection events may fire after mouseup.
       lastToolbarInteraction = Date.now();
     }
@@ -329,10 +329,10 @@ const TableBlock = defineComponent({
     // Floating toolbar position + visibility.
     const selectionDOMRect = ref<DOMRect | null>(null);
     let toolbarHideTimer: ReturnType<typeof setTimeout> | null = null;
-    // Delayed toolbar show for single-cell click — allows dblclick to cancel.
+    // Delayed toolbar show for single-cell click: allows dblclick to cancel.
     let singleSelectToolbarTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // When true, the cached toolbar state is "frozen" — it won't update even
+    // When true, the cached toolbar state is "frozen": it won't update even
     // if cellSel changes. Used during selection switching (A→B) to prevent
     // the toolbar at the OLD position from rendering the NEW cell's state
     // before the rect has moved to the new position. Cleared by showToolbar()
@@ -380,7 +380,7 @@ const TableBlock = defineComponent({
       headerRowActive: false,
     });
 
-    // Container ref (outer .block-table-container) — focusable so focusout
+    // Container ref (outer .block-table-container): focusable so focusout
     // fires when the user clicks outside the table.
     const containerRef = ref<HTMLDivElement | null>(null);
 
@@ -410,7 +410,7 @@ const TableBlock = defineComponent({
     // Tracks whether the popover was opened by clicking an existing link
     // (view mode) vs. from the HoverToolbar link button (edit mode). When
     // opened from a link click, closing the popover should NOT clear the
-    // cell's focus state — the cell remains in whatever state it was in.
+    // cell's focus state: the cell remains in whatever state it was in.
     let cellLinkFromViewClick = false;
 
     // Ordered-list cell marker click menu state (mirrors BlockEditor's olMenu).
@@ -460,7 +460,7 @@ const TableBlock = defineComponent({
       if (!self || self.covered || self.cellType !== 'orderedList') return;
       const num = orderedListCellNumber(tattrs.value, r, col);
       const hasStartNumber = typeof self.startNumber === 'number';
-      // "Continue previous" — clear startNumber; only actionable if the
+      // "Continue previous": clear startNumber; only actionable if the
       // cell currently has a startNumber override AND the cell above it
       // (same column, next non-covered going up) is an orderedList cell.
       let prevIsOrdered = false;
@@ -471,7 +471,7 @@ const TableBlock = defineComponent({
         break;
       }
       const canContinue = hasStartNumber && prevIsOrdered;
-      // "Start new list" — set startNumber = 1; no-op if ordinal is already 1.
+      // "Start new list": set startNumber = 1; no-op if ordinal is already 1.
       const canStartNew = num !== 1;
       closeCellLinkPopover();
       cellTextToolbar.visible = false;
@@ -537,7 +537,7 @@ const TableBlock = defineComponent({
       cellTextToolbar.visible = false;
       cellTextToolbar.selectionRect = null;
       // When opened from a link click (view mode), don't change the cell's
-      // focus state — it should remain in whatever state it was in before
+      // focus state: it should remain in whatever state it was in before
       // the link was clicked.
       if (cellLinkFromViewClick) {
         cellLinkFromViewClick = false;
@@ -623,7 +623,7 @@ const TableBlock = defineComponent({
     /** Save link via DOM manipulation on the cell's contenteditable. */
     function onCellLinkSave(url: string, text: string | undefined): void {
       // When opened from a link click (view mode), use the saved link element
-      // directly — there may be no text selection to work with.
+      // directly: there may be no text selection to work with.
       if (savedCellLinkEl && savedCellLinkEl.isConnected) {
         savedCellLinkEl.setAttribute('href', url);
         savedCellLinkEl.setAttribute('target', '_blank');
@@ -683,7 +683,7 @@ const TableBlock = defineComponent({
     /** Remove link from the cell's contenteditable (unwrap <a> to text). */
     function onCellLinkRemove(): void {
       // When opened from a link click (view mode), use the saved link element
-      // directly — there may be no text selection to work with.
+      // directly: there may be no text selection to work with.
       if (savedCellLinkEl && savedCellLinkEl.isConnected) {
         const linkEl = savedCellLinkEl;
         const parent = linkEl.parentElement;
@@ -739,7 +739,7 @@ const TableBlock = defineComponent({
 
     // Track whether the mouse button is currently held down inside a cell
     // that is in edit mode. While dragging to select text, the toolbar must
-    // NOT appear — matching the text-block HoverToolbar behavior which waits
+    // NOT appear: matching the text-block HoverToolbar behavior which waits
     // until mouseup before showing.
     let isCellMouseDown = false;
 
@@ -780,7 +780,7 @@ const TableBlock = defineComponent({
           cellTextToolbar.selectionRect = null;
           return;
         }
-        // Has a valid selection inside a table cell — keep toolbar visible.
+        // Has a valid selection inside a table cell: keep toolbar visible.
         return;
       }
       const sel = window.getSelection();
@@ -808,7 +808,7 @@ const TableBlock = defineComponent({
       }
       // Don't show toolbar while mouse button is held down (dragging to
       // select text). The toolbar will appear after mouseup via
-      // onCellMouseUp, which re-checks the selection — matching the
+      // onCellMouseUp, which re-checks the selection: matching the
       // text-block HoverToolbar behavior.
       if (isCellMouseDown) return;
       cellTextToolbar.visible = true;
@@ -860,7 +860,7 @@ const TableBlock = defineComponent({
       // Hide the cell text toolbar (cellEditMode) to avoid both showing.
       cellTextToolbar.visible = false;
       cellTextToolbar.selectionRect = null;
-      // Unfreeze the cached state — the new rect is being applied, so the
+      // Unfreeze the cached state: the new rect is being applied, so the
       // cache should update to match the new selection in the same render.
       isSwitchingSelection = false;
       // rect is wrapper-relative (from measureState); convert to
@@ -872,7 +872,7 @@ const TableBlock = defineComponent({
         clearTimeout(singleSelectToolbarTimer);
         singleSelectToolbarTimer = null;
       }
-      // Unfreeze — hideToolbar is called when selection is cancelled, so
+      // Unfreeze: hideToolbar is called when selection is cancelled, so
       // there's no switch in progress anymore.
       isSwitchingSelection = false;
       toolbarHideTimer = setTimeout(() => {
@@ -972,7 +972,7 @@ const TableBlock = defineComponent({
       // If focus is moving to the link popover (teleported to body),
       // keep cell state alive so link save/remove can still sync content.
       // If focus is moving to the HoverToolbar (cellTextToolbar, teleported to body),
-      // keep cell state alive — the toolbar is still interacting with the cell's text.
+      // keep cell state alive: the toolbar is still interacting with the cell's text.
       const relatedTarget = e?.relatedTarget as HTMLElement | null;
       if (relatedTarget?.closest('.link-popover')) {
         return;
@@ -1030,7 +1030,7 @@ const TableBlock = defineComponent({
       // Don't clear state if focus moved to the link popover.
       if (next?.closest('.link-popover')) return;
       // Don't clear state if focus moved to the cell text toolbar
-      // (cellEditMode HoverToolbar, teleported to body) — the toolbar is
+      // (cellEditMode HoverToolbar, teleported to body): the toolbar is
       // still interacting with the cell's text selection.
       if (next?.closest('.hover-toolbar')) return;
       // Fallback when relatedTarget is null (mousedown on HoverToolbar called
@@ -1060,7 +1060,7 @@ const TableBlock = defineComponent({
           }
         }
       }
-      // Focus has left the table — clear all selection / focus state.
+      // Focus has left the table: clear all selection / focus state.
       if (cellSel.value) cellSel.value = null;
       if (tableSel.value.kind !== 'none') {
         tableSel.value = { kind: 'none' };
@@ -1107,7 +1107,7 @@ const TableBlock = defineComponent({
           //
           // code-block cells have NO inline marks (sanitizeCellContent
           // strips them), so inlineFromDom always returns a single plain
-          // text run — character offsets are unambiguous.
+          // text run: character offsets are unambiguous.
           ev.preventDefault();
           ev.stopPropagation();
 
@@ -1323,7 +1323,7 @@ const TableBlock = defineComponent({
           }
         }
       }
-      // ESC: exit editing (blur) — the cell returns to default state.
+      // ESC: exit editing (blur): the cell returns to default state.
       if (ev.key === 'Escape') {
         ev.preventDefault();
         ev.stopPropagation();
@@ -1343,7 +1343,7 @@ const TableBlock = defineComponent({
 
     function onCellFocus(r: number, c: number, _el: HTMLDivElement): void {
       focusedCell.value = { row: r, col: c };
-      // Focus means editing mode — clear any selection state.
+      // Focus means editing mode: clear any selection state.
       if (cellSel.value) cellSel.value = null;
       if (tableSel.value.kind !== 'none') {
         tableSel.value = { kind: 'none' };
@@ -1393,20 +1393,20 @@ const TableBlock = defineComponent({
       if (target.closest('.table-row-strip, .table-col-strip, .table-insert-dot, .table-corner-handle, .table-col-resizer')) {
         return;
       }
-      // Check if click is on a todo-list checkbox inside a table cell — let
+      // Check if click is on a todo-list checkbox inside a table cell: let
       // the checkbox handle the click natively so it can toggle in non-edit
       // mode. The checkbox's onClick handler stops propagation.
       if (target.tagName === 'INPUT' && target.classList.contains('table-cell-todo-checkbox')) {
         return;
       }
-      // Check if click is on an ordered-list cell number marker — let the
+      // Check if click is on an ordered-list cell number marker: let the
       // marker's own click handler manage the menu popup (works in both
       // select state and edit state). The marker's click handler stops
       // propagation so this mousedown guard just lets it through.
       if (target.classList.contains('table-cell-ol-marker')) {
         return;
       }
-      // Check if click is on a link inside a table cell — open the link
+      // Check if click is on a link inside a table cell: open the link
       // view popover instead of selecting/editing the cell. This applies
       // to both edit mode and non-edit mode, matching the text-block
       // behavior where clicking a link always shows the view popover.
@@ -1417,7 +1417,7 @@ const TableBlock = defineComponent({
         openCellLinkView(linkEl);
         return;
       }
-      // Non-link click inside the table — close any open link popover.
+      // Non-link click inside the table: close any open link popover.
       if (cellLinkPopover.visible) {
         closeCellLinkPopover();
       }
@@ -1444,7 +1444,7 @@ const TableBlock = defineComponent({
       const focused = document.activeElement as HTMLElement | null;
       if (focused && focused.closest('.table-cell-inner')) focused.blur();
       focusedCell.value = null;
-      // Selecting a cell means the table is now the active block — clear
+      // Selecting a cell means the table is now the active block: clear
       // any caret / text selection in other blocks so they lose focus.
       editor.commands.selectBlock?.({ id: blockId });
       // Focus the container so focusout fires when clicking outside the table.
@@ -1501,7 +1501,7 @@ const TableBlock = defineComponent({
         return;
       }
       // Don't enter edit mode when double-clicking the ordered-list number
-      // marker — single-click already opens the menu.
+      // marker: single-click already opens the menu.
       if (target.classList.contains('table-cell-ol-marker')) {
         return;
       }
@@ -1523,7 +1523,7 @@ const TableBlock = defineComponent({
         clearTimeout(singleSelectToolbarTimer);
         singleSelectToolbarTimer = null;
       }
-      // Unfreeze any pending selection-switch state — dblclick cancels
+      // Unfreeze any pending selection-switch state: dblclick cancels
       // the switch and enters edit mode instead.
       isSwitchingSelection = false;
       isDragging = false;
@@ -1563,7 +1563,7 @@ const TableBlock = defineComponent({
         const { r1, c1, r2, c2 } = closed;
         tableSel.value = { kind: 'cell', rect: { r1, c1, r2, c2 } };
         // Also rewrite cellSel so visual highlight + selectionRect() callers
-        // all see the expanded (closed) rectangle — no half-merged states.
+        // all see the expanded (closed) rectangle: no half-merged states.
         cellSel.value = {
           anchor: { row: r1, col: c1 },
           focus: { row: r2, col: c2 },
@@ -1577,7 +1577,7 @@ const TableBlock = defineComponent({
           });
         } else if (hadToolbarOnMouseDown) {
           // Single-cell click while toolbar was already visible (switching
-          // selection A→B): skip the 250ms dblclick-cancel delay — the
+          // selection A→B): skip the 250ms dblclick-cancel delay: the
           // toolbar is already visible, just move it to the new position.
           // showToolbar() also unfreezes isSwitchingSelection so the cache
           // updates to the new cell's state in the same render.
@@ -1696,7 +1696,7 @@ const TableBlock = defineComponent({
       const attr = tattrs.value;
       if (attr.rows === 0 || attr.cols === 0) return;
       tableSel.value = { kind: 'all' };
-      // Full table — already covers the maximum possible rectangle, but run
+      // Full table: already covers the maximum possible rectangle, but run
       // expansion anyway for defense-in-depth (guards against any future
       // grid-size mismatch bugs that would leave merges dangling past the
       // nominal rows-1/cols-1 edge).
@@ -1806,10 +1806,10 @@ const TableBlock = defineComponent({
       // Don't close if clicking on the ordered-list menu or number picker.
       if (target.closest('.ordered-list-menu')) return;
       if (target.closest('.number-picker')) return;
-      // Don't close if clicking inside the table container — handled by
+      // Don't close if clicking inside the table container: handled by
       // onContainerMouseDown which will close it as needed.
       if (containerRef.value && containerRef.value.contains(target)) return;
-      // Clicked outside — close the popovers.
+      // Clicked outside: close the popovers.
       if (cellLinkPopover.visible) closeCellLinkPopover();
       if (tableOlMenu.visible) closeTableOlMenu();
       if (tableNumberPicker.visible) closeTableNumberPicker();
@@ -1848,7 +1848,7 @@ const TableBlock = defineComponent({
       document.addEventListener('mousedown', onDocMouseDownForCellLink, true);
       // Capture-phase listener so the hover-toolbar mousedown flag is flipped
       // BEFORE the focus/blur events that result from clicking on something
-      // outside the cell — otherwise blur would run with the flag still off.
+      // outside the cell: otherwise blur would run with the flag still off.
       document.addEventListener('mousedown', onDocMouseDownCaptureForHoverToolbar, true);
       document.addEventListener('mouseup', onDocMouseUpForHoverToolbar, true);
       // Close table OL menu / number picker on page scroll or touch swipe.
@@ -1918,7 +1918,7 @@ const TableBlock = defineComponent({
         rowHeights.push(rowHeights.length > 0 ? rowHeights[rowHeights.length - 1]! : 32);
       }
 
-      // Measure columns from <colgroup><col> elements — reliable even with
+      // Measure columns from <colgroup><col> elements: reliable even with
       // colspan/rowspan cells that would confuse a cell-based traversal.
       // Add wrap.scrollLeft to convert from viewport-relative (r.left −
       // wrapRect.left, which subtracts the scroll offset) to content-relative
@@ -1984,12 +1984,12 @@ const TableBlock = defineComponent({
       });
     });
 
-    // Re-measure when observed elements resize — column widths / row heights
+    // Re-measure when observed elements resize: column widths / row heights
     // can change when the viewport shrinks.
     let ro: ResizeObserver | null = null;
     onMounted(() => {
       ro = new ResizeObserver(() => {
-        // Skip expensive DOM measurements during column resize — the widths
+        // Skip expensive DOM measurements during column resize: the widths
         // are being driven by the mouse, not by layout. A final measurement
         // runs in onColResizeEnd.
         if (resizingCol.value !== null) return;
@@ -2002,7 +2002,7 @@ const TableBlock = defineComponent({
       if (tableEl.value) ro.observe(tableEl.value);
       // Observe the editor content area (.block-editor) so that layout
       // changes (sidebar toggle, panel resize, etc.) that alter the available
-      // width — even without changing the wrapper's own dimensions — trigger
+      // width (even without changing the wrapper's own dimensions) trigger
       // a re-measure and dot repositioning.
       const editorEl = containerRef.value?.closest('.block-editor') as HTMLElement | null;
       if (editorEl) ro.observe(editorEl);
@@ -2031,7 +2031,7 @@ const TableBlock = defineComponent({
       ev.preventDefault();
       ev.stopPropagation();
       resizingCol.value = col;
-      // Use the measured colWidth for the drag start — matches <colgroup>.
+      // Use the measured colWidth for the drag start: matches <colgroup>.
       const ms = measureState.value;
       resizeStartW = ms.colWidths[col] ?? 80;
       resizeStartX = ev.clientX;
@@ -2049,7 +2049,7 @@ const TableBlock = defineComponent({
       let newW = Math.max(40, Math.round(resizeStartW + dx));
       // Enforce table max-width, but only when the table is still within the
       // container. Once the table has reached or exceeded the container limit,
-      // we stop clamping — the table is allowed to overflow and the browser
+      // we stop clamping: the table is allowed to overflow and the browser
       // no longer shrinks columns (we use min-width instead of max-width on
       // the <table> to prevent proportional column compression).
       const wrap = wrapperRef.value;
@@ -2061,12 +2061,12 @@ const TableBlock = defineComponent({
         const otherW = tattrs.value.colWidths.reduce((a, b, i) => i === resizingCol.value ? a : a + b, 0);
         const totalW = otherW + newW;
         if (totalW <= availW) {
-          // Still fits inside the wrapper — enforce the cap so the
+          // Still fits inside the wrapper: enforce the cap so the
           // horizontal scrollbar never flickers in-and-out during drag.
           const maxW = Math.max(40, availW - otherW);
           newW = Math.min(newW, maxW);
         }
-        // else: table has already overflowed the wrapper — allow free
+        // else: table has already overflowed the wrapper: allow free
         // resizing; the wrapper's own horizontal scrollbar handles it.
       }
       const next = setColWidth(tattrs.value, resizingCol.value, newW);
@@ -2078,7 +2078,7 @@ const TableBlock = defineComponent({
       document.removeEventListener('mouseup', onColResizeEnd, true);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      // Final measurement after resize — the per-frame measurements were
+      // Final measurement after resize: the per-frame measurements were
       // skipped during drag for performance.
       nextTick(() => {
         measureOffsets();
@@ -2091,8 +2091,8 @@ const TableBlock = defineComponent({
     // The column insertion dots used to live INSIDE .table-wrapper (the
     // horizontal scroll container) as part of .table-col-handles, so they
     // scrolled with the table. They are now rendered as a FIXED overlay
-    // (.table-col-insert-dots) — a direct child of .block-table-container
-    // and sibling to .table-wrapper — so they never scroll themselves.
+    // (.table-col-insert-dots): a direct child of .block-table-container
+    // and sibling to .table-wrapper: so they never scroll themselves.
     //
     // Their horizontal positions are COMPUTED from the current scroll
     // state: each column boundary's content-x is mapped to a viewport-x
@@ -2106,7 +2106,7 @@ const TableBlock = defineComponent({
     const colScrollLeft = ref(0);
     const colViewportWidth = ref(0);
     const colScrollWidth = ref(0);
-    // True while the wrapper is actively scrolling — fades the dots out so
+    // True while the wrapper is actively scrolling: fades the dots out so
     // they don't visually chase every intermediate scroll frame.
     const colScrolling = ref(false);
     let colScrollRafId = 0;
@@ -2193,7 +2193,7 @@ const TableBlock = defineComponent({
 
     // Public API exposed via template ref for BlockEditor to clear internal
     // table focus state (cell selection, focused cell, popovers, toolbar).
-    // MUST be called once in setup() BEFORE returning the render function —
+    // MUST be called once in setup() BEFORE returning the render function;
     // Vue's expose() is a one-shot per-setup API; calling it from inside the
     // render closure triggers the "should be called only once per setup()"
     // runtime warning on every re-render.
@@ -2214,7 +2214,7 @@ const TableBlock = defineComponent({
       const rows = attr.rows;
       const cols = attr.cols;
       const rawSel = selectionRect(cellSel.value);
-      // Expand the selection rectangle for visual highlighting too — so the
+      // Expand the selection rectangle for visual highlighting too: so the
       // user immediately sees the closed rectangle that will be operated on.
       const sel = rawSel
         ? expandSelectionToFullRect(attr, rawSel.r1, rawSel.c1, rawSel.r2, rawSel.c2)
@@ -2294,7 +2294,7 @@ const TableBlock = defineComponent({
             cellStyle = { verticalAlign: cellVa };
           }
           // Focus (blue outline) and selection (blue background) are
-          // mutually exclusive — don't show focus outline on a selected cell.
+          // mutually exclusive: don't show focus outline on a selected cell.
           const isEditing = !hasSelection && focusedCell.value?.row === r && focusedCell.value?.col === c;
           if (isEditing) {
             classes.push('table-cell-focused');
@@ -2346,7 +2346,7 @@ const TableBlock = defineComponent({
           });
           // For todoList cells, render a checkbox + content wrapper so the
           // checkbox is clickable in non-edit mode (the checkbox is NOT
-          // part of the contenteditable — it's a sibling element).
+          // part of the contenteditable: it's a sibling element).
           //
           // For orderedList cells, render a clickable number marker +
           // content wrapper. Single-click opens the ordered-list menu
@@ -2466,7 +2466,7 @@ const TableBlock = defineComponent({
       // snapshot. To keep resizeItems (blue drag bars), colStrips (column
       // selection strips), and .table-col-handles width following the drag
       // in real time, compute column lefts/widths/total from the live
-      // tattrs.value.colWidths — pure arithmetic, zero DOM measurement.
+      // tattrs.value.colWidths: pure arithmetic, zero DOM measurement.
       const isResizing = resizingCol.value !== null;
       const effColLefts: number[] = [];
       const effColWidths: number[] = [];
@@ -2512,11 +2512,11 @@ const TableBlock = defineComponent({
 
       // --- Insertion dots ------------------------------------------------
       // Row dots are children of .table-row-handles (outside wrapper, fixed).
-      // Column dots are NO LONGER rendered here — they used to live inside
+      // Column dots are NO LONGER rendered here: they used to live inside
       // .table-col-handles (which scrolls with the table). They are now a
       // fixed overlay (.table-col-insert-dots) computed from the wrapper's
       // scroll state (see colDotItems) and rendered outside the wrapper.
-      // Hidden entirely in read-only mode — inserting rows/cols is an
+      // Hidden entirely in read-only mode: inserting rows/cols is an
       // editing action.
       const rowDots: VNode[] = [];
       if (editable.value) {
@@ -2592,11 +2592,11 @@ const TableBlock = defineComponent({
         ]),
       );
 
-      // Assemble the wrapper — this is the scroll container (overflow-x: auto).
+      // Assemble the wrapper: this is the scroll container (overflow-x: auto).
       // col-handles lives INSIDE the wrapper so it scrolls horizontally with
       // the table (like Arco Design's table header). Row handles stay outside
       // because rows don't move horizontally. Column INSERT dots also stay
-      // outside (see .table-col-insert-dots below) — they are computed from
+      // outside (see .table-col-insert-dots below): they are computed from
       // the scroll state instead of scrolling with the content.
       children.push(
         h('div', {
@@ -2643,7 +2643,7 @@ const TableBlock = defineComponent({
       );
 
       // --- Floating toolbar (HoverToolbar component in table mode) ---
-      // Always render — the `visible` prop controls CSS fade animations.
+      // Always render: the `visible` prop controls CSS fade animations.
       const selRect = selectionDOMRect.value;
       const showingDelete = tsel.kind === 'row' || tsel.kind === 'col' || tsel.kind === 'all';
 
@@ -2664,9 +2664,9 @@ const TableBlock = defineComponent({
       const effectiveRect = expandedRect ?? singleFocusRect;
 
       // Button visibility rules (precisely as specified):
-      //   * showMerge — only when the user explicitly selected MULTIPLE
+      //   * showMerge: only when the user explicitly selected MULTIPLE
       //     (non-covered) cells inside a multi-cell rectangle (≥ 2).
-      //   * showSplit — only if the effective rect (expanded + closed)
+      //   * showSplit: only if the effective rect (expanded + closed)
       //     contains at least one already-merged cell (rowspan>1 or
       //     colspan>1). This means the user must have selected merged
       //     cells before the split button appears.
@@ -2951,7 +2951,7 @@ const TableBlock = defineComponent({
 
       // --- Always publish descriptor to the bridge so FixedToolbar renders it
       // via <HoverToolbar inline>. Published AFTER the render flush with
-      // content-signature dedupe — see publishBridge()/scheduleBridgePublish().
+      // content-signature dedupe: see publishBridge()/scheduleBridgePublish().
       if (fixedToolbarBridge) {
         if (tableModeDescriptor.visible) {
           scheduleBridgePublish(tableModeDescriptor);
@@ -2967,7 +2967,7 @@ const TableBlock = defineComponent({
       }
 
       // Cell text editing toolbar (non-tableMode, uses execCommand).
-      // On desktop: always render — the `visible` prop controls CSS fade
+      // On desktop: always render: the `visible` prop controls CSS fade
       // animations. On mobile: publish descriptor to the bridge (cell-edit
       // takes priority over table-mode).
       const fc = focusedCell.value;
@@ -3042,7 +3042,7 @@ const TableBlock = defineComponent({
           openCellLinkPopover();
         },
       };
-      // Published AFTER the render flush with content-signature dedupe — see
+      // Published AFTER the render flush with content-signature dedupe: see
       // publishBridge()/scheduleBridgePublish().
       if (fixedToolbarBridge) {
         if (cellEditDescriptor.visible) {
@@ -3088,7 +3088,7 @@ const TableBlock = defineComponent({
 
       // Ordered-list menu (shown when user clicks the number marker of an
       // ordered-list cell). The `block-id` prop is typed as BlockId | null,
-      // but OrderedListMenu only uses it to emit events — the actual cell
+      // but OrderedListMenu only uses it to emit events: the actual cell
       // mutation goes through setCellAttrs which uses (row, col). Pass null.
       children.push(
         h(OrderedListMenu, {
@@ -3383,7 +3383,7 @@ function tableMergeCellsCommand(): CommandEntry<Partial<TableMergeCellsArgs> & {
       // we never merge from a "half-selected merged cell" state that would
       // leave stray covered cells and break the table structure.
       const closed = expandSelectionToFullRect(cur, rawR1, rawC1, rawR2, rawC2);
-      // After closing, a 1x1 rect cannot be merged — bail out.
+      // After closing, a 1x1 rect cannot be merged: bail out.
       if (closed.r1 === closed.r2 && closed.c1 === closed.c2) return false;
       return withAttrs(state, args.id, dispatch,
         (a) => mergeRect(a, closed.r1, closed.c1, closed.r2, closed.c2));
@@ -3415,7 +3415,7 @@ function tableSplitCellsInRectCommand(): CommandEntry<TableSplitCellsInRectArgs>
       const cur = attrsToTable(block.attrs as unknown as Record<string, JSONValue>);
       const closed = expandSelectionToFullRect(cur, args.r1, args.c1, args.r2, args.c2);
       if (!rectContainsMergedCells(cur, closed.r1, closed.c1, closed.r2, closed.c2)) {
-        return false; // Nothing to split — bail out (keeps undo stack clean).
+        return false; // Nothing to split: bail out (keeps undo stack clean).
       }
       return withAttrs(state, args.id, dispatch,
         (a) => splitCellsInRect(a, closed.r1, closed.c1, closed.r2, closed.c2));
@@ -3540,7 +3540,7 @@ function insertTableCommand(): CommandEntry<InsertTableArgs> {
 }
 
 /** Build all table commands. The registry context is accepted for parity with
- *  other factories but currently unused — kept for future callers that need
+ *  other factories but currently unused: kept for future callers that need
  *  schema-level coordination. */
 export function createTableCommands(
   _registries: EditorRegistries,

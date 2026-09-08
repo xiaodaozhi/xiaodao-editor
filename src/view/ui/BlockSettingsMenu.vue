@@ -48,7 +48,7 @@
         class="bsm-scroll"
         @scroll="updateScrollState"
       >
-        <!-- 1. Turn into (no label) — hidden for non-text blocks like image/table/divider,
+        <!-- 1. Turn into (no label): hidden for non-text blocks like image/table/divider,
              and for the equation block (equations can't be converted to other blocks). -->
         <template v-if="!isImageBlock && !isDividerBlock && !isEquationBlock">
           <div class="bsm-group">
@@ -73,7 +73,7 @@
           <div class="bsm-sep" />
         </template>
 
-        <!-- 2. Align & Indent (collapsible) — hidden for divider/table -->
+        <!-- 2. Align & Indent (collapsible): hidden for divider/table -->
         <div
           v-if="!hideAlignSection"
           class="bsm-group"
@@ -289,7 +289,7 @@
           </div>
         </div>
 
-        <!-- 2b. Indent only (collapsible) — for blocks that don't support
+        <!-- 2b. Indent only (collapsible): for blocks that don't support
              alignment but can still be indented as children: table, TOC,
              divider. Shows only the indent/outdent buttons. -->
         <div
@@ -369,7 +369,7 @@
           </div>
         </div>
 
-        <!-- 3. Text color (collapsible) — hidden for non-text blocks like image/table/divider -->
+        <!-- 3. Text color (collapsible): hidden for non-text blocks like image/table/divider -->
         <div
           v-if="!isImageBlock && !isDividerBlock"
           class="bsm-group bsm-colors"
@@ -417,7 +417,7 @@
           </div>
         </div>
 
-        <!-- 4. Background color (collapsible) — hidden for non-text blocks like image/table/divider -->
+        <!-- 4. Background color (collapsible): hidden for non-text blocks like image/table/divider -->
         <div
           v-if="!isImageBlock && !isDividerBlock"
           class="bsm-group bsm-colors"
@@ -597,7 +597,7 @@ const MENU_WIDTH = 260;
 const MENU_MIN_HEIGHT = 80;
 const SCROLL_BTN_HEIGHT = 24;
 
-// Collapsible sections — all collapsed by default
+// Collapsible sections: all collapsed by default
 type SectionKey = 'alignIndent' | 'indent' | 'textColor' | 'bgColor';
 const expandedSections = reactive<Record<SectionKey, boolean>>({
   alignIndent: false,
@@ -627,7 +627,7 @@ watch(() => props.visible, (visible) => {
 // --- Current block attrs --------------------------------------------------
 
 /**
- * The editor's state is NOT a Vue reactive object — `editor.getState()`
+ * The editor's state is NOT a Vue reactive object: `editor.getState()`
  * returns a plain field, so a `computed` over it would cache forever and
  * never reflect attribute changes (align/color/bgColor would always appear
  * at their first-evaluated value). To stay reactive we subscribe to the
@@ -700,15 +700,15 @@ const currentIndent = computed<number>(() => {
 });
 
 /** Whether the prev sibling type can ACT as a parent (schema.nestable).
- *  Mirrors the list inside indentBlockCommand — paragraph/heading + 3 list types. */
+ *  Mirrors the list inside indentBlockCommand: paragraph/heading + 3 list types. */
 function isParentableType(type: string): boolean {
   return ['paragraph', 'heading', 'orderedList', 'bulletList', 'todoList'].includes(type);
 }
 
-/** Any block type can be INDENTED (made a child of something else) — the
+/** Any block type can be INDENTED (made a child of something else): the
  *  "nestable: true" restriction is on WHETHER A BLOCK CAN BE A PARENT (i.e.
  *  ACCEPT children), not on whether it can be a child. So codeBlock, hr,
- *  table, divider, quote, image — any of them can be indented under a
+ *  table, divider, quote, image, any of them can be indented under a
  *  nestable sibling. Therefore canIndent is always true for any existing
  *  block; real availability is derived dynamically in indentDisabled. */
 const canIndent = computed<boolean>(() => {
@@ -848,7 +848,7 @@ watch(
   (visible) => {
     if (!visible) return;
     // 记录打开时的块类型，作为本菜单会话的区域显隐依据。
-    // 注意：关闭时不能清空 openedBlockType —— shouldRender 有 300ms 淡出延迟，
+    // 注意：关闭时不能清空 openedBlockType，shouldRender 有 300ms 淡出延迟，
     // 若关闭瞬间将其置为 undefined，特殊块被隐藏的区域会在菜单消失前闪现。
     // 每次打开都会经过 visible=false→true，因此这里会写入最新的块类型。
     openedBlockType.value = props.blockId != null
@@ -905,11 +905,11 @@ function setBgColor(key: string): void {
 // Chain of fallbacks for maximum reliability on Windows (and elsewhere):
 //   1. `navigator.clipboard.write()` with web-standard MIME types only.
 //      Custom MIME types like `application/x-blockeditor-block` are rejected
-//      by Chromium on Windows, silently failing the whole write — so we
+//      by Chromium on Windows, silently failing the whole write: so we
 //      never send them.
-//   2. `navigator.clipboard.writeText()` — simpler but universally works for
+//   2. `navigator.clipboard.writeText()`: simpler but universally works for
 //      plain text.
-//   3. `document.execCommand('copy')` via an offscreen textarea — needed for
+//   3. `document.execCommand('copy')` via an offscreen textarea: needed for
 //      non-secure contexts (file://, http://) where navigator.clipboard is
 //      undefined.
 async function copyBlock(): Promise<void> {
@@ -927,7 +927,7 @@ async function copyBlock(): Promise<void> {
   let ok = false;
 
   // 1. Multi-format write (best-effort: text/plain + text/html).
-  //    We intentionally AVOID custom MIME types here — Chromium rejects
+  //    We intentionally AVOID custom MIME types here: Chromium rejects
   //    anything outside a small allowlist and throws for the whole call.
   try {
     if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {

@@ -35,7 +35,7 @@ export const QuoteExtension: Extension = {
     content: 'text',
     nestable: false,
     // Quote blocks render italic globally via CSS, so an inline italic mark
-    // would be redundant — disallow it.
+    // would be redundant: disallow it.
     disallowedMarks: ['italic'],
     // quote can be a CHILD block (indented under a nestable sibling),
     // so it needs the `indent` attr to reflect its nesting depth and render

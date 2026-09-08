@@ -1,7 +1,7 @@
 /**
  * Selection helpers. Selection is part of editor state but *separate* from the
  * document (docs §8). This module provides constructors, guards, and pure
- * utilities used by commands and the view layer. It never touches the DOM —
+ * utilities used by commands and the view layer. It never touches the DOM:
  * native-selection sync lives in `view/dom/selectionSync.ts`.
  */
 

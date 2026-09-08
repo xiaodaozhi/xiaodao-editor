@@ -4,7 +4,7 @@
   Responsibilities:
     1. Construct the `Editor` instance from extensions + initial document.
     2. Maintain a `shallowRef<EditorState>` that triggers Vue reactivity on
-       state changes — but only at the top level (no deep reactivity).
+       state changes: but only at the top level (no deep reactivity).
     3. Provide the editor to child components via injection.
     4. Host three popups (all Teleported to body):
          • PlusMenu  - opened by "/" (mode="slash") or left "+" button (mode="insert")
@@ -41,7 +41,7 @@
     @dragleave="onFileDragLeave"
     @drop.prevent="onFileDrop"
   >
-    <!-- Fixed action bar (always visible — plus/handle + contextual buttons).
+    <!-- Fixed action bar (always visible: plus/handle + contextual buttons).
          Position is auto-detected: top on desktop, bottom on mobile.
          Can be overridden via the `toolbarPosition` prop. Hidden entirely in
          floating mode (toolbarPosition='float' on desktop). -->
@@ -74,7 +74,7 @@
       v-bind="floatToolbarDescriptor"
       @interacting="markToolbarInteracting"
     />
-    <!-- Scrollable content area — vertical scrolling lives here, not on the
+    <!-- Scrollable content area: vertical scrolling lives here, not on the
          editor root. When height is set this area scrolls internally; when
          height is unset it grows with its content and the page scrolls. -->
     <div class="editor-content">
@@ -104,7 +104,7 @@
     <!-- Cross-block text selection overlay.
          Teleported to <body> so ancestor transforms (scale/translate) don't
          break the alignment. getClientRects() reports viewport-relative
-         coordinates — only a document-level overlay can match them. -->
+         coordinates: only a document-level overlay can match them. -->
     <Teleport to="body">
       <div
         v-if="crossBlockRects.length > 0"
@@ -270,7 +270,7 @@ const emit = defineEmits<{
 // NOTE: the previous `'cleanup:image-file'` Vue emit (fired when the last
 // image block referencing a given `fileId` was removed) is gone.
 // Equivalent functionality is now provided by `ImageExtension`'s
-// `onFileCleanup` option — pass it via `createImageExtension({ onFileCleanup })`
+// `onFileCleanup` option: pass it via `createImageExtension({ onFileCleanup })`
 // when composing `:extensions`. See `src/extensions/Image.ts` for details.
 
 // --- I18n + theme -------------------------------------------------------
@@ -280,7 +280,7 @@ const normalizedTheme = computed<Theme>(() => normalizeTheme(props.theme));
 
 // Create refs that will be provided to all child components.  Each child
 // injects these refs and builds its own `t()` that reads `localeRef.value`
-// directly — a plain ref read that Vue tracks reliably even across
+// directly: a plain ref read that Vue tracks reliably even across
 // <Teleport> boundaries.
 const localeRef = ref<Locale>(normalizedLocale.value);
 const themeRef = ref<Theme>(normalizedTheme.value);
@@ -336,7 +336,7 @@ const effectivePlaceholder = computed<string>(
 // factory (e.g. `createEquationExtension({ renderer })`,
 // `createImageExtension({ upload, onFileCleanup })`). `BlockEditor.vue`
 // itself never imports extension internals or attaches them on behalf of
-// the consumer — that responsibility now lives entirely in the extension
+// the consumer: that responsibility now lives entirely in the extension
 // layer.
 
 const editor = new Editor({
@@ -345,7 +345,7 @@ const editor = new Editor({
   editable: props.editable,
 });
 
-// Reactive editable flag — provided to child components so they can
+// Reactive editable flag: provided to child components so they can
 // reactively bind `contenteditable` and gate editing actions. The Editor
 // instance itself is non-reactive; this ref bridges the prop → view layer.
 const editableRef = ref(props.editable);
@@ -357,7 +357,7 @@ provide(editorKey, editor);
 // This is provided to child components (TableBlock) so they can adapt
 // their rendering for mobile. The FixedToolbar is always visible.
 //
-// NOTE: matchMedia is synchronous — create the MQL and read `.matches`
+// NOTE: matchMedia is synchronous: create the MQL and read `.matches`
 // IMMEDIATELY during setup so the FIRST render already uses the correct
 // mobile state. Otherwise we'd render the desktop layout (block handles,
 // HoverToolbar, etc.) for one frame before flipping to mobile, causing
@@ -474,7 +474,7 @@ const state = shallowRef<EditorState>(editor.getState());
 let prevSelection = editor.getState().selection;
 let suppressSelectionSync = false;
 // When insertCodeBlockNewline sets the caret directly via the live DOM
-// selection, we skip the subsequent applySelectionToDom call — it would
+// selection, we skip the subsequent applySelectionToDom call: it would
 // call el.focus() + setCaretInElement which can clobber the caret position
 // (especially when a trailing <br> is present for pre-wrap rendering).
 let skipNextSelectionApply = false;
@@ -593,7 +593,7 @@ function markToolbarInteracting(): void {
     //
     // `force:true` bypasses the `isMouseDown` early return: the 500ms timer
     // fires when the user might still be holding down a toolbar button
-    // (outside the contenteditable area) — we want to materialise any
+    // (outside the contenteditable area): we want to materialise any
     // legitimate still-existing DOM selection into hoverToolbar state so
     // the toolbar buttons don't stay disabled until the next mouseup click
     // cycle re-runs selectionchange.
@@ -690,7 +690,7 @@ function findLinkAtOffset(blockId: BlockId, offset: number): {
         };
       }
       // No link on this run. An offset equal to runEnd is a SHARED boundary
-      // with the next run (runs are contiguous, runEnd === next runStart) —
+      // with the next run (runs are contiguous, runEnd === next runStart);
       // e.g. the exact start of a link run. In that case keep scanning so
       // the next run gets a chance to match; only truly-covering offsets
       // (offset < runEnd) terminate the search.
@@ -776,7 +776,7 @@ function onLinkShortcut(): void {
   syncSelectionFromDom();
   const sel = editor.getState().selection;
   if (sel.kind === 'caret') {
-    // Cursor — check if it's inside a link.
+    // Cursor: check if it's inside a link.
     const linkInfo = findLinkAtOffset(sel.blockId, sel.offset);
     if (linkInfo) {
       linkPopover.blockId = sel.blockId;
@@ -792,7 +792,7 @@ function onLinkShortcut(): void {
       linkPopover.showTextInput = false;
       linkPopover.visible = true;
     } else {
-      // No link at cursor — do nothing (need a selection to create a link).
+      // No link at cursor: do nothing (need a selection to create a link).
     }
   } else if (sel.kind === 'text' && !isCrossBlockText(sel)) {
     openLinkPopover(sel.focus.blockId, sel.anchor.offset, sel.focus.offset);
@@ -856,7 +856,7 @@ let mouseDownOnNonTextBlock = false;
 type DropPosition = 'before' | 'after' | 'first' | 'last' | 'into';
 
 /**
- * 统一的块级焦点设置入口 — focusedBlockId 的唯一写入点。
+ * 统一的块级焦点设置入口：focusedBlockId 的唯一写入点。
  *
  * @param id  要聚焦的块 id；传 null 表示清空所有块级焦点
  * @param opts.clearNativeSelection  true 时顺带移除浏览器原生的 DOM 文本选区/光标。
@@ -1045,9 +1045,9 @@ const unsubscribe = editor.subscribe((update) => {
   // Same rationale as Guard 2 in onDocumentSelectionChange. If the
   // current focused block is a non-text type (table / TOC / etc.) AND
   // the new selection is a caret/text pointing at a DIFFERENT block,
-  // keep the existing non-text focus — the caret change is from stale
+  // keep the existing non-text focus: the caret change is from stale
   // DOM state, not a real user intent to move focus. `kind: blocks`
-  // is an explicit block-level selection so it always wins — UNLESS
+  // is an explicit block-level selection so it always wins: UNLESS
   // blockIds is empty (a clearSelection dispatch), in which case we
   // preserve non-text focus to prevent flicker during mousedown.
   let finalFocused = nextFocused;
@@ -1068,7 +1068,7 @@ const unsubscribe = editor.subscribe((update) => {
   // often in a transitive state where innerHTML has been rewritten but the
   // native selection hasn't been restored yet, and plugins or selection
   // fallbacks can briefly produce nonsensical focus signals. Ignore any
-  // attempt to move focusedBlockId during the 500ms grace period — the
+  // attempt to move focusedBlockId during the 500ms grace period: the
   // block the user had focused before clicking the toolbar is the correct
   // one and we don't want to flash "Heading 1" / first-block UI because of
   // it.
@@ -1209,7 +1209,7 @@ function onKeyDown(event: KeyboardEvent): void {
       return;
     }
     // Copy: a cross-block selection has an empty native selection, so the
-    // browser copy event cannot carry the text — serialize it here.
+    // browser copy event cannot carry the text: serialize it here.
     if (mod && modKey === 'c') {
       const sel = editor.getState().selection;
       if (sel.kind === 'text' && isCrossBlockText(sel)) {
@@ -1244,7 +1244,7 @@ function onKeyDown(event: KeyboardEvent): void {
 
   // Some non-block-content elements are also contenteditable (e.g. image
   // caption, the caption input). For these we must NOT route keys through
-  // the keymap / command system — otherwise dispatchKeymap calls
+  // the keymap / command system: otherwise dispatchKeymap calls
   // preventDefault() on printable chars and the user cannot type text.
   const target = event.target as HTMLElement | null;
   if (target && target.classList.contains('image-block-caption')) {
@@ -1391,7 +1391,7 @@ function onKeyDown(event: KeyboardEvent): void {
   // enterCommand returns false for isolating blocks (schema.isolating === true),
   // which means the keymap didn't handle it. The browser default for
   // contenteditable would insert <br> or <div> wrappers instead of a plain
-  // "\n" character — and inlineFromDom skips <br>, so the newline would be
+  // "\n" character: and inlineFromDom skips <br>, so the newline would be
   // lost from the data model.
   //
   // Fix: dispatch a setText transaction that inserts "\n" at the caret offset.
@@ -1416,7 +1416,7 @@ function onKeyDown(event: KeyboardEvent): void {
 
 /**
  * Insert a "\n" character at the given offset in an isolating block (code
- * block). Dispatches a setText transaction — the view layer's normal update
+ * block). Dispatches a setText transaction: the view layer's normal update
  * flow handles the DOM update and caret placement.
  */
 function insertCodeBlockNewline(blockId: BlockId, offset: number): void {
@@ -1432,7 +1432,7 @@ function insertCodeBlockNewline(blockId: BlockId, offset: number): void {
   //
   // Why not just set textContent? Setting textContent rebuilds all child
   // nodes. When "\n" ends up as the last character, browsers using
-  // pre-wrap do NOT render a visible new line — the caret appears stuck on
+  // pre-wrap do NOT render a visible new line: the caret appears stuck on
   // the previous line. By using the live selection and inserting a Text
   // node (or splitting), the browser handles the caret rendering natively.
   const root = rootEl.value;
@@ -1484,7 +1484,7 @@ function insertCodeBlockNewline(blockId: BlockId, offset: number): void {
 
 // --- BlockList / BlockHost events ---------------------------------------
 //
-// UNIFIED DRAG LIFECYCLE — the BlockEditor is the single owner of all
+// UNIFIED DRAG LIFECYCLE: the BlockEditor is the single owner of all
 // document-level capture listeners used for block reorder drags.
 //
 // Flow:
@@ -1617,7 +1617,7 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
   // Keep the native DOM selection empty throughout the ENTIRE drag.
   // selectstart preventDefault catches new drag-selections, but on some
   // browsers (particularly Chromium) a prior or partially-created range
-  // can still grow while the pointer moves over text nodes — we zap it
+  // can still grow while the pointer moves over text nodes: we zap it
   // on every mousemove to be absolutely sure. This is a no-op visually
   // (the user is dragging a block, not selecting text) and cheap.
   try {
@@ -1704,7 +1704,7 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
   const armInto = inCenterBand && targetCanInto;
 
   if (armInto) {
-    // In the center band, over an eligible target — arm the 200ms timer.
+    // In the center band, over an eligible target: arm the 200ms timer.
     // Until the timer fires we STILL show the immediate before/after line so
     // fast movement is predictable.
     dropTargetBlockId.value = targetBlockId;
@@ -1736,7 +1736,7 @@ function onGlobalDragMouseMove(e: MouseEvent): void {
   }
 }
 
-/** SINGLE mouseup handler — runs once, teardown everything and maybe move. */
+/** SINGLE mouseup handler: runs once, teardown everything and maybe move. */
 function onGlobalDragMouseUp(_e: MouseEvent): void {
   removeGlobalDragListeners();
 
@@ -1747,7 +1747,7 @@ function onGlobalDragMouseUp(_e: MouseEvent): void {
     return;
   }
 
-  // dragPhase === 'active' — do drop + move.
+  // dragPhase === 'active': do drop + move.
   const bid = activeDragBlockId;
   const finalTarget = dropTargetBlockId.value;
   const finalPos = dropPosition.value;
@@ -1772,7 +1772,7 @@ function transitionPendingToActive(): void {
   // 0. Clear any native text selection before the drag fully starts.
   //    Without this, elementFromPoint during onGlobalDragMouseMove lands on
   //    a contenteditable and the browser extends a text selection across
-  //    blocks as the pointer moves — visually wrong and fights overlays.
+  //    blocks as the pointer moves: visually wrong and fights overlays.
   //    selectstart prevent-default (onDragSelectStart) stops NEW selections
   //    from being started, but clearing here removes any pre-existing or
   //    in-flight native range that started before the capture listener
@@ -1786,7 +1786,7 @@ function transitionPendingToActive(): void {
   //     mousedown listener (onMouseDown) may have armed pendingSel before
   //     onGripPointerDown ran; if we don't cancel it here, processSelectionMove
   //     will keep firing during the drag and paint the cross-block highlight
-  //     overlay on target blocks — the exact "text selected" bug.
+  //     overlay on target blocks: the exact "text selected" bug.
   if (pendingSel) {
     pendingSel = null;
     if (selRafId) {
@@ -1806,7 +1806,7 @@ function transitionPendingToActive(): void {
 
   // 1. Locate the source block host in the DOM.
   // use the data-block-id attribute (which BlockHost writes on
-  // every host, nested or not) to find the src host directly — no need to
+  // every host, nested or not) to find the src host directly: no need to
   // line up a flat renderItems index with document.querySelectorAll().
   const srcHost = document.querySelector<HTMLElement>(`.block-host[data-block-id="${blockId}"]`);
   if (!srcHost) {
@@ -1948,8 +1948,8 @@ function onMoveBlock(blockId: BlockId, targetBlockId: BlockId | null, position: 
 // file through beginImageUpload.
 //
 // State: `fileDragActive` tracks whether the current drag actually contains
-// image files (other drags — e.g. links from browser, plain text, internal
-// block drags — are deliberately ignored so we don't show spurious drop
+// image files (other drags, e.g. links from browser, plain text, internal
+// block drags, are deliberately ignored so we don't show spurious drop
 // indicators).
 
 const fileDragActive = ref(false);
@@ -2045,7 +2045,7 @@ function onFileDragOver(e: DragEvent): void {
 
 function onFileDragLeave(e: DragEvent): void {
   // Only clear when the pointer actually left the root (not just moved over
-  // a different child — browsers fire dragleave rapidly between children).
+  // a different child: browsers fire dragleave rapidly between children).
   const to = e.relatedTarget as Node | null;
   const root = rootEl.value;
   if (root && to && root.contains(to)) return;
@@ -2057,7 +2057,7 @@ function onFileDragLeave(e: DragEvent): void {
 }
 
 async function onFileDrop(e: DragEvent): Promise<void> {
-  if (draggingBlockId.value) return; // internal drag — let grip handler run
+  if (draggingBlockId.value) return; // internal drag: let grip handler run
   const dt = e.dataTransfer;
   if (!dt) return;
   const images = collectImageFilesFromDataTransfer(dt);
@@ -2212,11 +2212,11 @@ function closePlusMenu(): void {
   plusMenu.sourceBlockId = undefined;
 }
 
-// When text is selected, the HoverToolbar takes over — close any open menus
+// When text is selected, the HoverToolbar takes over: close any open menus
 // and hide block handles (handles are hidden via hasTextSelection prop).
 watch(() => hoverToolbar.visible, (visible) => {
   // On mobile the user can tap the handle / plus buttons on the bottom
-  // toolbar while text is selected — that path opens PlusMenu /
+  // toolbar while text is selected: that path opens PlusMenu /
   // BlockSettingsMenu directly (onOpenPlusMenu / onOpenSettingsMenu set
   // them visible), then a subsequent selectionchange updates hoverToolbar
   // and fires this watch. Without the guards the newly-opened menu is
@@ -2285,7 +2285,7 @@ function onPlusCommit(cmd: SlashCommand, _mode: PlusMenuMode): void {
       // try to access anything; but we don't actually need the renderer,
       // we just need a temp <input> + the image extension's upload method.
       // If the consumer didn't register an image upload handler, skip the
-      // picker — the empty placeholder image block stays as-is.
+      // picker: the empty placeholder image block stays as-is.
       if (cmd.id === 'image' && beginImageUpload) {
         const begin = beginImageUpload;
         nextTick(() => {
@@ -2364,7 +2364,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
       }
     }
     // [Guard 3] Refuse ANY focus change during the toolbar interaction
-    // grace period — even legit-looking ones. Clicking a bold/italic/type
+    // grace period: even legit-looking ones. Clicking a bold/italic/type
     // button inside FixedToolbar sometimes fires a transient focusin /
     // selectionchange combo that briefly points at a DIFFERENT block (e.g.
     // the document's first block) before the action's own selection restores
@@ -2387,7 +2387,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
   const root = rootEl.value;
   if (!root) return;
   // If the editor state holds a cross-block text selection, the native
-  // selection is intentionally empty — don't let selectionchange hide the
+  // selection is intentionally empty: don't let selectionchange hide the
   // toolbar or overlay. The selection is cleared on the next mousedown.
   const stateSel = editor.getState().selection;
   if (stateSel.kind === 'text' && isCrossBlockText(stateSel) && !pendingSel) {
@@ -2397,21 +2397,21 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
   // the browser fires selectionchange (collapsing / emptying the text
   // selection) before the click action completes. We only want to GUARD
   // against the "hide toolbar / null out rect" destructive assignments
-  // below — we still allow the POSITIVE "set visible=true + fill rect"
+  // below: we still allow the POSITIVE "set visible=true + fill rect"
   // branch at the bottom to run freely, so that selection-restore after
   // BlockContent's innerHTML rewrite always materialises into state.
   // Accordingly, there is no blanket `return;` here; each destructive
   // site checks the flag on its own.
   //
   // A block selection (e.g. a selected image) is active but the caret has
-  // moved into a text block — a plain click into contenteditable dispatches
+  // moved into a text block: a plain click into contenteditable dispatches
   // no editor transaction, so the selection state would stay stuck on the
   // selected block. Adopt the native caret position to drop the selection.
   if (isBlocks(stateSel) && stateSel.blockIds.length > 0) {
     // If a collapsed caret has appeared (e.g. the user clicked into a text
     // block while a block selection was active), downgrade the block selection
     // to that caret. This is what deselects a non-text block (image/equation/
-    // table/...) when you click elsewhere — without it the block would stay
+    // table/...) when you click elsewhere: without it the block would stay
     // "selected" forever. Selecting a non-text block itself never reaches this
     // branch (its mousedown arms mouseDownOnNonTextBlock, so onMouseUp skips
     // onDocumentSelectionChange entirely), so this downgrade never interferes
@@ -2427,7 +2427,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
     }
   }
   const sel = window.getSelection();
-  // Destructive "clear hoverToolbar state" exits below — each is guarded by
+  // Destructive "clear hoverToolbar state" exits below: each is guarded by
   // BOTH !toolbarInteracting AND !isMouseDown. Why two flags?
   //   * `toolbarInteracting` covers the 500ms window AFTER a FixedToolbar /
   //     HoverToolbar button mousedown: click inside a teleported dropdown or
@@ -2435,7 +2435,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
   //     applying; clearing state here would cause the "toolbar flashes
   //     disabled" bug because the POSITIVE branch at the bottom hasn't fired
   //     yet for the post-command restored selection.
-  //   * `isMouseDown` covers everything BEFORE a mouseup — i.e. the user is
+  //   * `isMouseDown` covers everything BEFORE a mouseup: i.e. the user is
   //     actively DRAGGING inside contenteditable to extend/shrink the text
   //     selection, or is still HOLDING a toolbar button down (no mouseup yet
   //     → no click handler fired → no command run → no POSITIVE refill). In
@@ -2447,7 +2447,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
   //     protection, locking the toolbar on the Priority-4 focused-block
   //     fallback with all buttons disabled.
   // NOTE: the POSITIVE branch at the bottom (visible=true + fill rect + block
-  // info) never checks either flag — selection-restore during command apply
+  // info) never checks either flag: selection-restore during command apply
   // must always be allowed to populate state so subsequent lazy-clear runs
   // find a valid descriptor to latch on to.
   if (!sel || sel.rangeCount === 0) {
@@ -2478,7 +2478,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
     return;
   }
   // Drag-in-progress suppression inside editor content (NOT the force:true
-  // post-timeout resync case — see inlined comment).
+  // post-timeout resync case: see inlined comment).
   if (isMouseDown && !force) return;
   const anchorNode = sel.anchorNode;
   // If the selection is inside a table cell's contenteditable, the TableBlock
@@ -2535,7 +2535,7 @@ function onDocumentSelectionChange(_eventOrOpts?: Event | { force?: boolean }): 
  * Re-read the live selection rect from the DOM. Called on scroll/resize so
  * the hover toolbar follows the selected text instead of staying at a fixed
  * screen position. `selectionRect` is a viewport-relative DOMRect captured
- * at mouseup time — it goes stale the moment the page scrolls, so we must
+ * at mouseup time: it goes stale the moment the page scrolls, so we must
  * refresh it from the current selection range.
  */
 function refreshHoverToolbarRect(): void {
@@ -2612,7 +2612,7 @@ function onMouseDown(e: MouseEvent): void {
   // Clicks on the hover toolbar (teleported to <body>) must NOT hide it.
   if (!root.contains(e.target as Node)) return;
   // Skip cross-block selection tracking when the press is on a block handle
-  // (grip / plus button) — those start a block DRAG, not a text selection,
+  // (grip / plus button): those start a block DRAG, not a text selection,
   // and leaving pendingSel active would cause the cross-block highlight
   // overlay to follow the cursor during the drag.
   const targetEl = e.target as HTMLElement | null;
@@ -2625,8 +2625,8 @@ function onMouseDown(e: MouseEvent): void {
     crossBlockRects.value = [];
   }
   // Start cross-block selection tracking if the press is inside a block content.
-  // Skip for non-text blocks (table, TOC, image, divider, codeBlock, etc.)
-  // — these blocks manage their own mouse events. Mark mouseDownOnNonTextBlock
+  // Skip for non-text blocks (table, TOC, image, divider, codeBlock, etc.);
+  // these blocks manage their own mouse events. Mark mouseDownOnNonTextBlock
   // so onMouseUp skips calling onDocumentSelectionChange (which would read
   // a stale caret in a previously-edited text block and clear the focus
   // border set by selectBlock / onBlockRootClick).
@@ -2683,14 +2683,14 @@ function onMouseUp(): void {
   // (table / TOC / image / divider / codeBlock), the DOM selection is
   // either empty or a stale caret left-over from a previously-edited text
   // block. Calling onDocumentSelectionChange would read that stale caret
-  // and overwrite focusedBlockId — exactly the bug where the table focus
+  // and overwrite focusedBlockId: exactly the bug where the table focus
   // border disappears on mouseup. Skip entirely.
   if (mouseDownOnNonTextBlock) {
     mouseDownOnNonTextBlock = false;
     return;
   }
   // Re-check selection now that the mouse is released.
-  // If a cross-block selection is active, the native selection is empty —
+  // If a cross-block selection is active, the native selection is empty;
   // onDocumentSelectionChange would hide the toolbar, so we skip it.
   const sel = editor.getState().selection;
   if (sel.kind === 'text' && isCrossBlockText(sel)) return;
@@ -2728,7 +2728,7 @@ function onTouchStart(e: TouchEvent): void {
   const contentEl = targetEl.closest('.block-content');
   if (!contentEl) return;
 
-  // Skip handles, buttons, links — let them handle their own events.
+  // Skip handles, buttons, links: let them handle their own events.
   if (targetEl.closest('.block-handle, .tt-btn, .ht-btn, a[href]')) return;
 
   const touch = e.touches[0];
@@ -2754,7 +2754,7 @@ function onTouchStart(e: TouchEvent): void {
   document.addEventListener('touchend', onTouchEnd, true);
   document.addEventListener('touchcancel', onTouchEnd, true);
 
-  // Do NOT prevent default on touchstart — this lets normal scrolling
+  // Do NOT prevent default on touchstart: this lets normal scrolling
   // and single-tap caret positioning continue unmodified.
 }
 
@@ -2766,7 +2766,7 @@ function onTouchMove(e: TouchEvent): void {
   if (!root) return;
 
   // If selection hasn't started yet (still within the long-press window)
-  // and the finger has moved a lot, it's just a normal scroll — cancel the
+  // and the finger has moved a lot, it's just a normal scroll: cancel the
   // long-press timer and let the browser handle scrolling.
   if (!pendingSel) {
     const touch = e.touches[0];
@@ -2872,7 +2872,7 @@ function onTouchEnd(): void {
   if (!isMobileTouchMoved) {
     // Long-press released without dragging: let the browser's native
     // word-selection (or caret) behavior stand. We must NOT touch the
-    // selection here — placing a caret would destroy the native handles
+    // selection here: placing a caret would destroy the native handles
     // the OS just showed. pendingSel has already been cleared above.
     return;
   }
@@ -2935,7 +2935,7 @@ function onCopy(e: ClipboardEvent): void {
 }
 
 function onCut(e: ClipboardEvent): void {
-  // Read-only: cutting would delete content — block it entirely.
+  // Read-only: cutting would delete content: block it entirely.
   if (!editableRef.value) {
     e.preventDefault();
     return;
@@ -3096,7 +3096,7 @@ function onWindowOutsideDown(e: Event): void {
   closeLinkPopover();
   // Clicking outside the editor, or on editor whitespace, drops any active
   // block selection (e.g. a selected image block). Clicks inside an editable
-  // region or a block body are left to their own handlers — selectionchange
+  // region or a block body are left to their own handlers: selectionchange
   // adopts the caret for text blocks, and image/table/code blocks re-select
   // via their own click handlers.
   const stateSel = editor.getState().selection;
@@ -3122,7 +3122,7 @@ function onWindowOutsideDown(e: Event): void {
 // viewport, so they go stale the moment the page scrolls.
 // NOTE: scroll/touch events that originate INSIDE one of the popups (their
 // own list scrolling, wheel-to-list scrolling, or touch dragging over the
-// menu) are ignored — the scroll event of an inner overflow element still
+// menu) are ignored: the scroll event of an inner overflow element still
 // reaches this window-capture listener, and must not close the menu itself.
 function onScrollOrTouchClose(e: Event): void {
   const target = e.target;
@@ -3172,7 +3172,7 @@ function onBlockRootClick(e: MouseEvent): void {
   // .block-code) must NOT clear the native selection: the contenteditable
   // owns its own caret. Clearing it here is what makes the caret vanish
   // the instant the mouse is released. The same applies to the Equation
-  // block's LaTeX <textarea> — it is a real text-editing surface (tagged
+  // block's LaTeX <textarea>: it is a real text-editing surface (tagged
   // with [data-equation-edit]) and must keep its caret/selection.
   if (target.closest('[contenteditable="true"]')) return;
   if (target.closest('[data-equation-edit]')) return;
@@ -3217,7 +3217,7 @@ onMounted(() => {
   document.addEventListener('mousedown', onWindowOutsideDown, true);
   document.addEventListener('touchstart', onWindowOutsideDown, true);
   // Capture phase so we refresh the rect before the HoverToolbar's own
-  // scroll handler repositions — the toolbar then reads a fresh rect.
+  // scroll handler repositions: the toolbar then reads a fresh rect.
   window.addEventListener('scroll', refreshHoverToolbarRect, true);
   window.addEventListener('resize', refreshHoverToolbarRect);
   // Close ol-menu / number picker / code-lang picker on scroll or touch swipe.
