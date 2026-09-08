@@ -24,7 +24,7 @@ placement and IME composition *within a single block*.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        Application                            │
-│   uses <BlockEditor :model> / useEditor() API                 │
+│   uses <BlockEditor :initial-data> / useEditor() API          │
 └──────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────┐
@@ -348,10 +348,16 @@ file, pass it to the editor" with zero core changes.
 
 ### 6.1 Components
 
-- **`<BlockEditor>`**: public root component. Props: `modelValue` (document
-  JSON), `extensions` (defaults to `BuiltinExtensions`), `editable`,
-  `placeholder` (locale-aware default), `theme` (`'light' | 'dark'`), `locale`
-  (`'zh-CN' | 'en-US'`). Exposes `useEditor()` via `provide`.
+- **`<BlockEditor>`**: public root component. Props: `initialData`
+  (`DocumentData` JSON or a Markdown `string`, one-way), `extensions` (defaults
+  to `BuiltinExtensions`), `editable`, `placeholder` (locale-aware default),
+  `theme` (`'light' | 'dark'`), `locale` (`'zh-CN' | 'en-US'`), and `editor` (a
+  pre-built instance from `createEditor()`; when set, `extensions` and
+  `initialData` are ignored and the component neither owns nor destroys the
+  instance). Emits `change` (latest `DocumentData`) and `change-markdown`
+  (Markdown string) only in internal mode; an injected instance is observed via
+  `editor.onChange()` / `editor.onChangeMarkdown()`. Exposes `useEditor()` via
+  `provide`.
 - **`<BlockList>`**: renders an ordered list of block ids (root or a parent's
   children). **Virtualization seam**: this component is the only place that
   decides *which* blocks are mounted; a virtualized implementation can drop in
@@ -569,7 +575,12 @@ user event / command
 
 ### 10.4 Persistence
 
-- `v-model` emits the document as plain JSON on debounced changes (or on blur).
+- In internal mode, `<BlockEditor @change>` emits the document as plain JSON on
+  content changes (a block added / edited / removed), and `<BlockEditor
+  @change-markdown>` emits the same state as a Markdown string. When you own
+  the instance, `editor.onChange((doc) => …)` / `editor.onChangeMarkdown((md)
+  => …)` give the same payloads; there is no `v-model`. `initialData` also
+  accepts a Markdown string, parsed once at construction.
 - Loading replaces state wholesale (new `EditorState`); the view bridge diffs
   against the previous state to minimize DOM churn.
 
@@ -690,8 +701,9 @@ src/
     Editor.ts                   # facade: state, dispatch, commands proxy, history, plugins
     index.ts                    # core barrel (public surface of the framework-agnostic engine)
   view/                         # Vue-specific bridge + components
+    createEditor.ts             # headless factory: BuiltinExtensions default + dev config checks -> new Editor(); imports no Vue
     context.ts                  # editorKey/useEditor (provide/inject) + BlockRenderItem type
-    BlockEditor.vue             # public root: constructs Editor, subscribes, keymap, selection sync, i18n/theme, upload-image hook, link popover orchestration, fileId ref-count + cleanup:event
+    BlockEditor.vue             # public root: adopts or constructs Editor, subscribes, keymap, selection sync, i18n/theme, upload-image hook, link popover orchestration, fileId ref-count + cleanup:event
     BlockList.vue               # flat block list (virtualization seam)
     BlockHost.vue               # type → renderer resolution via RendererRegistry; forwards linkClick
     BlockContent.vue            # per-block contenteditable (IME guard, input sync, placeholder, link detection on click, URL paste auto-link, space-triggered auto-link)
@@ -755,6 +767,7 @@ because the design over-anticipated needs:
 | `view/useEditor.ts` + `view/useBlock.ts` | `view/context.ts` (editorKey + useEditor + BlockRenderItem) | `useBlock` was not needed in Phase 1 (blocks receive props, not subscriptions). |
 | `view/dom/selectionSync.ts` + `view/dom/caret.ts` | `view/domSelection.ts` | The two concerns are tightly coupled; splitting them added ceremony without clarity. |
 | `view/contenteditable.ts` | `view/BlockContent.vue` | The contenteditable contract is a component, not a composable. |
+| No headless factory in the design | `view/createEditor.ts` (+ the `editor` prop on `<BlockEditor>`) | `EditorConfig.extensions` is required, so a headless caller needs a default-extension policy; the factory is also the documented home of the "whoever creates the editor destroys it" ownership rule. It lives under `src/view/` (importing no Vue) because `Editor.ts` already pointed there and `src/core` must not depend on `src/extensions`. |
 | `extensions/paragraph/` (directory) | `extensions/Paragraph.ts` (file) | Each Phase 1 extension is small enough for one file. Directories can be adopted when an extension grows (e.g. Code Block with syntax highlighting). |
 | `extensions/selection/`, `extensions/inputRules/`, `extensions/placeholder/` | Absent | Selection sync lives in the view layer (`domSelection.ts` + `BlockEditor.vue`). InputRules is Phase 2. Placeholder is handled by `BlockContent.vue` via `data-empty` CSS. |
 | `history/` as a plugin | `history/HistoryManager.ts` (owned by Editor) + `extensions/History.ts` (keymap only) | History requires the Editor's dispatch and state; making it a plugin would need privileged access. The keymap is a separate extension. |

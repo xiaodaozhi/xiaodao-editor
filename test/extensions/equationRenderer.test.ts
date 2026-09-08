@@ -134,7 +134,7 @@ describe('<BlockEditor :extensions> with custom EquationExtension', () => {
   it('renders formulas through the injected renderer passed via :extensions', () => {
     const wrapper = mount(BlockEditor as any, {
       props: {
-        modelValue: {
+        initialData: {
           blocks: [
             { id: 'b1', type: 'equation', attrs: { expression: 'x^2' }, content: [], children: [] },
           ],
@@ -153,7 +153,7 @@ describe('<BlockEditor :extensions> with custom EquationExtension', () => {
   it('renders formulas through the built-in renderer when :extensions is omitted', () => {
     const wrapper = mount(BlockEditor as any, {
       props: {
-        modelValue: {
+        initialData: {
           blocks: [
             { id: 'b1', type: 'equation', attrs: { expression: 'x^2' }, content: [], children: [] },
           ],

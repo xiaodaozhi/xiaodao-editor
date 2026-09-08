@@ -621,7 +621,7 @@ class DeserializerRegistry {
 interface EditorConfig {
   readonly extensions: readonly Extension[];
   readonly defaultBlockType?: string;
-  readonly initialDocument?: DocumentData;
+  readonly initialData?: DocumentData | string;  // a Markdown string is parsed once at construction
   readonly initialSelection?: Selection;
   readonly editable?: boolean;
   readonly historyLimit?: number;
@@ -646,6 +646,8 @@ class Editor {
   canUndo(): boolean;
   canRedo(): boolean;
   subscribe(listener: EditorListener): () => void;
+  onChange(handler: (doc: DocumentData) => void): () => void;        // subscribe to document changes as JSON
+  onChangeMarkdown(handler: (md: string) => void): () => void;      // subscribe to document changes as Markdown
   handleKeyDown(event: KeyboardEvent): boolean;
   handleInput(event: InputEvent): boolean;
   handleCompositionStart(event: CompositionEvent): void;
@@ -662,11 +664,36 @@ Construction: `buildRegistries`, register primitive commands, let extension comm
 
 **Extension points.** Extensions are the only configuration surface (`EditorConfig.extensions` plus `defaultBlockType`/`historyLimit`). The `focusBlockId` field is the contract the view layer writes so plugins (via `EventContext.focusBlockId`) know which block is focused. A future headless/server usage would construct `Editor` directly without the Vue components.
 
+### Markdown 支持
+
+The core ships a native Markdown round-trip (no third-party parser): `docToMarkdown` / `markdownToDoc` in `Editor.ts`, plus per-block `toMarkdown` / `fromMarkdown` specs in `serialize/Serializer.ts`. It covers headings, quote, todo/ordered/unordered lists, divider, code fences, tables, images, and equations.
+
+Three surfaces expose it:
+
+1. **Initialize from Markdown.** `EditorConfig.initialData` (and `createEditor`'s `initialData`, and `<BlockEditor :initial-data>`) accepts a Markdown `string` in addition to a `DocumentData` object. A string is parsed once at construction via `markdownToDoc`; a `DocumentData` keeps the JSON path. Both reuse the same empty-document seeding and unknown-block-type dev check.
+
+   ```ts
+   const editor = createEditor({ initialData: '# 标题\n\n正文段落' });
+   ```
+
+2. **Subscribe to Markdown changes.** Parallel to `onChange` / `change`, there is a Markdown-tracked counterpart that fires with the serialized document whenever the content changes (a block added / edited / removed, not selection-only moves), and returns an unsubscribe function:
+
+   ```ts
+   // Headless (you own the Editor):
+   const off = editor.onChangeMarkdown((md) => console.log(md));
+   // Vue component (internal mode):
+   <BlockEditor :initial-data="doc" @change-markdown="md = $event" />;
+   ```
+
+3. **Import / export imperatively.** `Editor.toMarkdown(): string` exports the live document; `Editor.setDocFromMarkdown(md: string): void` replaces the whole document and resets history. These are the building blocks the `initialData` string path and `onChangeMarkdown` use internally.
+
+The JSON contract (`toData` / `setDocument` / `onChange` / `change`) is unchanged: Markdown support is strictly additive.
+
 ### `src/core/index.ts`
 
 **Responsibility.** The core barrel: the public surface of the framework-agnostic engine. Re-exports every type, function, and class from the core modules so the view layer, extensions, and consumers import from a single path. Nothing in this barrel imports Vue.
 
-**Public API.** Re-exports from: `types` (all types + helpers), `ids` (`createBlockId`, `asBlockId`), `schema/BlockSchema` (`defineSchema`, `defaultAttrs`, `coerceAttrs`, `canContain`, `hasText`, `isIsolating`, `isEmpty`, `SchemaRegistry`), `state/store` (all), `state/Step` (`Step`, `applySteps`, `ApplyResult`), `state/EditorState` (`createState`, `applyTransaction`, `EditorState`, `ApplyTransactionResult`), `state/Transaction` (`createTransaction`, `TransactionBuilder`, `Transaction`, `TransactionMeta`, `InsertBlockParams`), `state/invert` (`invertSteps`), `selection/Selection` (all), `command/Command` (types + `CommandRegistry`), `command/primitiveCommands` (`createPrimitiveCommands`), `command/Keymap` (types + `KeymapRegistry`, `keyNameFromEvent`, `keyMatches`), `command/InputRule` (types + `InputRuleRegistry`), `command/SlashCommand` (types + `SlashCommandRegistry`), `serialize/Serializer` (types + registries), `plugin/Plugin` (types), `extension/Extension` (types + `extensionBlockType`), `extension/Registry` (`flattenExtensions`, `buildRegistries`, `EditorRegistries`, `RendererRegistry`, `ToolbarRegistry`, `BuildRegistriesOptions`), `history/HistoryManager` (`HistoryManager`), and `Editor` (`Editor`, `EditorConfig`, `StateUpdate`, `EditorListener`).
+**Public API.** Re-exports from: `types` (all types + helpers), `ids` (`createBlockId`, `asBlockId`), `schema/BlockSchema` (`defineSchema`, `defaultAttrs`, `coerceAttrs`, `canContain`, `hasText`, `isIsolating`, `isEmpty`, `SchemaRegistry`), `state/store` (all), `state/Step` (`Step`, `applySteps`, `ApplyResult`), `state/EditorState` (`createState`, `applyTransaction`, `EditorState`, `ApplyTransactionResult`), `state/Transaction` (`createTransaction`, `TransactionBuilder`, `Transaction`, `TransactionMeta`, `InsertBlockParams`), `state/invert` (`invertSteps`), `selection/Selection` (all), `command/Command` (types + `CommandRegistry`), `command/primitiveCommands` (`createPrimitiveCommands`), `command/Keymap` (types + `KeymapRegistry`, `keyNameFromEvent`, `keyMatches`), `command/InputRule` (types + `InputRuleRegistry`), `command/SlashCommand` (types + `SlashCommandRegistry`), `serialize/Serializer` (types + registries), `plugin/Plugin` (types), `extension/Extension` (types + `extensionBlockType`), `extension/Registry` (`flattenExtensions`, `buildRegistries`, `EditorRegistries`, `RendererRegistry`, `ToolbarRegistry`, `BuildRegistriesOptions`), `history/HistoryManager` (`HistoryManager`), and `Editor` (`Editor`, `EditorConfig`, `StateUpdate`, `EditorListener`, `EditorHistory`).
 
 **Interactions.** Imported by `src/index.ts` (the package entry), the view layer, and the extensions.
 
@@ -692,16 +719,39 @@ function useEditor(): Editor;  // throws if called outside a <BlockEditor> tree
 
 **Extension points.** A future `useBlock(blockId)` composable (per-block subscription returning a `BlockSnapshot` shallow ref) would live here, restoring the design's per-block subscription seam (§13.1 notes it was unnecessary for Phase 1).
 
+### `src/view/createEditor.ts`
+
+**Responsibility.** The headless editor factory, and the counterpart of the `editor` prop on `<BlockEditor>`. Despite living under `src/view/` it imports zero Vue: it is the assembly point the `Editor` class comment refers to (extensions + `new Editor()`), and it sits next to its only in-repo consumer. It makes `extensions` optional by defaulting to `BuiltinExtensions` (which `EditorConfig` requires), so the component path and the headless path share one definition of "a default editor", and it hosts the dev-only config sanity checks.
+
+**Public API.**
+
+```ts
+type CreateEditorOptions = Omit<EditorConfig, 'extensions'> & {
+  readonly extensions?: readonly Extension[];
+};
+function createEditor(options?: CreateEditorOptions): Editor;
+```
+
+**Interactions.** Imports `core/Editor`, `core/extension/Extension` (types), and `extensions/builtin`. Exported from `src/index.ts`. `<BlockEditor.vue>` calls it when no `editor` prop is given.
+
+**Extension points.** Ownership lives with the caller: `createEditor()` returns a plain `Editor`, and whoever calls it must call `editor.destroy()` exactly once (the method is idempotent). `<BlockEditor :editor>` never destroys an injected instance.
+
 ### `src/view/BlockEditor.vue`
 
-**Responsibility.** The public root editor component. Constructs the `Editor` from extensions + initial document, maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `update:modelValue`, and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links: opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) for image upload, simply forwards the async `startImageUpload` extension method (registered by `ImageExtension` via `Editor.registerExtensionMethod`) to the existing `useBeginImageUpload()` Vue injection: all upload orchestration + fileId ref-count tracking + `onFileCleanup` wiring now lives on the `image-upload` plugin in `extensions/Image.ts`. See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
+**Responsibility.** The public root editor component. Obtains the `Editor` either by adopting the injected `editor` prop (built with `createEditor()`) or by constructing one from extensions + initial document; maintains a `shallowRef<EditorState>` that triggers Vue reactivity only at the top level (no deep reactivity), provides the editor to children, handles keyboard events (sync DOM selection → state, then dispatch keymap commands), applies state selection changes → DOM (after `nextTick`), emits `change` (internal-editor mode only), and focuses the first block on mount. Also owns i18n/theme: normalizes `locale`/`theme` props into reactive refs, provides them via `provideI18n()`, and syncs the theme class to `<body>` so `<Teleport>`-ed popovers inherit CSS variables. **Phase-6 additions here:** (1) handles `Mod+K` shortcut for links: opens the link popover in edit mode for the current selection or, if the caret sits inside an existing link, in view mode; (2) owns the `<LinkPopover>` mount and its state (view vs edit mode, target link range, anchor rect from `LinkClickEvent` or native selection rect); (3) for image upload, simply forwards the async `startImageUpload` extension method (registered by `ImageExtension` via `Editor.registerExtensionMethod`) to the existing `useBeginImageUpload()` Vue injection: all upload orchestration + fileId ref-count tracking + `onFileCleanup` wiring now lives on the `image-upload` plugin in `extensions/Image.ts`. See `docs/architecture.md` §6.1, §6.2, §14 (Phase 6).
 
 **Public API (props/emits/expose).**
 
 ```ts
 props: {
+  // A pre-built instance from `createEditor()`. When set, `extensions` and
+  // `initialData` are ignored (both are fixed at creation time) and the
+  // component does NOT destroy the instance on unmount. `editable` still
+  // applies. Hot-swapping is impossible: `provide()` runs once during setup,
+  // so pass `:key="editorId"` and let Vue remount to use a different instance.
+  editor?: Editor;                          // default undefined (the component builds its own)
   extensions?: readonly Extension[];        // default BuiltinExtensions (14 extensions, including Image/Table/Divider/Equation/TableOfContents)
-  modelValue?: DocumentData;                // default { blocks: [] }
+  initialData?: DocumentData;               // default { blocks: [] }; one-way seed, NOT two-way
   editable?: boolean;                       // default true
   placeholder?: string;                     // default locale-aware ("输入文字，或按 '/' 获取命令…" / "Type '/' for commands…")
   theme?: 'light' | 'dark';                 // default 'light'
@@ -721,17 +771,26 @@ props: {
   // callback. See `src/extensions/Image.ts`.
 }
 emits: {
-  'update:modelValue': [DocumentData];
+  // Fires with the latest document JSON whenever the content changes (a block
+  // added / edited / removed, not selection-only moves). Only emitted in
+  // internal-editor mode (no `editor` prop): an injected instance is listened
+  // to via `editor.onChange()` instead.
+  'change': [DocumentData];
+  // Markdown counterpart of `change`: fires with the latest document as a
+  // Markdown string whenever the content changes (same trigger as `change`).
+  // Only emitted in internal-editor mode (no `editor` prop): an injected
+  // instance is observed via `editor.onChangeMarkdown()` instead.
+  'change-markdown': [markdown: string];
   // NOTE: there is NO `cleanup:image-file` emit. ImageExtension invokes
   // `onFileCleanup(fileId)` itself from its `image-upload` plugin's
   // `applyTransaction` hook.
 }
-expose: { editor: Editor }
+expose: { editor: Editor }   // the injected instance when `editor` is passed, otherwise the one built here
 ```
 
 The `suppressSelectionSync` flag prevents feedback loops: when the DOM selection is read and dispatched to state, the subscribe callback must NOT write it back to the DOM. `renderItems` is a `computed` mapping `doc.root` → `BlockRenderItem[]`. `onKeyDown` calls `syncSelectionFromDom()` (reads the native selection into state with `addToHistory: false`) then `dispatchKeymap`; if handled, `preventDefault()`. Mod+K is handled inside `BlockEditor.vue` itself (not via the keymap registry) because it bridges selection state, the link mark, and the floating UI; a pure keymap command could not open the popover.
 
-**Interactions.** Imports `vue`, `core/Editor`, `core/extension/Extension`, `core/types`, `core/state/EditorState`, `core/state/Transaction`, `view/context` (`editorKey`, `BlockRenderItem`), `view/keymapHandler` (`dispatchKeymap`), `view/domSelection` (`readDomSelection`, `applySelectionToDom`), `view/inlineDom`, `view/clipboard`, **`view/imageUpload`** (subscribes/unsubscribes transient upload states, owns the fileId→refcount map, invokes `uploadImage` prop or mock), **`view/urlUtils`** (`sanitizeUrl` guards href in link popover save path), `i18n` (`provideI18n`, `useI18n`, `normalizeLocale`, `normalizeTheme`), `BlockList.vue` + 8 popup components (`PlusMenu`, `BlockSettingsMenu`, `HoverToolbar`, `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, **`LinkPopover`**). Subscribes to the editor; on unmount it unsubscribes, revokes any outstanding temporary object URLs from `imageUpload`, and calls `editor.destroy()`.
+**Interactions.** Imports `vue`, `core/Editor`, `core/extension/Extension`, `core/types`, `core/state/EditorState`, `core/state/Transaction`, `view/context` (`editorKey`, `BlockRenderItem`), `view/keymapHandler` (`dispatchKeymap`), `view/domSelection` (`readDomSelection`, `applySelectionToDom`), `view/inlineDom`, `view/clipboard`, **`view/imageUpload`** (forwards the `startImageUpload` extension method registered by `ImageExtension` to the `useBeginImageUpload()` injection; all upload orchestration + fileId ref-count + `onFileCleanup` wiring lives on `ImageExtension`), **`view/urlUtils`** (`sanitizeUrl` guards href in link popover save path), `i18n` (`provideI18n`, `useI18n`, `normalizeLocale`, `normalizeTheme`), `BlockList.vue` + 8 popup components (`PlusMenu`, `BlockSettingsMenu`, `HoverToolbar`, `OrderedListMenu`, `NumberPicker`, `CodeLangPicker`, **`LinkPopover`**). Subscribes to the editor; on unmount it unsubscribes, revokes any outstanding temporary object URLs from `imageUpload`, and calls `editor.destroy()` **only if it created the editor itself** (an injected instance belongs to its caller).
 
 **Extension points.** This component is the sole reactivity boundary (the design's `ViewBridge` was folded into it, §13.1). If the view layer grows, the bridge can be extracted without changing the core. A virtualized list swap replaces `BlockList` only. The `theme`/`locale` props flow through provide/inject so all child components (including `<Teleport>`-ed popovers) can access `t(key)` reactively.
 
@@ -1470,6 +1529,10 @@ export { default as BlockEditor } from './view/BlockEditor.vue';
 export { default as BlockList } from './view/BlockList.vue';
 export { default as BlockHost } from './view/BlockHost.vue';
 export { default as BlockContent } from './view/BlockContent.vue';
+// Headless editor factory (framework-agnostic; pairs with `<BlockEditor :editor>`)
+export { createEditor } from './view/createEditor';
+export type { CreateEditorOptions } from './view/createEditor';
+
 export { editorKey, useEditor } from './view/context';
 export type { BlockRenderItem } from './view/context';
 

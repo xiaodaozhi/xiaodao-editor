@@ -16,6 +16,10 @@ export { default as BlockEditor } from './view/BlockEditor.vue';
 export { default as BlockList } from './view/BlockList.vue';
 export { default as BlockHost } from './view/BlockHost.vue';
 export { default as BlockContent } from './view/BlockContent.vue';
+// Headless editor factory (framework-agnostic; pairs with `<BlockEditor :editor>`)
+export { createEditor } from './view/createEditor';
+export type { CreateEditorOptions } from './view/createEditor';
+
 export { editorKey, useEditor } from './view/context';
 export type { BlockRenderItem } from './view/context';
 

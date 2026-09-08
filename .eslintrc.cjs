@@ -75,6 +75,14 @@ module.exports = {
         '@typescript-eslint/no-restricted-imports': 'off',
       },
     },
+    // Playground is a demo app: intentional console.log for upload / cleanup
+    // / markdown demos. No rules relaxed for production code.
+    {
+      files: ['playground/**/*'],
+      rules: {
+        'no-console': 'off',
+      },
+    },
     // Test files use `any` for editor/command mocks and non-null assertions for
     // fixtures; relax those rules here without affecting production code.
     {
@@ -91,5 +99,7 @@ module.exports = {
       },
     },
   ],
-  ignorePatterns: ['dist', 'node_modules', '*.cjs', '*.css'],
+  // native.check.ts / native.build.mjs: manual CLI verification & build
+  // scripts, console output is their purpose.
+  ignorePatterns: ['dist', 'node_modules', '*.cjs', '*.css', 'native.check.ts', 'native.build.mjs'],
 }

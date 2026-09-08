@@ -62,4 +62,4 @@ export type {
 
 export { HistoryManager } from './history/HistoryManager';
 export { Editor } from './Editor';
-export type { EditorConfig, StateUpdate, EditorListener } from './Editor';
+export type { EditorConfig, StateUpdate, EditorListener, EditorHistory, EditorChangeHandler, EditorMarkdownChangeHandler } from './Editor';

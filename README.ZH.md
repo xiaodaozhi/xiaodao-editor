@@ -46,11 +46,17 @@ import { BlockEditor } from 'xiaodao-editor';
 import type { DocumentData } from 'xiaodao-editor';
 import 'xiaodao-editor/style.css';
 
-const doc = ref<DocumentData>({ blocks: [] });
+// `initialData` 仅用于初始化文档，不是双向绑定。监听 `change` 获取编辑结果。
+const initialData: DocumentData = { blocks: [] };
+const latest = ref<DocumentData>(initialData);
+
+function onChange(doc: DocumentData): void {
+  latest.value = doc;
+}
 </script>
 
 <template>
-  <BlockEditor v-model="doc" />
+  <BlockEditor :initial-data="initialData" @change="onChange" />
 </template>
 ```
 
@@ -101,9 +107,6 @@ const katexRenderer: EquationRenderer = {
   render(expression, options) {
     const src = expression ?? '';
     try {
-      // `output: 'htmlAndMathml'` 与项目 449885a 之前的版本一致：视觉上
-      // 与 HTML 无异，同时内联一段 <math>，对读屏 / SSR 友好。改 `html`
-      // 也可以，但会丢掉 MathML 分支。
       const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
         throwOnError: false,   // 不抛错：出错片段包成 <span class="katex-error">…</span>
@@ -131,7 +134,7 @@ const extensions = [
 </script>
 
 <template>
-  <BlockEditor v-model="doc" :extensions="extensions" />
+  <BlockEditor :extensions="extensions" />
 </template>
 ```
 
@@ -141,8 +144,9 @@ const extensions = [
 
 | 属性名            | 类型                                     | 默认值                 | 说明                                                                          |
 | ----------------- | ---------------------------------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `modelValue`      | `DocumentData`                           | `{ blocks: [] }`       | 文档 JSON（通过 `v-model` 双向绑定）。                                         |
-| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`    | 要注册的扩展。可覆盖此值以添加自定义块、覆盖公式渲染器（`createEquationExtension({ renderer })`）、或替换图片上传管线（`createImageExtension({ upload, onFileCleanup })`）。 |
+| `editor`         | `Editor`                                 | `undefined`            | 由 `createEditor()` 预先创建的实例。传入后 `extensions` 与 `initialData` 不再生效，且卸载时不会销毁该实例。详见下方「外部 editor 实例」。 |
+| `initialData`     | `DocumentData \| string`                 | `{ blocks: [] }`       | 初始文档：传 `DocumentData` 对象（JSON）或 Markdown `string`（构造时原生解析）。仅在创建时使用：之后修改此属性不会重载文档（非双向绑定）。传入 `editor` 时该属性被忽略。 |
+| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`    | 要注册的扩展。可覆盖此值以添加自定义块、覆盖公式渲染器（`createEquationExtension({ renderer })`）、或替换图片上传管线（`createImageExtension({ upload, onFileCleanup })`）。传入 `editor` 时该属性被忽略。 |
 | `editable`        | `boolean`                                | `true`                 | 为 `false` 时进入只读模式。                                                    |
 | `placeholder`     | `string`                                 | 跟随 locale            | 首个空块的占位符，默认使用本地化字符串。                                        |
 | `theme`           | `'light' \| 'dark'`                      | `'light'`              | 颜色主题。对应类名会应用到 `.block-editor` 并同步到 `<body>`。                   |
@@ -197,15 +201,73 @@ const extensions = [
 
 ### Emits 事件
 
-| 事件名                    | 载荷           | 触发时机                                                                              |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------------- |
-| `update:modelValue`       | `DocumentData` | 文档变更（失焦时做防抖处理）。                                                          |
+| 事件名   | 载荷           | 触发时机                                                                              |
+| -------- | -------------- | ------------------------------------------------------------------------------------- |
+| `change` | `DocumentData` | 文档内容变更时（新增 / 编辑 / 删除块，纯选区移动不触发）携带最新文档 JSON 触发。仅在内部编辑器模式下（未传 `editor`）发出；若实例由你持有，请直接使用 `editor.onChange()`。 |
+| `change-markdown` | `string` | `change` 的 Markdown 对应事件：同一触发条件下携带最新文档的 Markdown 字符串。仅在内部编辑器模式下（未传 `editor`）发出；若实例由你持有，请直接使用 `editor.onChangeMarkdown()`。 |
 
 ### Expose 暴露成员
 
 | 成员名   | 类型     | 说明                                                                                                                                                                                                  |
 | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `editor` | `Editor` | 与框架无关的 `Editor` 实例。常用方法：<br>`toData(): DocumentData`：导出 JSON。<br>`setDocument(json: DocumentData)`：用新 JSON 替换整个文档。<br>`toMarkdown(): string`：原生导出 Markdown。<br>`setDocFromMarkdown(md: string)`：原生导入 Markdown（会重置历史）。 |
+| `editor` | `Editor` | 与框架无关的 `Editor` 实例。常用方法：<br>`toData(): DocumentData`：导出 JSON。<br>`setDocument(json: DocumentData)`：用新 JSON 替换整个文档。<br>`onChange(handler: (doc: DocumentData) => void): () => void`：以 JSON 形式订阅文档变更（返回取消订阅函数）。<br>`onChangeMarkdown(handler: (md: string) => void): () => void`：以 Markdown 形式订阅文档变更。<br>`toMarkdown(): string`：原生导出 Markdown。<br>`setDocFromMarkdown(md: string)`：原生导入 Markdown（会重置历史）。 |
+
+传入 `editor` 时该成员就是外部实例；否则是组件内部创建的实例。
+
+## 外部 editor 实例（createEditor）
+
+`<BlockEditor>` 默认自己创建 `Editor`。当你需要在组件之外拿到实例（自定义工具栏、
+快捷键、状态管理、测试）时，用 `createEditor()` 创建后传入：
+
+```vue
+<script setup lang="ts">
+import { onBeforeUnmount, shallowRef } from 'vue';
+import { BlockEditor, createEditor, type DocumentData } from 'xiaodao-editor';
+import 'xiaodao-editor/style.css';
+
+// 编辑器与框架无关、不碰 DOM，因此可以在渲染周期之外创建。
+const editor = createEditor({
+  initialData: {
+    blocks: [{ type: 'paragraph', content: [{ type: 'text', text: '你好' }] }],
+  },
+});
+
+// 实例由你持有，直接订阅变更即可（组件不会为注入实例再发 `change`）。
+const latest = shallowRef<DocumentData>(editor.toData());
+editor.onChange((doc) => { latest.value = doc; });
+// 或者以 Markdown 形式订阅（替代 JSON）：
+editor.onChangeMarkdown((md) => { console.log(md); });
+
+// 谁创建谁销毁，且只调用一次。
+onBeforeUnmount(() => {
+  editor.destroy();
+});
+</script>
+
+<template>
+  <BlockEditor :editor="editor" />
+</template>
+```
+
+所有权规则：
+
+1. **`extensions` 与 `initialData` 不再生效。** 两者都在编辑器创建时固定，请改为传给
+   `createEditor()`。dev 模式下同时传 `extensions`（或非空的 `initialData`）与 `:editor` 会收到一次控制台警告。
+2. **`editable` 继续生效。** `:editable="false"` 仍会切到只读。这里没有 `v-model`：
+   读取文档用 `editor.toData()`，监听编辑结果用 `editor.onChange()`（组件不会为注入实例再发 `change`）。
+3. **组件不会销毁传入的实例。** 请自行调用 `editor.destroy()`，且只调一次。
+4. **不要热替换这个 prop。** `provide()` 只在 setup 阶段执行一次，换实例需要
+   重新挂载：
+
+```vue
+<BlockEditor :key="editorId" :editor="editor" />
+```
+
+> 请把实例放在普通 `const` 或 `shallowRef` 里。用深层 `ref()` 或 `reactive()`
+> 会把编辑器的响应式代理交给视图层。
+>
+> SSR 应用里不要在模块作用域创建编辑器：那样会让实例跨请求共享。请按请求
+> （或按组件）创建。
 
 ## 主题化
 

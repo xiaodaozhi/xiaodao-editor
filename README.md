@@ -116,11 +116,18 @@ import { BlockEditor } from 'xiaodao-editor';
 import type { DocumentData } from 'xiaodao-editor';
 import 'xiaodao-editor/style.css';
 
-const doc = ref<DocumentData>({ blocks: [] });
+// `initialData` seeds the document once; it is NOT two-way. Listen to
+// `change` to observe edits.
+const initialData: DocumentData = { blocks: [] };
+const latest = ref<DocumentData>(initialData);
+
+function onChange(doc: DocumentData): void {
+  latest.value = doc;
+}
 </script>
 
 <template>
-  <BlockEditor v-model="doc" />
+  <BlockEditor :initial-data="initialData" @change="onChange" />
 </template>
 ```
 
@@ -181,10 +188,6 @@ const katexRenderer: EquationRenderer = {
   render(expression, options) {
     const src = expression ?? '';
     try {
-      // `output: 'htmlAndMathml'` matches the project's pre-`built-in math
-      // engine` version (KaTeX v0.16 default): visually identical to HTML,
-      // and the inline `<math>` helps a11y / SSR consumers. `'html'` would
-      // work too but loses the MathML branch.
       const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
         throwOnError: false,   // never throw: KaTeX wraps the bad fragment
@@ -216,7 +219,7 @@ const extensions = [
 </script>
 
 <template>
-  <BlockEditor v-model="doc" :extensions="extensions" />
+  <BlockEditor :extensions="extensions" />
 </template>
 ```
 
@@ -232,8 +235,9 @@ top of the AST.
 
 | Prop              | Type                                     | Default            | Description                                                                   |
 | ----------------- | ---------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
-| `modelValue`      | `DocumentData`                           | `{ blocks: [] }`   | The document JSON (two-way via `v-model`).                                    |
-| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`| Extensions to register. Override to add custom blocks, replace the equation renderer (`createEquationExtension({ renderer })`), or replace the image upload pipeline (`createImageExtension({ upload, onFileCleanup })`). |
+| `editor`         | `Editor`                                 | `undefined`        | A pre-built instance from `createEditor()`. When set, `extensions` and `initialData` are ignored and the instance is NOT destroyed on unmount. See *External editor instance* below. |
+| `initialData`     | `DocumentData \| string`                 | `{ blocks: [] }`   | The initial document. Pass a `DocumentData` object (JSON) or a Markdown `string` (parsed natively at construction). Used only at construction: changing it later does NOT reload the document (no two-way binding). Ignored when `editor` is passed. |
+| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`| Extensions to register. Override to add custom blocks, replace the equation renderer (`createEquationExtension({ renderer })`), or replace the image upload pipeline (`createImageExtension({ upload, onFileCleanup })`). Ignored when `editor` is passed. |
 | `editable`        | `boolean`                                | `true`             | Read-only mode when `false`.                                                  |
 | `placeholder`     | `string`                                 | locale-aware       | Placeholder for the first empty block. Defaults to a localized string.        |
 | `theme`           | `'light' \| 'dark'`                      | `'light'`          | Color theme. The class is applied to `.block-editor` and synced to `<body>`.  |
@@ -290,15 +294,73 @@ NOT for persisted documents.
 
 ### Emits
 
-| Event                    | Payload        | When                                                                                  |
-| ------------------------ | -------------- | ------------------------------------------------------------------------------------- |
-| `update:modelValue`      | `DocumentData` | Document changed (debounced on blur).                                                 |
+| Event    | Payload        | When                                                                                  |
+| -------- | -------------- | ------------------------------------------------------------------------------------- |
+| `change` | `DocumentData` | Fires with the latest document JSON whenever the content changes (a block added / edited / removed, not selection-only moves). Only emitted in internal-editor mode (no `editor` prop). When you own the instance, use `editor.onChange()` directly. |
+| `change-markdown` | `string` | Markdown counterpart of `change`: fires with the latest document as a Markdown string on the same trigger. Only emitted in internal-editor mode (no `editor` prop). When you own the instance, use `editor.onChangeMarkdown()` directly. |
 
 ### Expose
 
 | Member   | Type     | Description                                                                                                                                          |
 | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `editor` | `Editor` | The framework-agnostic `Editor` instance. Useful methods: <br>`toData(): DocumentData`: export JSON. <br>`setDocument(json: DocumentData)`: replace JSON. <br>`toMarkdown(): string`: export native Markdown. <br>`setDocFromMarkdown(md: string)`: import native Markdown (resets history). |
+| `editor` | `Editor` | The framework-agnostic `Editor` instance. Useful methods: <br>`toData(): DocumentData`: export JSON. <br>`setDocument(json: DocumentData)`: replace JSON. <br>`onChange(handler: (doc: DocumentData) => void): () => void`: subscribe to document changes as JSON (returns an unsubscribe fn). <br>`onChangeMarkdown(handler: (md: string) => void): () => void`: subscribe to document changes as Markdown. <br>`toMarkdown(): string`: export native Markdown. <br>`setDocFromMarkdown(md: string)`: import native Markdown (resets history). |
+
+This is the injected instance when the `editor` prop is used, and the
+internally created one otherwise.
+
+## External editor instance (createEditor)
+
+By default `<BlockEditor>` creates the `Editor` itself. When you need the
+instance outside the component (custom toolbars, keyboard shortcuts, a store,
+tests), create it with `createEditor()` and pass it in:
+
+```vue
+<script setup lang="ts">
+import { onBeforeUnmount, shallowRef } from 'vue';
+import { BlockEditor, createEditor, type DocumentData } from 'xiaodao-editor';
+import 'xiaodao-editor/style.css';
+
+// The editor is framework-agnostic and never touches the DOM, so it can be
+// created outside the render cycle.
+const editor = createEditor({
+  initialData: {
+    blocks: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
+  },
+});
+
+// You own the instance, so subscribe to changes directly (no `@change` emit).
+const latest = shallowRef<DocumentData>(editor.toData());
+editor.onChange((doc) => { latest.value = doc; });
+
+// Whoever creates the editor destroys it. Call this exactly once.
+onBeforeUnmount(() => {
+  editor.destroy();
+});
+</script>
+
+<template>
+  <BlockEditor :editor="editor" />
+</template>
+```
+
+Rules of ownership:
+
+1. **`extensions` and `initialData` are ignored.** Both are fixed when the editor is built, so pass them to `createEditor()` instead. In dev mode you get a one-time console warning if you pass `extensions` (or a non-empty `initialData`) alongside `:editor`.
+2. **`editable` keeps working.** `:editable="false"` still switches the view to read-only. There is no `v-model`: read the document via `editor.toData()` and observe edits via `editor.onChange()` (the component does not re-emit `change` for an injected instance).
+3. **The component never destroys an injected editor.** Call
+   `editor.destroy()` yourself, exactly once.
+4. **Never hot-swap the prop.** `provide()` happens once during setup, so a
+   different instance requires a remount:
+
+```vue
+<BlockEditor :key="editorId" :editor="editor" />
+```
+
+> Store the instance in a plain `const` or a `shallowRef`. A deep `ref()` or
+> `reactive()` would hand the view layer a reactive proxy of the editor.
+>
+> Do not create the editor at module scope in an SSR app: the instance would be
+> shared across requests. Create it per request (or per component) instead.
 
 ## Theming
 

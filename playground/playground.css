@@ -152,6 +152,55 @@ body {
   display: block;
 }
 
+/* --- Settings dropdown menu --------------------------------------------- */
+
+.pg-menu {
+  position: relative;
+}
+
+.pg-menu-trigger {
+  background: var(--pg-hover);
+}
+
+.pg-menu-trigger[aria-expanded='true'] {
+  background: var(--pg-active);
+  color: var(--pg-text);
+}
+
+.pg-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--pg-bg);
+  border: 1px solid var(--pg-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  z-index: 50;
+}
+
+.pg-menu-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px;
+}
+
+.pg-menu-label {
+  font-size: 0.78rem;
+  color: var(--pg-muted);
+  user-select: none;
+}
+
+.pg-menu-panel .pg-switch {
+  flex: 0 0 auto;
+}
+
 /* --- Debug panel -------------------------------------------------------- */
 
 .playground-debug {

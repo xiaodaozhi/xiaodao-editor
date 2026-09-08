@@ -13,7 +13,7 @@
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        应用层(Application)                    │
-│   使用 <BlockEditor :model> / useEditor() API                │
+│   使用 <BlockEditor :initial-data> / useEditor() API         │
 └──────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────┐
@@ -253,7 +253,7 @@ schema 让核心无需知道类型就能回答结构性问题："块 A 能包含
 
 ### 6.1 组件
 
-- **`<BlockEditor>`**：公开的根组件。Props:`modelValue`（文档 JSON）、`extensions`（默认 `BuiltinExtensions`）、`editable`、`placeholder`（locale 感知默认值）、`theme`（`'light' | 'dark'`）、`locale`（`'zh-CN' | 'en-US'`）。通过 `provide` 暴露 `useEditor()` 和 i18n 上下文。
+- **`<BlockEditor>`**：公开的根组件。Props:`initialData`（`DocumentData` JSON 或 Markdown `string`，单向）、`extensions`（默认 `BuiltinExtensions`）、`editable`、`placeholder`（locale 感知默认值）、`theme`（`'light' | 'dark'`）、`locale`（`'zh-CN' | 'en-US'`）、`editor`（由 `createEditor()` 预先构建的实例；传入后 `extensions` 与 `initialData` 被忽略，且组件既不拥有也不销毁该实例）。仅在内部模式下 emit `change`（最新 `DocumentData`）与 `change-markdown`（Markdown 字符串）；外部注入的实例改用 `editor.onChange()` / `editor.onChangeMarkdown()` 订阅。通过 `provide` 暴露 `useEditor()` 和 i18n 上下文。
 - **`<BlockList>`**：渲染有序的块 id 列表（根或某个父节点的子块）。**虚拟化接缝**：此组件是唯一决定*哪些*块被挂载的地方；虚拟化实现以后可以无缝替换，而无需触碰块组件。
 - **`<BlockHost>`**：通过注册表把 `block.type` 解析为渲染器并挂载它。提供按块上下文（`blockId`、编辑器 API、选择状态）。使用 `key=blockId` 让 Vue 跨重排复用 DOM。
 - **块渲染器组件**：普通的 Vue 组件。对内容块，它们渲染绑定到各自块内容的 `contenteditable`。它们通过 `useBlock(blockId)` 读取状态，通过 `useEditor()` 分发。
@@ -411,7 +411,7 @@ interface EditorState {
 
 ### 10.4 持久化
 
-- `v-model` 在防抖变化时（或失焦时）把文档作为普通 JSON emit 出去。
+- 内部模式下，`<BlockEditor @change>` 在文档内容变更时（新增 / 编辑 / 删除块）把文档作为普通 JSON emit 出去，`<BlockEditor @change-markdown>` 则把同一状态作为 Markdown 字符串 emit。若实例由你持有，用 `editor.onChange((doc) => …)` / `editor.onChangeMarkdown((md) => …)` 订阅同样的载荷，没有 `v-model`。`initialData` 也接受 Markdown 字符串，构造时解析一次。
 - 加载是整体替换状态（新的 `EditorState`）；视图桥接与上一状态做 diff，以最小化 DOM 变动。
 
 ---
@@ -497,8 +497,9 @@ src/
     Editor.ts                   # 门面:state、dispatch、commands 代理、history、plugins
     index.ts                    # core barrel(框架无关引擎的公共面)
   view/                         # Vue 专属桥接 + 组件
+    createEditor.ts             # 无头工厂：注入 BuiltinExtensions 默认扩展 + dev 配置校验后 new Editor()；完全不导入 Vue
     context.ts                  # editorKey/useEditor (provide/inject) + BlockRenderItem 类型
-    BlockEditor.vue             # 公开根:构造 Editor、订阅、键位映射、选择同步、i18n/主题、链接浮层编排;通过 Editor.getExtensionMethod('startImageUpload') 转发 ImageExtension 的异步命令到 useBeginImageUpload() 注入口(零图片专属知识)
+    BlockEditor.vue             # 公开根:接管或构造 Editor、订阅、键位映射、选择同步、i18n/主题、链接浮层编排;通过 Editor.getExtensionMethod('startImageUpload') 转发 ImageExtension 的异步命令到 useBeginImageUpload() 注入口(零图片专属知识)
     BlockList.vue               # 扁平块列表(虚拟化接缝)
     BlockHost.vue               # 通过 RendererRegistry 把 type → renderer 解析；向上转发 linkClick
     BlockContent.vue            # 按块 contenteditable(IME 防护、输入同步、占位符、点击 <a> 链接检测、粘贴 URL 自动加链、空格触发自动链接)
@@ -560,6 +561,7 @@ src/
 | `view/useEditor.ts` + `view/useBlock.ts` | `view/context.ts`（editorKey + useEditor + BlockRenderItem） | 阶段一不需要 `useBlock`（块接收 props，而非订阅）。 |
 | `view/dom/selectionSync.ts` + `view/dom/caret.ts` | `view/domSelection.ts` | 两个关注点紧密耦合；拆分增加了仪式感而无清晰度。 |
 | `view/contenteditable.ts` | `view/BlockContent.vue` | contenteditable 契约是一个组件，而非 composable。 |
+| 设计中没有无头工厂 | `view/createEditor.ts`（配套 `<BlockEditor>` 的 `editor` prop） | `EditorConfig.extensions` 是必填，无头调用方需要一份默认扩展策略；工厂同时是「谁创建谁销毁」这条所有权规则的文档载体。它放在 `src/view/`（不导入 Vue）是因为 `Editor.ts` 的注释早已指向该路径，且 `src/core` 不得依赖 `src/extensions`。 |
 | `extensions/paragraph/`（目录） | `extensions/Paragraph.ts`（文件） | 每个阶段一扩展都够小，一个文件即可。当扩展变大时（例如带语法高亮的代码块）可以采用目录。 |
 | `extensions/selection/`、`extensions/inputRules/`、`extensions/placeholder/` | 不存在 | 选择同步位于视图层（`domSelection.ts` + `BlockEditor.vue`）。InputRules 属阶段二。占位符由 `BlockContent.vue` 通过 `data-empty` CSS 处理。 |
 | `history/` 作为一个插件 | `history/HistoryManager.ts`（由 Editor 持有）+ `extensions/History.ts`（仅键位映射） | 历史需要 Editor 的 dispatch 和 state；做成插件需要特权访问。键位映射是一个独立的扩展。 |

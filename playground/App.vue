@@ -3,124 +3,136 @@
     <header class="playground-title">
       <span class="pg-title-text">{{ locale === 'zh-CN' ? '小刀编辑器' : 'Xiaodao Editor' }}</span>
       <div class="pg-toolbar">
-        <!-- Language switch -->
-        <div class="pg-switch" role="group" aria-label="Language">
+        <div ref="menuRef" class="pg-menu">
           <button
             type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: locale === 'zh-CN' }"
-            :title="locale === 'zh-CN' ? '中文' : 'Chinese'"
-            @click="locale = 'zh-CN'"
+            class="pg-menu-trigger pg-switch-btn pg-switch-btn-icon"
+            :aria-expanded="menuOpen"
+            :title="locale === 'zh-CN' ? '设置' : 'Settings'"
+            @click="toggleMenu"
           >
-            <!-- Chinese character '中' icon -->
-            <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
-              <path d="M555.231787 330.203429v-107.997284h-68.202727v108.038827H263.433935v273.457531H487.02906v210.976899h68.202727V603.70431h224.21827V330.203429H555.231787z m-68.202727 209.074952h-157.337694v-144.605675h157.335888v144.605675z m226.131053 0H555.195662v-144.605675h157.962645v144.605675z" />
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
             </svg>
           </button>
-          <button
-            type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: locale === 'en-US' }"
-            :title="locale === 'zh-CN' ? '英文' : 'English'"
-            @click="locale = 'en-US'"
-          >
-            <!-- Latin letter A icon -->
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 13L8 3l5 10" />
-              <path d="M5 9h6" />
-            </svg>
-          </button>
-        </div>
-        <!-- Theme switch -->
-        <div class="pg-switch" role="group" aria-label="Theme">
-          <button
-            type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: theme === 'light' }"
-            :title="locale === 'zh-CN' ? '浅色模式' : 'Light mode'"
-            @click="theme = 'light'"
-          >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <circle cx="8" cy="8" r="3" fill="currentColor"/>
-              <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
-                <line x1="8" y1="1.5" x2="8" y2="3"/>
-                <line x1="8" y1="13" x2="8" y2="14.5"/>
-                <line x1="1.5" y1="8" x2="3" y2="8"/>
-                <line x1="13" y1="8" x2="14.5" y2="8"/>
-                <line x1="3.3" y1="3.3" x2="4.4" y2="4.4"/>
-                <line x1="11.6" y1="11.6" x2="12.7" y2="12.7"/>
-                <line x1="3.3" y1="12.7" x2="4.4" y2="11.6"/>
-                <line x1="11.6" y1="4.4" x2="12.7" y2="3.3"/>
-              </g>
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: theme === 'dark' }"
-            :title="locale === 'zh-CN' ? '深色模式' : 'Dark mode'"
-            @click="theme = 'dark'"
-          >
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <path d="M13.5 9.2A5.6 5.6 0 0 1 6.8 2.5a.6.6 0 0 0-.85-.74A6.5 6.5 0 1 0 14.24 9.95a.6.6 0 0 0-.74-.75z" fill="currentColor"/>
-            </svg>
-          </button>
-        </div>
-        <!-- Editable switch -->
-        <div class="pg-switch" role="group" aria-label="Editable">
-          <button
-            type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: !editable }"
-            :title="locale === 'zh-CN' ? '只读模式' : 'Read-only mode'"
-            @click="editable = false"
-          >
-            <!-- Open book icon (read-only) -->
-            <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
-              <path d="M192 768h640V192h-160a128 128 0 0 0-128 128h-64a128 128 0 0 0-128-128H192v576z m426.666667 64a106.773333 106.773333 0 0 0-92.309334 53.333333v0.042667a16.426667 16.426667 0 0 1-28.458666-0.042667A106.389333 106.389333 0 0 0 405.333333 832H170.666667a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667h181.333333a191.829333 191.829333 0 0 1 160 85.824A191.829333 191.829333 0 0 1 672 128H853.333333a42.666667 42.666667 0 0 1 42.666667 42.666667v618.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H618.666667z m-170.666667-64c23.765333 0 44.501333 12.778667 55.530667 32a9.856 9.856 0 0 0 17.066666 0.021333l0.021334-0.021333A64.064 64.064 0 0 1 576 768h-128z m32-448h64v352a32 32 0 0 1-64 0V320z" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="pg-switch-btn pg-switch-btn-icon"
-            :class="{ active: editable }"
-            :title="locale === 'zh-CN' ? '编辑模式' : 'Edit mode'"
-            @click="editable = true"
-          >
-            <!-- Pencil edit icon -->
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11.5 2.5l2 2-8 8.5-3.5 1 1-3.5z" />
-              <path d="M10 4l2 2" />
-            </svg>
-          </button>
+          <div v-if="menuOpen" class="pg-menu-panel" role="menu">
+            <div class="pg-menu-section">
+              <span class="pg-menu-label">{{ locale === 'zh-CN' ? '语言' : 'Language' }}</span>
+              <div class="pg-switch" role="group" aria-label="Language">
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: locale === 'zh-CN' }" :title="locale === 'zh-CN' ? '中文' : 'Chinese'" @click="locale = 'zh-CN'">
+                  <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
+                    <path d="M555.231787 330.203429v-107.997284h-68.202727v108.038827H263.433935v273.457531H487.02906v210.976899h68.202727V603.70431h224.21827V330.203429H555.231787z m-68.202727 209.074952h-157.337694v-144.605675h157.335888v144.605675z m226.131053 0H555.195662v-144.605675h157.962645v144.605675z" />
+                  </svg>
+                </button>
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: locale === 'en-US' }" :title="locale === 'zh-CN' ? '英文' : 'English'" @click="locale = 'en-US'">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 13L8 3l5 10" />
+                    <path d="M5 9h6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="pg-menu-section">
+              <span class="pg-menu-label">{{ locale === 'zh-CN' ? '主题' : 'Theme' }}</span>
+              <div class="pg-switch" role="group" aria-label="Theme">
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: theme === 'light' }" :title="locale === 'zh-CN' ? '浅色模式' : 'Light mode'" @click="theme = 'light'">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <circle cx="8" cy="8" r="3" fill="currentColor"/>
+                    <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+                      <line x1="8" y1="1.5" x2="8" y2="3"/>
+                      <line x1="8" y1="13" x2="8" y2="14.5"/>
+                      <line x1="1.5" y1="8" x2="3" y2="8"/>
+                      <line x1="13" y1="8" x2="14.5" y2="8"/>
+                      <line x1="3.3" y1="3.3" x2="4.4" y2="4.4"/>
+                      <line x1="11.6" y1="11.6" x2="12.7" y2="12.7"/>
+                      <line x1="3.3" y1="12.7" x2="4.4" y2="11.6"/>
+                      <line x1="11.6" y1="4.4" x2="12.7" y2="3.3"/>
+                    </g>
+                  </svg>
+                </button>
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: theme === 'dark' }" :title="locale === 'zh-CN' ? '深色模式' : 'Dark mode'" @click="theme = 'dark'">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path d="M13.5 9.2A5.6 5.6 0 0 1 6.8 2.5a.6.6 0 0 0-.85-.74A6.5 6.5 0 1 0 14.24 9.95a.6.6 0 0 0-.74-.75z" fill="currentColor"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="pg-menu-section">
+              <span class="pg-menu-label">{{ locale === 'zh-CN' ? '模式' : 'Mode' }}</span>
+              <div class="pg-switch" role="group" aria-label="Editable">
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: !editable }" :title="locale === 'zh-CN' ? '只读模式' : 'Read-only mode'" @click="editable = false">
+                  <svg viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true" fill="currentColor">
+                    <path d="M192 768h640V192h-160a128 128 0 0 0-128 128h-64a128 128 0 0 0-128-128H192v576z m426.666667 64a106.773333 106.773333 0 0 0-92.309334 53.333333v0.042667a16.426667 16.426667 0 0 1-28.458666-0.042667A106.389333 106.389333 0 0 0 405.333333 832H170.666667a42.666667 42.666667 0 0 1-42.666667-42.666667V170.666667a42.666667 42.666667 0 0 1 42.666667-42.666667h181.333333a191.829333 191.829333 0 0 1 160 85.824A191.829333 191.829333 0 0 1 672 128H853.333333a42.666667 42.666667 0 0 1 42.666667 42.666667v618.666666a42.666667 42.666667 0 0 1-42.666667 42.666667H618.666667z m-170.666667-64c23.765333 0 44.501333 12.778667 55.530667 32a9.856 9.856 0 0 0 17.066666 0.021333l0.021334-0.021333A64.064 64.064 0 0 1 576 768h-128z m32-448h64v352a32 32 0 0 1-64 0V320z" />
+                  </svg>
+                </button>
+                <button type="button" class="pg-switch-btn pg-switch-btn-icon" :class="{ active: editable }" :title="locale === 'zh-CN' ? '编辑模式' : 'Edit mode'" @click="editable = true">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11.5 2.5l2 2-8 8.5-3.5 1 1-3.5z" />
+                    <path d="M10 4l2 2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="pg-menu-section">
+              <span class="pg-menu-label">{{ locale === 'zh-CN' ? '实例' : 'Instance' }}</span>
+              <div class="pg-switch" role="group" aria-label="Editor ownership">
+                <button type="button" class="pg-switch-btn" :class="{ active: !externalMode }" :title="locale === 'zh-CN' ? '内部 editor（组件自己创建）' : 'Internal editor (created by the component)'" @click="externalMode = false">
+                  {{ locale === 'zh-CN' ? '内部' : 'Internal' }}
+                </button>
+                <button type="button" class="pg-switch-btn" :class="{ active: externalMode }" :title="locale === 'zh-CN' ? '外部 editor（createEditor 创建后注入）' : 'External editor (created with createEditor, injected)'" @click="externalMode = true">
+                  {{ locale === 'zh-CN' ? '外部' : 'External' }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
     <div class="playground-body">
       <BlockEditor
-        v-model="doc"
+        :key="externalMode ? 'external' : 'internal'"
+        :editor="externalEditor ?? undefined"
+        :initial-data="externalMode ? undefined : doc"
+        :extensions="externalMode ? undefined : extensions"
         :locale="locale"
         :theme="theme"
-        :extensions="extensions"
         :editable="editable"
         :toolbar-position="'float'"
         :placeholder="locale === 'zh-CN' ? placeholderZh : placeholderEn"
+        @change="onDocChange"
+        @change-markdown="onMarkdownChange"
       />
     </div>
     <details class="playground-debug">
       <summary>Document JSON</summary>
       <pre>{{ JSON.stringify(doc, null, 2) }}</pre>
     </details>
+    <details class="playground-debug">
+      <summary>Document Markdown (change-markdown)</summary>
+      <pre>{{ mdText || '(empty)' }}</pre>
+      <button
+        v-if="externalEditor"
+        type="button"
+        class="pg-switch-btn"
+        @click="initFromMarkdown"
+      >
+        {{ locale === 'zh-CN' ? '用 Markdown 初始化' : 'Init from Markdown' }}
+      </button>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, shallowRef, watch, onMounted, onBeforeUnmount } from 'vue';
 import {
   BlockEditor,
   BuiltinExtensions,
+  createEditor,
   createImageExtension,
   type DocumentData,
+  type Editor,
   type Extension,
   type Locale,
   type Theme,
@@ -185,6 +197,102 @@ const extensions: readonly Extension[] = [
 const locale = ref<Locale>('zh-CN');
 const theme = ref<Theme>('light');
 const editable = ref(true);
+
+// --- Settings dropdown (top-right) ---------------------------------------
+// The language / theme / mode / editor-ownership switches live inside one
+// menu so the title bar stays compact. The menu closes on outside click or
+// Escape; selecting an item keeps it open so several toggles can be applied.
+const menuOpen = ref(false);
+const menuRef = ref<HTMLElement | null>(null);
+function toggleMenu(): void {
+  menuOpen.value = !menuOpen.value;
+}
+function onWindowClick(e: MouseEvent): void {
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
+    menuOpen.value = false;
+  }
+}
+function onWindowKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') menuOpen.value = false;
+}
+onMounted(() => {
+  window.addEventListener('click', onWindowClick);
+  window.addEventListener('keydown', onWindowKeydown);
+});
+
+// --- External editor mode ------------------------------------------------
+//
+// `externalMode` demos `<BlockEditor :editor>`: the editor is built here with
+// `createEditor()` and injected, so this component owns it and destroys it.
+// In internal mode (`externalMode === false`) nothing is injected and
+// `<BlockEditor>` builds and owns its own instance as before.
+//
+// `shallowRef` (not `ref`) is deliberate: a deep `ref` would hand the editor
+// to the view layer as a reactive proxy.
+const externalMode = ref(false);
+const externalEditor = shallowRef<Editor | null>(null);
+
+// `doc` is bound to `:initial-data` (one-way: read only at mount, with no
+// watcher, so writing it back via the change events below never reloads the
+// editor) and is also the live document shown in the debug JSON panel. In
+// external mode the `editor.onChange` handler keeps it in sync the same way.
+function onDocChange(d: DocumentData): void {
+  doc.value = d;
+}
+
+function onMarkdownChange(md: string): void {
+  mdText.value = md;
+}
+
+watch(externalMode, (on) => {
+  externalEditor.value?.destroy();
+  if (on) {
+    const editor = createEditor({ extensions, initialData: doc.value, editable: editable.value });
+    editor.onChange((d) => { doc.value = d; });
+    editor.onChangeMarkdown((md) => { mdText.value = md; });
+    mdText.value = editor.toMarkdown();
+    externalEditor.value = editor;
+  } else {
+    externalEditor.value = null;
+  }
+});
+
+// Whoever creates the editor destroys it. `destroy()` is idempotent, so this
+// is safe even when `externalMode` already turned it off.
+onBeforeUnmount(() => {
+  window.removeEventListener('click', onWindowClick);
+  window.removeEventListener('keydown', onWindowKeydown);
+  externalEditor.value?.destroy();
+  externalEditor.value = null;
+});
+
+// Live Markdown of the document, updated by the `change-markdown` event.
+const mdText = ref('');
+
+// Demo: load a Markdown string into the (external) editor. This exercises the
+// same native `markdownToDoc` parser that the `initialData: string` constructor
+// path uses, and the `change-markdown` event reflects the result live.
+const sampleMarkdown = [
+  '# 示例文档',
+  '',
+  '这是一段**加粗**与*斜体*混排的正文。',
+  '',
+  '- 列表项一',
+  '- 列表项二',
+  '',
+  '> 引用块示例',
+  '',
+  '```ts',
+  'const x = 1;',
+  '```',
+].join('\n');
+function initFromMarkdown(): void {
+  const editor = externalEditor.value;
+  if (!editor) return;
+  editor.setDocFromMarkdown(sampleMarkdown);
+  doc.value = editor.toData();
+  mdText.value = editor.toMarkdown();
+}
 
 const placeholderZh = "输入文字，或按 '/' 获取命令…";
 const placeholderEn = "Type '/' for commands…";
@@ -562,7 +670,7 @@ const doc = ref<DocumentData>({
     },
     {
       type: 'orderedList',
-      content: [{ type: 'text', text: '挂载 BlockEditor 组件，传入 v-model 绑定 DocumentData。' }],
+      content: [{ type: 'text', text: '挂载 BlockEditor 组件，传入 :initial-data 作为初始文档（对象或 Markdown 字符串均可），并监听 @change / @change-markdown 获取最新文档。' }],
     },
     {
       type: 'orderedList',
@@ -1257,10 +1365,6 @@ const doc = ref<DocumentData>({
       content: [],
     },
   ],
-});
-
-watch(() => doc, (newDoc) => {
-  console.log(newDoc);
 });
 
 // Update document title based on locale (i18n)

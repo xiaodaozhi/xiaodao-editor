@@ -60,7 +60,7 @@ const STRUCTURAL_CHARS: Readonly<Record<string, TokenKind>> = {
   '(': 'lparen',
   ')': 'rparen',
   '^': 'sup',
-  '_': 'sub',
+  _: 'sub',
   '&': 'amp',
 };
 

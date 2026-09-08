@@ -2,7 +2,9 @@
   BlockEditor: the root editor component.
 
   Responsibilities:
-    1. Construct the `Editor` instance from extensions + initial document.
+    1. Obtain the `Editor` instance: either adopted from the `editor` prop
+       (created with `createEditor()`, owned by the caller) or constructed
+       here from extensions + initial document (owned by this component).
     2. Maintain a `shallowRef<EditorState>` that triggers Vue reactivity on
        state changes: but only at the top level (no deep reactivity).
     3. Provide the editor to child components via injection.
@@ -13,7 +15,9 @@
     5. Handle keyboard events: when a popup is open, route keys there first,
        otherwise sync DOM → state → keymap command.
     6. Apply state selection changes → DOM (after Vue re-renders, via nextTick).
-    7. Emit `update:modelValue` when the document changes.
+    7. Emit `change` with the latest document JSON when the content changes
+       (internal-editor mode only; an injected instance is listened to via
+       `editor.onChange()`).
     8. Focus the first block on mount.
     9. Watch document `selectionchange` to show/hide the HoverToolbar.
 
@@ -195,11 +199,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, provide, onMounted, onBeforeUnmount, nextTick, reactive, watch } from 'vue';
+import { ref, shallowRef, computed, provide, onMounted, onBeforeUnmount, nextTick, reactive, watch, toRaw } from 'vue';
 import type { Extension } from '../core/extension/Extension';
 import type { DocumentData, BlockId, Block, InlineSeq, Anchor, Selection as EditorSelection } from '../core/types';
 import { inlineText, inlineFromString, splitInline } from '../core/types';
-import { Editor } from '../core/Editor';
+import type { Editor } from '../core/Editor';
+import { createEditor } from './createEditor';
 import type { EditorState } from '../core/state/EditorState';
 import type { Transaction } from '../core/state/Transaction';
 import { editorKey, editableKey, mobileKey, fixedToolbarBridgeKey, fixedToolbarBottomKey, imageUploadKey } from './context';
@@ -228,8 +233,25 @@ import { provideI18n, useI18n, normalizeLocale, normalizeTheme, type Theme, type
 type PlusMenuMode = 'slash' | 'insert';
 
 const props = withDefaults(defineProps<{
+  /**
+   * A ready-made editor instance (from `createEditor()`). When provided, the
+   * creation-time props `extensions` and `initialData` (as the initial
+   * document) are ignored: configure them in `createEditor()` instead. The
+   * component also does NOT destroy an injected instance on unmount, because
+   * whoever creates an editor destroys it. `editable` sync still works; there
+   * is no `v-model`, so in internal mode document changes surface via the
+   * `change` emit while an injected instance is observed through `editor.onChange()`.
+   */
+  editor?: Editor;
   extensions?: readonly Extension[];
-  modelValue?: DocumentData;
+  /**
+   * The initial document: a `DocumentData` JSON object, or a Markdown string
+   * (parsed natively at construction). Used only at construction time:
+   * changing this prop later does NOT re-load the document (no two-way
+   * binding). Pass a fresh `:editor` (rebuild via `createEditor`) if you need
+   * to swap the doc. Ignored when the `editor` prop is provided.
+   */
+  initialData?: DocumentData | string;
   editable?: boolean;
   placeholder?: string;
   /** 'light' (default) or 'dark'. */
@@ -249,8 +271,13 @@ const props = withDefaults(defineProps<{
    *    falls back to the auto FixedToolbar. */
   toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';
 }>(), {
+  editor: undefined,
   extensions: () => BuiltinExtensions,
-  modelValue: () => ({ blocks: [] }),
+  // `DocumentData` is an imported interface, so type-only prop inference
+  // cannot resolve it and `vue/require-valid-default-prop` only sees the
+  // `string` branch. The factory default is valid for the Object branch.
+  // eslint-disable-next-line vue/require-valid-default-prop
+  initialData: () => ({ blocks: [] }),
   editable: true,
   theme: 'light',
   locale: 'zh-CN',
@@ -265,7 +292,20 @@ const props = withDefaults(defineProps<{
 const hasExplicitPlaceholder = props.placeholder !== '';
 
 const emit = defineEmits<{
-  'update:modelValue': [DocumentData];
+  /**
+   * Fires with the latest document JSON whenever the content changes (a block
+   * added / edited / removed, not selection-only moves). Only emitted in
+   * internal-editor mode (no `editor` prop): when the host owns the instance
+   * it subscribes via `editor.onChange()` directly.
+   */
+  change: [doc: DocumentData];
+  /**
+   * Markdown counterpart of `change`: fires with the latest document as a
+   * Markdown string whenever the content changes (same trigger as `change`).
+   * Only emitted in internal-editor mode (no `editor` prop): an injected
+   * instance is observed through `editor.onChangeMarkdown()` instead.
+   */
+  'change-markdown': [markdown: string];
 }>();
 // NOTE: the previous `'cleanup:image-file'` Vue emit (fired when the last
 // image block referencing a given `fileId` was removed) is gone.
@@ -338,17 +378,58 @@ const effectivePlaceholder = computed<string>(
 // itself never imports extension internals or attaches them on behalf of
 // the consumer: that responsibility now lives entirely in the extension
 // layer.
-
-const editor = new Editor({
+//
+// Two acquisition modes:
+//  - `editor` prop: adopt the caller's instance (built with `createEditor()`).
+//    The creation-time props `extensions` and `initialData` (as the initial
+//    document) are ignored, and ownership stays with the caller: an injected
+//    editor is never destroyed here.
+//  - No `editor` prop: build it here (existing behaviour) and own it, which
+//    means this component destroys it on unmount.
+// `toRaw` matters here: a host that stores the editor in a `ref()` or a
+// `reactive()` object hands us a deep reactive proxy. Everything downstream
+// (identity comparisons, plugin state, registries, renderer components)
+// expects the real instance, and Vue would also warn about rendering a
+// component that was made reactive. `toRaw` is a no-op on a plain instance.
+const injectedEditor = props.editor === undefined ? undefined : toRaw(props.editor);
+const ownsEditor = injectedEditor === undefined;
+const editor = injectedEditor ?? createEditor({
   extensions: props.extensions,
-  initialDocument: props.modelValue,
+  initialData: props.initialData,
   editable: props.editable,
 });
+
+if (import.meta.env.DEV && !ownsEditor) {
+  // `extensions` defaults to the `BuiltinExtensions` array itself, so a
+  // reference check is a reliable "did the caller actually pass one?" test.
+  // `initialData` is reported only when it carries content: a non-empty
+  // Markdown string, or a non-trivial document (the default `{ blocks: [] }`
+  // is always present and is never a mistake). `editable` keeps working with
+  // an injected editor, so it is not reported.
+  const ignored: string[] = [];
+  if (props.extensions !== BuiltinExtensions) ignored.push('extensions');
+  const hasInitialContent = typeof props.initialData === 'string'
+    ? props.initialData.length > 0
+    : (props.initialData?.blocks?.length ?? 0) > 0;
+  if (hasInitialContent) ignored.push('initialData');
+  if (ignored.length > 0) {
+    // eslint-disable-next-line no-console -- intentional DEV-only warning
+    console.warn(
+      '[xiaodao-editor] <BlockEditor>: the `editor` prop is set, so creation-time prop(s) '
+      + `"${ignored.join('", "')}" are ignored. They are fixed when the editor is created: `
+      + 'pass them to createEditor() instead.',
+    );
+  }
+}
 
 // Reactive editable flag: provided to child components so they can
 // reactively bind `contenteditable` and gate editing actions. The Editor
 // instance itself is non-reactive; this ref bridges the prop → view layer.
-const editableRef = ref(props.editable);
+// Seeded from the instance rather than the prop: for an injected editor the
+// instance is the source of truth on the first frame, and `editable` cannot
+// distinguish "explicitly true" from "not passed". Later prop changes are
+// still synced by the watcher below.
+const editableRef = ref(editor.editable);
 provide(editableKey, editableRef);
 provide(editorKey, editor);
 
@@ -449,6 +530,26 @@ watch(
     }
   },
 );
+
+if (import.meta.env.DEV) {
+  // `provide(editorKey, editor)` is a one-time setup action and every
+  // `useEditor()` consumer injects the instance once in its own setup, so a
+  // hot swap is architecturally impossible. The supported way to use a
+  // different instance is remounting with `:key="editor"`.
+  watch(
+    () => props.editor,
+    (nextProp) => {
+      const next = nextProp === undefined ? undefined : toRaw(nextProp);
+      if (next !== undefined && next !== editor) {
+        // eslint-disable-next-line no-console -- intentional DEV-only warning
+        console.warn(
+          '[xiaodao-editor] <BlockEditor>: the `editor` prop changed after mount, so the change is '
+          + 'ignored. Remount the component with `:key="editor"` to swap instances.',
+        );
+      }
+    },
+  );
+}
 
 // --- Image upload integration ------------------------------------------
 //
@@ -1008,29 +1109,18 @@ const NON_TEXT_BLOCK_TYPES = new Set([
   'image', 'divider', 'table', 'toc', 'tableOfContents', 'codeBlock', 'equation',
 ]);
 
-/**
- * Guard flag: while true, the `watch(props.modelValue)` callback must skip
- * applying external changes, because a document change from INSIDE the
- * editor has just been serialized and emitted, and the v-model assignment
- * in the parent is about to bounce back through the prop.  Without this,
- * every user keystroke would trigger setDocument() (resetting history and
- * the caret position) at the next tick.
- */
-let externalEmitInFlight = false;
-
 const unsubscribe = editor.subscribe((update) => {
   state.value = update.state;
 
   if (update.changed.size > 0 || update.removed.size > 0) {
-    externalEmitInFlight = true;
-    emit('update:modelValue', editor.toData());
-    // The parent's v-model assignment runs synchronously (Vue emits then
-    // parent reactivity propagates).  Queue a microtask to clear the guard
-    // after that prop update has been observed, so that truly external
-    // changes scheduled later (next frame / user code) are honoured.
-    Promise.resolve().then(() => {
-      externalEmitInFlight = false;
-    });
+    // Two-way `v-model` is gone: in internal-editor mode the component owns
+    // the instance, so it re-emits a `change` event with the latest document
+    // JSON. An injected instance is owned by the host, which listens via
+    // `editor.onChange()` instead, so we stay silent there.
+    if (ownsEditor) {
+      emit('change', editor.toData());
+      emit('change-markdown', editor.toMarkdown());
+    }
   }
   const sel = update.state.selection;
   // Track focused block for handle visibility.
@@ -1102,49 +1192,6 @@ const unsubscribe = editor.subscribe((update) => {
   }
   prevSelection = sel;
 });
-
-// --- External document sync (props.modelValue → editor) -------------------
-
-/**
- * Deep equality for plain JSON-like documents. Used to decide whether an
- * incoming `modelValue` prop change is truly different from what the
- * editor currently holds. Prevents unnecessary setDocument() calls which
- * would reset history/selection.
- */
-function jsonEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== typeof b) return false;
-  if (a === null || b === null) return false;
-  if (typeof a !== 'object') return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    if (a.length !== (b as unknown[]).length) return false;
-    for (let i = 0; i < a.length; i++) if (!jsonEqual(a[i], (b as unknown[])[i])) return false;
-    return true;
-  }
-  const ak = Object.keys(a as Record<string, unknown>);
-  const bk = Object.keys(b as Record<string, unknown>);
-  if (ak.length !== bk.length) return false;
-  for (const k of ak) {
-    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
-    if (!jsonEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
-  }
-  return true;
-}
-
-watch(
-  () => props.modelValue,
-  (nextDoc) => {
-    // Ignore the "bounce-back" prop change triggered by our own emit.
-    if (externalEmitInFlight) return;
-    if (nextDoc === undefined) return;
-    // Skip if identical (cheap), then do a deep compare for values.
-    const current = editor.toData();
-    if (jsonEqual(current, nextDoc)) return;
-    editor.setDocument(nextDoc);
-  },
-  { deep: true },
-);
 
 // --- Keyboard handling --------------------------------------------------
 
@@ -3258,12 +3305,17 @@ onBeforeUnmount(() => {
   document.removeEventListener('touchmove', onTouchMove, true);
   document.removeEventListener('touchend', onTouchEnd, true);
   document.removeEventListener('touchcancel', onTouchEnd, true);
-  // Image upload side-channel cleanup is now the responsibility of
+  // Image upload side-channel cleanup is the responsibility of
   // `ImageExtension`'s `onDestroy` hook, which runs from `editor.destroy()`
-  // above (it clears all transient upload state, revokes object URLs, and
+  // (it clears all transient upload state, revokes object URLs, and
   // deregisters the upload handler in one place).
   unsubscribe();
-  editor.destroy();
+  // Ownership: only destroy what we created. An injected editor belongs to
+  // its caller, which is the only party that knows when it is truly done with
+  // it (a shared instance may outlive this component entirely).
+  if (ownsEditor) {
+    editor.destroy();
+  }
 });
 
 defineExpose({ editor });

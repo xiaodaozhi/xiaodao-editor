@@ -625,7 +625,7 @@ class DeserializerRegistry {
 interface EditorConfig {
   readonly extensions: readonly Extension[];
   readonly defaultBlockType?: string;
-  readonly initialDocument?: DocumentData;
+  readonly initialData?: DocumentData | string;  // 传字符串则按 Markdown 解析
   readonly initialSelection?: Selection;
   readonly editable?: boolean;
   readonly historyLimit?: number;
@@ -664,13 +664,38 @@ function hasBlock(editor: Editor, id: BlockId): boolean;  // 调试辅助
 
 **交互。** 依赖 `store.ts`、`EditorState.ts`、`Transaction.ts`、`Registry.ts`、`primitiveCommands.ts`、`Command.ts`、`Plugin.ts`、`HistoryManager.ts`、`Selection.ts`、`ids.ts` 和 `types.ts`。视图层(`BlockEditor.vue`)构造它、订阅它、把键盘/输入/组合事件路由到它的 `handle*` 方法，并读取 `editor.commands` / `editor.registries` / `editor.focusBlockId`。
 
-**扩展点。** 扩展是唯一的配置面(`EditorConfig.extensions` 加上 `defaultBlockType`/`historyLimit`)。`focusBlockId` 字段是视图层写入的契约，让插件(通过 `EventContext.focusBlockId`)知道哪个块被聚焦。未来的无头/服务端用法会直接构造 `Editor`，而不用 Vue 组件。
+**扩展点.** 扩展是唯一的配置面(`EditorConfig.extensions` 加上 `defaultBlockType`/`historyLimit`)。`focusBlockId` 字段是视图层写入的契约，让插件(通过 `EventContext.focusBlockId`)知道哪个块被聚焦。未来的无头/服务端用法会直接构造 `Editor`，而不用 Vue 组件。
+
+### Markdown 支持
+
+内核自带原生 Markdown 互转(不依赖第三方解析器)：`Editor.ts` 里的 `docToMarkdown` / `markdownToDoc`，以及 `serialize/Serializer.ts` 里各块类型的 `toMarkdown` / `fromMarkdown` 规范。覆盖标题、引用、待办/有序/无序列表、分割线、代码块、表格、图片和公式。
+
+对外有三个入口：
+
+1. **用 Markdown 初始化。** `EditorConfig.initialData`(以及 `createEditor` 的 `initialData`、`<BlockEditor :initial-data>`)除了 `DocumentData` 对象外，也可接受 Markdown `string`。字符串在构造时通过 `markdownToDoc` 解析一次；`DocumentData` 走 JSON 路径。两者复用同一套空文档播种与未知块类型的 dev 校验。
+
+   ```ts
+   const editor = createEditor({ initialData: '# 标题\n\n正文段落' });
+   ```
+
+2. **订阅 Markdown 变更。** 与 `onChange` / `change` 平行，提供 Markdown 跟踪的对应接口：内容变更时(新增/编辑/删除块，非纯选区移动)以序列化后的文档触发，返回取消订阅函数：
+
+   ```ts
+   // 无头模式(你拥有 Editor 实例)：
+   const off = editor.onChangeMarkdown((md) => console.log(md));
+   // Vue 组件(内部模式)：
+   <BlockEditor :initial-data="doc" @change-markdown="md = $event" />;
+   ```
+
+3. **命令式导入 / 导出。** `Editor.toMarkdown(): string` 导出当前文档；`Editor.setDocFromMarkdown(md: string): void` 整体替换文档并重置历史。这两个方法是 `initialData` 字符串路径与 `onChangeMarkdown` 的内部基石。
+
+JSON 契约(`toData` / `setDocument` / `onChange` / `change`)保持不变：Markdown 支持是纯增量扩展。
 
 ### `src/core/index.ts`
 
 **职责。** 核心 barrel：框架无关引擎的公共表面。再导出核心模块的每个类型、函数和类，让视图层、扩展和消费者从单个路径导入。此 barrel 中的任何东西都不导入 Vue。
 
-**公共 API。** 再导出自：`types`(全部类型 + 辅助函数)、`ids`(`createBlockId`、`asBlockId`)、`schema/BlockSchema`(`defineSchema`、`defaultAttrs`、`coerceAttrs`、`canContain`、`hasText`、`isIsolating`、`isEmpty`、`SchemaRegistry`)、`state/store`(全部)、`state/Step`(`Step`、`applySteps`、`ApplyResult`)、`state/EditorState`(`createState`、`applyTransaction`、`EditorState`、`ApplyTransactionResult`)、`state/Transaction`(`createTransaction`、`TransactionBuilder`、`Transaction`、`TransactionMeta`、`InsertBlockParams`)、`state/invert`(`invertSteps`)、`selection/Selection`(全部)、`command/Command`(类型 + `CommandRegistry`)、`command/primitiveCommands`(`createPrimitiveCommands`)、`command/Keymap`(类型 + `KeymapRegistry`、`keyNameFromEvent`、`keyMatches`)、`command/InputRule`(类型 + `InputRuleRegistry`)、`command/SlashCommand`(类型 + `SlashCommandRegistry`)、`serialize/Serializer`(类型 + 注册表)、`plugin/Plugin`(类型)、`extension/Extension`(类型 + `extensionBlockType`)、`extension/Registry`(`flattenExtensions`、`buildRegistries`、`EditorRegistries`、`RendererRegistry`、`ToolbarRegistry`、`BuildRegistriesOptions`)、`history/HistoryManager`(`HistoryManager`)和 `Editor`(`Editor`、`EditorConfig`、`StateUpdate`、`EditorListener`)。
+**公共 API。** 再导出自：`types`(全部类型 + 辅助函数)、`ids`(`createBlockId`、`asBlockId`)、`schema/BlockSchema`(`defineSchema`、`defaultAttrs`、`coerceAttrs`、`canContain`、`hasText`、`isIsolating`、`isEmpty`、`SchemaRegistry`)、`state/store`(全部)、`state/Step`(`Step`、`applySteps`、`ApplyResult`)、`state/EditorState`(`createState`、`applyTransaction`、`EditorState`、`ApplyTransactionResult`)、`state/Transaction`(`createTransaction`、`TransactionBuilder`、`Transaction`、`TransactionMeta`、`InsertBlockParams`)、`state/invert`(`invertSteps`)、`selection/Selection`(全部)、`command/Command`(类型 + `CommandRegistry`)、`command/primitiveCommands`(`createPrimitiveCommands`)、`command/Keymap`(类型 + `KeymapRegistry`、`keyNameFromEvent`、`keyMatches`)、`command/InputRule`(类型 + `InputRuleRegistry`)、`command/SlashCommand`(类型 + `SlashCommandRegistry`)、`serialize/Serializer`(类型 + 注册表)、`plugin/Plugin`(类型)、`extension/Extension`(类型 + `extensionBlockType`)、`extension/Registry`(`flattenExtensions`、`buildRegistries`、`EditorRegistries`、`RendererRegistry`、`ToolbarRegistry`、`BuildRegistriesOptions`)、`history/HistoryManager`(`HistoryManager`)和 `Editor`(`Editor`、`EditorConfig`、`StateUpdate`、`EditorListener`、`EditorHistory`)。
 
 **交互。** 被 `src/index.ts`(包入口)、视图层和扩展导入。
 
@@ -696,16 +721,38 @@ function useEditor(): Editor;  // 在 <BlockEditor> 树之外调用时抛出
 
 **扩展点。** 未来的 `useBlock(blockId)` composable(按块订阅，返回 `BlockSnapshot` 浅层 ref)会住在这里，恢复设计的按块订阅接缝(§13.1 指出阶段一不需要它)。
 
+### `src/view/createEditor.ts`
+
+**职责。** 无头编辑器工厂，也是 `<BlockEditor>` 上 `editor` prop 的配套入口。虽然位于 `src/view/` 下，但它完全不导入 Vue：它是 `Editor` 类注释所指的那个装配点（扩展 + `new Editor()`），放在这里只是因为唯一的仓库内消费者在旁边。它把 `extensions` 变成可选并默认注入 `BuiltinExtensions`（`EditorConfig` 里该字段是必填），让组件路径与无头路径共用同一份「默认编辑器」定义，并承载仅 dev 生效的配置校验。
+
+**公共 API。**
+
+```ts
+type CreateEditorOptions = Omit<EditorConfig, 'extensions'> & {
+  readonly extensions?: readonly Extension[];
+};
+function createEditor(options?: CreateEditorOptions): Editor;
+```
+
+**交互。** 导入 `core/Editor`、`core/extension/Extension`（仅类型）与 `extensions/builtin`。由 `src/index.ts` 导出。未传 `editor` prop 时，`<BlockEditor.vue>` 会调用它。
+
+**扩展点。** 所有权归调用方：`createEditor()` 返回一个原生 `Editor`，调用方必须且只需调用一次 `editor.destroy()`（该方法是幂等的）。`<BlockEditor :editor>` 绝不销毁传入的实例。
+
 ### `src/view/BlockEditor.vue`
 
-**职责。** 公开的根编辑器组件。从扩展 + 初始文档构造 `Editor`，维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，emit `update:modelValue`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键：为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 对图片上传，仅把 `ImageExtension` 通过 `Editor.registerExtensionMethod('startImageUpload', …)` 注册的异步命令转发到原有的 `useBeginImageUpload()` Vue 注入口：所有上传编排、fileId 引用计数、`onFileCleanup` 触发现在都归 `extensions/Image.ts` 的 `image-upload` 插件负责。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
+**职责。** 公开的根编辑器组件。获取 `Editor` 有两条路径：接管通过 `editor` prop 传入的实例（由 `createEditor()` 构建），或从扩展 + 初始文档自行构造；维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，仅在内部编辑器模式下 emit `change`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键：为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 对图片上传，仅把 `ImageExtension` 通过 `Editor.registerExtensionMethod('startImageUpload', …)` 注册的异步命令转发到原有的 `useBeginImageUpload()` Vue 注入口：所有上传编排、fileId 引用计数、`onFileCleanup` 触发现在都归 `extensions/Image.ts` 的 `image-upload` 插件负责。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
 
 **公共 API(Props/Emits/Expose)。**
 
 ```ts
 props: {
+  // 由 `createEditor()` 预先构建的实例。传入后 `extensions` 与 `initialData`
+  // 被忽略（两者都在创建时就已固定），且组件卸载时不会销毁该实例；`editable`
+  // 仍生效。热替换不可行：`provide()` 只在 setup 阶段执行一次，换实例需要传
+  // `:key="editorId"` 让 Vue 重新挂载。
+  editor?: Editor;                          // 默认 undefined（组件自行创建）
   extensions?: readonly Extension[];        // 默认 BuiltinExtensions（14 个扩展，含 Image/Table/Divider/Equation/TableOfContents）
-  modelValue?: DocumentData;                // 默认 { blocks: [] }
+  initialData?: DocumentData;               // 默认 { blocks: [] }；单向初始化，非双向绑定
   editable?: boolean;                       // 默认 true
   placeholder?: string;                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
   theme?: 'light' | 'dark';                 // 默认 'light'
@@ -722,17 +769,24 @@ props: {
   // 接入清理回调。详见 `src/extensions/Image.ts`。
 }
 emits: {
-  'update:modelValue': [DocumentData];
+  // 文档内容变更时（新增 / 编辑 / 删除块，纯选区移动不触发）携带最新文档 JSON
+  // 触发。仅在内部编辑器模式下（未传 `editor`）发出；若实例由调用方持有，请
+  // 直接用 `editor.onChange()` 订阅。
+  'change': [DocumentData];
+  // `change` 的 Markdown 对应事件：内容变更时（与 `change` 同一触发条件）以 Markdown
+  // 字符串形式回传最新文档。仅在内部编辑器模式下（未传 `editor`）发出；注入实例请用
+  // `editor.onChangeMarkdown()` 订阅。
+  'change-markdown': [markdown: string];
   // 注意：没有 `cleanup:image-file` 事件。`ImageExtension` 在它的
   // `image-upload` 插件的 `applyTransaction` 钩子里自行调用
   // `onFileCleanup(fileId)`。
 }
-expose: { editor: Editor }
+expose: { editor: Editor }   // 传入 `editor` 时即该外部实例，否则是组件内部创建的实例
 ```
 
 `suppressSelectionSync` 标志防止反馈循环：当 DOM 选择被读取并分发到状态时，订阅回调绝不能把它写回 DOM。`renderItems` 是一个把 `doc.root` → `BlockRenderItem[]` 映射的 `computed`。`onKeyDown` 调用 `syncSelectionFromDom()`(把原生选择读入状态，带 `addToHistory: false`)，然后 `dispatchKeymap`；若已处理，则 `preventDefault()`。`Mod+K` 在 `BlockEditor.vue` 自身内部处理(而不走 keymap 注册表)，因为它需要桥接选择状态、link mark 和浮动 UI，纯 keymap 命令无法打开浮层。
 
-**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、`view/imageUpload`(瞬时态响应式订阅 / 取消订阅、占位 URL 注册)、`view/urlUtils`(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`)。**`<BlockEditor>` 不再持有 fileId 引用计数，也不再发出 `cleanup:image-file` 事件**：这两件事都由 `ImageExtension` 自带的 `image-upload` 插件在 `applyTransaction` 钩子里完成：当 fileId 引用归零时它通过 `createImageExtension({ onFileCleanup })` 注入的回调通知宿主；本组件只负责在挂载时查询扩展方法 `startImageUpload` 并 forward 到原有的 `useBeginImageUpload()` Vue 注入口（slash / paste / drop / 文件选择都通过这条路径下发），卸载时取消订阅、撤销未完成的临时对象 URL、调用 `editor.destroy()`。
+**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、`view/imageUpload`(瞬时态响应式订阅 / 取消订阅、占位 URL 注册)、`view/urlUtils`(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`)。**`<BlockEditor>` 不再持有 fileId 引用计数，也不再发出 `cleanup:image-file` 事件**：这两件事都由 `ImageExtension` 自带的 `image-upload` 插件在 `applyTransaction` 钩子里完成：当 fileId 引用归零时它通过 `createImageExtension({ onFileCleanup })` 注入的回调通知宿主；本组件只负责在挂载时查询扩展方法 `startImageUpload` 并 forward 到原有的 `useBeginImageUpload()` Vue 注入口（slash / paste / drop / 文件选择都通过这条路径下发），卸载时取消订阅、撤销未完成的临时对象 URL，并**仅在编辑器由自己创建时**调用 `editor.destroy()`（传入的实例归调用方所有）。
 
 **扩展点。** 此组件是唯一的响应式边界(设计的 `ViewBridge` 被并入其中，见 §13.1)。若视图层增长，可以在不改核心的情况下抽取桥接。虚拟化列表替换只替换 `BlockList`。`theme`/`locale` props 通过 provide/inject 流转，使所有子组件(包括通过 `<Teleport>` 渲染的弹出层)都能响应式地访问 `t(key)`。
 
@@ -1434,7 +1488,7 @@ export interface DocumentData {
 
 **不变量。** image 块出站无瞬态泄漏（`width/height` 为 `number | undefined`，绝无 `progress`/`error`/`tempSrc`；`ImageExtension.schema.attrs.validate` 在 `setAttrs` 时拒绝，`docToData` 只写白名单 attrs）；未知块类型的 `attrs`/`content` 原样保留，老客户端可 round-trip 回存未知扩展。
 
-**交互。** 消费者（`BlockEditor.vue` 的 `modelValue` prop、外部保存 API、`v-model` 用户）读写 `DocumentData`。
+**交互。** 消费者（`BlockEditor.vue` 的 `initialData` prop、外部保存 API、`editor.onChange` 订阅方）读写 `DocumentData`。
 
 ### 文档 ↔ Markdown 转换（原生集成于 `Editor`）
 
@@ -1516,6 +1570,10 @@ export { default as BlockEditor } from './view/BlockEditor.vue';
 export { default as BlockList } from './view/BlockList.vue';
 export { default as BlockHost } from './view/BlockHost.vue';
 export { default as BlockContent } from './view/BlockContent.vue';
+// 无头编辑器工厂（框架无关；与 `<BlockEditor :editor>` 配套使用）
+export { createEditor } from './view/createEditor';
+export type { CreateEditorOptions } from './view/createEditor';
+
 export { editorKey, useEditor } from './view/context';
 export type { BlockRenderItem } from './view/context';
 

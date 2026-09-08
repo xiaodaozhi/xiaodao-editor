@@ -27,7 +27,8 @@ import { createBlockId } from './ids';
 export interface EditorConfig {
   readonly extensions: readonly Extension[];
   readonly defaultBlockType?: string;
-  readonly initialDocument?: DocumentData;
+  /** A `DocumentData` object, or a Markdown string parsed via `markdownToDoc`. */
+  readonly initialData?: DocumentData | string;
   readonly initialSelection?: Selection;
   readonly editable?: boolean;
   readonly historyLimit?: number;
@@ -40,6 +41,12 @@ export interface StateUpdate {
 }
 
 export type EditorListener = (update: StateUpdate) => void;
+
+/** Handler for `Editor.onChange`: receives the latest document as JSON. */
+export type EditorChangeHandler = (doc: DocumentData) => void;
+
+/** Handler for `Editor.onChangeMarkdown`: receives the latest document as Markdown. */
+export type EditorMarkdownChangeHandler = (markdown: string) => void;
 
 /** Public read-only history API exposed by the Editor facade. */
 export interface EditorHistory {
@@ -84,6 +91,14 @@ export class Editor {
    */
   private readonly extensionMethods = new Map<string, unknown>();
 
+  /**
+   * Set by `destroy()` so a second call is a no-op. Without this guard every
+   * extra `destroy()` would re-run each plugin's `onDestroy` hook, which for
+   * some extensions mutates module-level state (for example the shared image
+   * upload handler).
+   */
+  private destroyed = false;
+
   /** Context handed to plugin `init` and `applyTransaction` hooks. */
   private readonly pluginCtx: PluginInitContext;
 
@@ -109,8 +124,13 @@ export class Editor {
     }
 
     // Build the initial document, ensuring at least one default block.
-    const { doc } = docFromData(config.initialDocument ?? { blocks: [] });
-    const docWithContent = doc.root.length === 0 ? this.seedEmptyDocument(doc.id) : doc;
+    // A string `initialData` is parsed as Markdown (see `markdownToDoc` below);
+    // an object keeps the existing JSON path. Both reuse `seedEmptyDocument`
+    // and the unknown-block-type dev check downstream.
+    const initialDoc = typeof config.initialData === 'string'
+      ? markdownToDoc(config.initialData)
+      : docFromData(config.initialData ?? { blocks: [] }).doc;
+    const docWithContent = initialDoc.root.length === 0 ? this.seedEmptyDocument(initialDoc.id) : initialDoc;
 
     // Initialise plugins.
     const pluginState: Record<string, unknown> = {};
@@ -187,7 +207,7 @@ export class Editor {
     return docToMarkdown(this.state.doc);
   }
 
-  /** Replace the whole document (e.g. on external `v-model` change). Resets history. */
+  /** Replace the whole document (e.g. when applying an externally loaded doc). Resets history. */
   setDocument(json: DocumentData): void {
     this.adoptDoc(docFromData(json).doc);
   }
@@ -302,6 +322,35 @@ export class Editor {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Convenience document-change subscription. The handler fires only when the
+   * document content actually changes (a block added / edited / removed), not
+   * on selection-only updates, and receives the latest `DocumentData` (the
+   * same payload `v-model` used to emit). Returns an unsubscribe function.
+   *
+   * This is the framework-agnostic counterpart of `<BlockEditor @change>`:
+   * when the host owns the `Editor` instance it listens here directly; when
+   * the component owns the instance it re-emits as `@change`.
+   */
+  onChange(handler: EditorChangeHandler): () => void {
+    return this.subscribe((update) => {
+      if (update.changed.size > 0 || update.removed.size > 0) handler(this.toData());
+    });
+  }
+
+  /**
+   * Markdown counterpart of `onChange`: receives the latest document as a
+   * Markdown string whenever the content changes (same trigger condition as
+   * `onChange`: a block added / edited / removed, not selection-only moves).
+   * Returns an unsubscribe function. Use this when the host wants to persist
+   * or preview the document as Markdown without calling `toMarkdown()` itself.
+   */
+  onChangeMarkdown(handler: EditorMarkdownChangeHandler): () => void {
+    return this.subscribe((update) => {
+      if (update.changed.size > 0 || update.removed.size > 0) handler(this.toMarkdown());
+    });
+  }
+
   private notify(update: StateUpdate): void {
     for (const listener of this.listeners) listener(update);
   }
@@ -344,6 +393,10 @@ export class Editor {
   }
 
   destroy(): void {
+    // Idempotent by design: an editor may be shared (see the `editor` prop of
+    // `<BlockEditor>`), so defensive second calls must not re-run `onDestroy`.
+    if (this.destroyed) return;
+    this.destroyed = true;
     for (const plugin of this.registries.plugins) plugin.onDestroy?.();
     this.listeners.clear();
     // Drop any extension-attached callables so a destroyed editor can be
