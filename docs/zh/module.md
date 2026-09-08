@@ -1,6 +1,6 @@
 # 小刀编辑器模块参考
 
-本文档是 `xiaodao-editor` 包的按模块 API 参考。这是一个 Notion 风格、块优先的编辑器，以可复用的 Vue 3 + TypeScript 库形式构建。**核心**（`src/core/**`）与框架无关——它零 Vue 导入，可移植到任何框架；而**视图层**（`src/view/**`）是连接 Vue 响应式和 DOM 的唯一桥梁。每个块类型和编辑行为都由一个**扩展**贡献，因此核心绝不对块类型做 switch。包内置 **13** 个扩展（Paragraph、Heading、BulletList、OrderedList、TodoList、Quote、CodeBlock、**Image**、**Table**、**Divider**、**TableOfContents**、Keymap、History），覆盖全部块类型、行内标记（加粗/斜体/下划线/删除线/代码/**带 href 属性和 URL 净化的 link mark**）、块级属性、斜杠菜单、输入规则、悬停工具栏（新增链接按钮）、拖拽手柄、剪贴板、国际化、主题、**图片上传管线（侧信道 + fileId cleanup 事件）**、**链接浮层（查看/编辑/复制/删除）+ Mod+K + 粘贴/键入 URL 自动加链**、**表格块（合并/拆分/切换标题行）**、**目录块（实时标题列表视图）**、JSON 持久化以及 Markdown/HTML 序列化/反序列化。本参考按子系统组织；设计理由和更新流程见 `docs/architecture.md`（特别是 §4 文档模型、§6 渲染、§7 命令、§10 状态、§11 键盘/IME、§14 阶段 6 图片 + 链接 Mark、阶段 7 表格 + 分割线、阶段 8 目录）。
+本文档是 `xiaodao-editor` 包的按模块 API 参考。这是一个 Notion 风格、块优先的编辑器，以可复用的 Vue 3 + TypeScript 库形式构建。**核心**（`src/core/**`）与框架无关：它零 Vue 导入，可移植到任何框架；而**视图层**（`src/view/**`）是连接 Vue 响应式和 DOM 的唯一桥梁。每个块类型和编辑行为都由一个**扩展**贡献，因此核心绝不对块类型做 switch。包内置 **13** 个扩展（Paragraph、Heading、BulletList、OrderedList、TodoList、Quote、CodeBlock、**Image**、**Table**、**Divider**、**TableOfContents**、Keymap、History），覆盖全部块类型、行内标记（加粗/斜体/下划线/删除线/代码/**带 href 属性和 URL 净化的 link mark**）、块级属性、斜杠菜单、输入规则、悬停工具栏（新增链接按钮）、拖拽手柄、剪贴板、国际化、主题、**图片上传管线（侧信道 + fileId cleanup 事件）**、**链接浮层（查看/编辑/复制/删除）+ Mod+K + 粘贴/键入 URL 自动加链**、**表格块（合并/拆分/切换标题行）**、**目录块（实时标题列表视图）**、JSON 持久化以及 Markdown/HTML 序列化/反序列化。本参考按子系统组织；设计理由和更新流程见 `docs/architecture.md`（特别是 §4 文档模型、§6 渲染、§7 命令、§10 状态、§11 键盘/IME、§14 阶段 6 图片 + 链接 Mark、阶段 7 表格 + 分割线、阶段 8 目录）。
 
 ## 文档模型与类型
 
@@ -76,7 +76,7 @@ function asBlockId(value: string): BlockId;  // 强制转换可信字符串(仅�
 
 ### `src/core/state/store.ts`
 
-**职责。** 负责从嵌套 JSON 构建规范化的 `DocState`、序列化回 JSON，以及纯查找辅助函数（父、兄弟、文档序遍历）。它绝不就地变更 `DocState`——变更位于 `Step.ts` / `Transaction.ts`。见 `docs/architecture.md` §4.4（森林 + 规范化 store）和 §10。
+**职责。** 负责从嵌套 JSON 构建规范化的 `DocState`、序列化回 JSON，以及纯查找辅助函数（父、兄弟、文档序遍历）。它绝不就地变更 `DocState`：变更位于 `Step.ts` / `Transaction.ts`。见 `docs/architecture.md` §4.4（森林 + 规范化 store）和 §10。
 
 **公共 API。**
 
@@ -106,11 +106,11 @@ function withAttrs(block: Block, attrs: Block['attrs']): Block;
 
 **交互。** 依赖 `types.ts` 和 `ids.ts`。被 `Step.ts`（apply 读取父/子）、`invert.ts`（`indexOf`、`parentOf`、`requireBlock` 以反转步骤）、`Editor.ts`（`docFromData`、`docToData`、`flatten`、`getBlock`）和 `primitiveCommands.ts`（遍历以支持 Enter/Backspace/导航）使用。
 
-**扩展点。** id 策略（若唯一则保留，否则重新生成，返回 `idMap`）是改变导入身份规则的唯一地方——见待解决问题 §17.1。`flatten` 是视图桥接用来推导扁平渲染列表的接缝；未来的虚拟化 `BlockList` 消费同样的输出。
+**扩展点。** id 策略（若唯一则保留，否则重新生成，返回 `idMap`）是改变导入身份规则的唯一地方，见待解决问题 §17.1。`flatten` 是视图桥接用来推导扁平渲染列表的接缝；未来的虚拟化 `BlockList` 消费同样的输出。
 
 ### `src/core/state/Step.ts`
 
-**职责。** 定义变更文档的原子化、可序列化的结构操作（`Step`），以及 `applySteps`——它产出一个新的不可变 `DocState` 加一个 diff（`changed` / `removed`），视图桥接消费它以只更新受影响的块。步骤刻意保持底层和"笨"——它们携带完全解析好的数据，不做任何策略决策；命令分配 id 并对步骤排序。见 `docs/architecture.md` §7.2 和 §10.3。
+**职责。** 定义变更文档的原子化、可序列化的结构操作（`Step`），以及 `applySteps`：它产出一个新的不可变 `DocState` 加一个 diff（`changed` / `removed`），视图桥接消费它以只更新受影响的块。步骤刻意保持底层和"笨"：它们携带完全解析好的数据，不做任何策略决策；命令分配 id 并对步骤排序。见 `docs/architecture.md` §7.2 和 §10.3。
 
 **公共 API。**
 
@@ -132,11 +132,11 @@ function applySteps(doc: DocState, steps: readonly Step[]): ApplyResult;
 
 **交互。** 依赖 `types.ts`。被 `EditorState.ts`（`applyTransaction` 调用 `applySteps`）、`Transaction.ts`（`Step` 类型）和 `invert.ts`（反转步骤列表）消费。diff（`changed`/`removed`）经 `applyTransaction` → `Editor.dispatch` → 视图层流出。
 
-**扩展点。** 新的结构操作（例如 `insertInlineNode`、`setMark`）作为新的联合成员以及 `applySteps` 中的一个 `case` 加入。由于步骤可序列化，它们是未来协作传输会广播的单元——见 §15（协作）。
+**扩展点。** 新的结构操作（例如 `insertInlineNode`、`setMark`）作为新的联合成员以及 `applySteps` 中的一个 `case` 加入。由于步骤可序列化，它们是未来协作传输会广播的单元，见 §15（协作）。
 
 ### `src/core/state/Transaction.ts`
 
-**职责。** 定义 `Transaction`——变更编辑器状态的唯一路径——作为有序的 `Step` 列表加上可选的结果选择和元数据。提供一个流式的 `TransactionBuilder`，命令用它来组装事务。Meta 携带横切提示：`addToHistory`、`historyGroup`、`viewHints.skipDomWrite`，以及一个 `source` 溯源标签。见 `docs/architecture.md` §6.3、§7.2、§10.3。
+**职责。** 定义 `Transaction`（变更编辑器状态的唯一路径）作为有序的 `Step` 列表加上可选的结果选择和元数据。提供一个流式的 `TransactionBuilder`，命令用它来组装事务。Meta 携带横切提示：`addToHistory`、`historyGroup`、`viewHints.skipDomWrite`，以及一个 `source` 溯源标签。见 `docs/architecture.md` §6.3、§7.2、§10.3。
 
 **公共 API。**
 
@@ -202,7 +202,7 @@ function createState(doc: DocState, selection: Selection, pluginState?: Readonly
 
 ### `src/core/state/invert.ts`
 
-**职责。** 计算对给定步骤列表做撤销所需的步骤（针对这些步骤应用*之前*的文档状态）。这实现了内存高效、正确的撤销/重做，而无需对整个文档做快照——只有事务触碰到的块被逆步骤引用。步骤以逆序反转，因此最后应用的更改最先被撤销。见 `docs/architecture.md` §9 和 §16。
+**职责。** 计算对给定步骤列表做撤销所需的步骤（针对这些步骤应用*之前*的文档状态）。这实现了内存高效、正确的撤销/重做，而无需对整个文档做快照：只有事务触碰到的块被逆步骤引用。步骤以逆序反转，因此最后应用的更改最先被撤销。见 `docs/architecture.md` §9 和 §16。
 
 **公共 API。**
 
@@ -214,7 +214,7 @@ function invertSteps(steps: readonly Step[], prevDoc: DocState): Step[];
 
 **交互。** 依赖 `types.ts`、`Step.ts` 和 `store.ts`（`indexOf`、`parentOf`、`requireBlock`）。被 `HistoryManager.ts` 消费，后者在记录事务时调用 `invertSteps`，使每个历史条目同时携带原始步骤和逆步骤。
 
-**扩展点。** 新的步骤操作需要在这里有一个匹配的 `case`，否则撤销会静默跳过它们。该模块刻意独立，以便这段反转逻辑保持可审计——见 §13.1（"'invert.ts' 不在设计中 → 新增"）。
+**扩展点。** 新的步骤操作需要在这里有一个匹配的 `case`，否则撤销会静默跳过它们。该模块刻意独立，以便这段反转逻辑保持可审计，见 §13.1（"'invert.ts' 不在设计中 → 新增"）。
 
 ## Schema 系统
 
@@ -250,7 +250,7 @@ function isEmpty(schema: BlockSchema, block: Block): boolean;
 
 **交互。** 依赖 `types.ts`。被 `SchemaRegistry.ts`（用类型键控查找包装它）使用，并间接被 `Registry.ts` 使用（`defineSchema` 规范化每个扩展的 spec）。谓词被 `primitiveCommands.ts` 通过 `SchemaRegistry` 读取，以驱动 Enter/Backspace/split/merge 而无需引用类型。
 
-**扩展点。** 块类型扩展提供 `BlockSchemaSpec`；`defineSchema` 填补空隙。未来的结构标志（例如 `inlineContent: 'marks'`、`void: true`）是 spec 上的增量字段。`allowedChildren` 白名单是未来嵌套块（Toggle、Columns、Callout）约束其子块的方式——见 §15。
+**扩展点。** 块类型扩展提供 `BlockSchemaSpec`；`defineSchema` 填补空隙。未来的结构标志（例如 `inlineContent: 'marks'`、`void: true`）是 spec 上的增量字段。`allowedChildren` 白名单是未来嵌套块（Toggle、Columns、Callout）约束其子块的方式，见 §15。
 
 ### `src/core/schema/SchemaRegistry.ts`
 
@@ -274,7 +274,7 @@ class SchemaRegistry {
 
 **交互。** 依赖 `BlockSchema.ts`（委托给它的纯函数）。由 `Registry.ts`（`buildRegistries`）用一个 `type: '__fallback__'` 的 `FALLBACK_SCHEMA` 构造。被 `primitiveCommands.ts` 大量读取（例如 `enter` 检查 `hasText`/`isEmpty`/`isIsolating`；`splitBlock` 检查 `hasText`），也被 `Editor.ts` 读取（播种空文档时的 `defaultAttrsFor`）。
 
-**扩展点。** 回退 schema 让核心即使某个块类型缺失也能运行——在动态注册期间很有用。新增块类型就是"通过扩展注册一个 schema"；注册表在编辑器重新配置时重建（§5.4）。
+**扩展点。** 回退 schema 让核心即使某个块类型缺失也能运行，在动态注册期间很有用。新增块类型就是"通过扩展注册一个 schema"；注册表在编辑器重新配置时重建（§5.4）。
 
 ## 命令系统
 
@@ -416,7 +416,7 @@ class SlashCommandRegistry {
 
 ### `src/core/extension/Extension.ts`
 
-**职责。** `Extension` 契约:编辑器获得新块类型和行为的唯一机制。扩展是一个普通 spec 对象(由工厂产出),在构造时贡献;核心从不导入扩展,它只把它们的 spec 处理进注册表。每个字段均可选——扩展只贡献它需要的部分。见 `docs/architecture.md` §5。
+**职责。** `Extension` 契约:编辑器获得新块类型和行为的唯一机制。扩展是一个普通 spec 对象(由工厂产出),在构造时贡献;核心从不导入扩展,它只把它们的 spec 处理进注册表。每个字段均可选，扩展只贡献它需要的部分。见 `docs/architecture.md` §5。
 
 **公共 API。**
 
@@ -446,7 +446,7 @@ function extensionBlockType(ext: Extension): BlockType | null;   // 便捷：所
 
 **交互。** 依赖(仅类型)`BlockSchema`、`Command`、`InputRule`、`Keymap`、`Plugin`、`SlashCommand`、`Serializer` 和 `types`。被 `Registry.ts`(`flattenExtensions` + `buildRegistries`)消费。内置扩展(`Paragraph`、`Heading`、`Keymap`、`History`)实现它；用户扩展被传给 `Editor` / `BlockEditor.vue`。
 
-**扩展点。** *这就是*扩展点。新增块类型 = 创建一个带 `schema` + `renderer`(加上可选的 serialize/slash/commands)的 `Extension` 并传给编辑器——零核心改动(§5.4、§15)。`uses` 图支持组合(例如一个捆绑 `History` 类行为的 "CodeBlock" 扩展)。
+**扩展点。** *这就是*扩展点。新增块类型 = 创建一个带 `schema` + `renderer`(加上可选的 serialize/slash/commands)的 `Extension` 并传给编辑器，零核心改动(§5.4、§15)。`uses` 图支持组合(例如一个捆绑 `History` 类行为的 "CodeBlock" 扩展)。
 
 ### `src/core/extension/Registry.ts`
 
@@ -488,13 +488,13 @@ function buildRegistries(extensions: readonly Extension[], options?: BuildRegist
 
 **交互。** 依赖每个注册表模块(`Command`、`InputRule`、`Keymap`、`SlashCommand`、`SchemaRegistry`、`BlockSchema`、`Serializer`)以及 `Extension.ts`/`Plugin.ts`。由 `Editor.ts` 在构造函数中调用一次。结果 `EditorRegistries` 是 `primitiveCommands.ts`、`Editor.ts` 和视图层读取的中央对象。
 
-**扩展点。** `flattenExtensions` 的"后者胜出"规则是用户扩展覆盖同名内置扩展的方式。新增注册表(例如未来用于行内格式化的 `MarkRegistry`)意味着给 `EditorRegistries` 加一个字段、加一个类、在 `buildRegistries` 中加一个注册循环——局部改动，无命令/核心变更。
+**扩展点。** `flattenExtensions` 的"后者胜出"规则是用户扩展覆盖同名内置扩展的方式。新增注册表(例如未来用于行内格式化的 `MarkRegistry`)意味着给 `EditorRegistries` 加一个字段、加一个类、在 `buildRegistries` 中加一个注册循环，局部改动，无命令/核心变更。
 
 ## 插件系统
 
 ### `src/core/plugin/Plugin.ts`
 
-**职责。** `Plugin` 契约。插件在定义良好的钩子上增强编辑器行为。它们与扩展不同：扩展*声明*块/命令/键位映射；插件*响应*编辑器生命周期和事件。插件状态存储在 `EditorState` 内部(以名为键)，因此它是不可变的、带版本的状态的一部分——这正是让撤销/重做跨插件效果保持正确的关键。见 `docs/architecture.md` §9。
+**职责。** `Plugin` 契约。插件在定义良好的钩子上增强编辑器行为。它们与扩展不同：扩展*声明*块/命令/键位映射；插件*响应*编辑器生命周期和事件。插件状态存储在 `EditorState` 内部(以名为键)，因此它是不可变的、带版本的状态的一部分，这正是让撤销/重做跨插件效果保持正确的关键。见 `docs/architecture.md` §9。
 
 **公共 API。**
 
@@ -527,7 +527,7 @@ interface Plugin {
 
 ### `src/core/selection/Selection.ts`
 
-**职责。** `Selection` 的构造器、类型守卫和纯辅助函数。Selection 是编辑器状态的一部分,但*与*文档*分离*(§8)。此模块绝不触碰 DOM——原生选择同步位于 `view/domSelection.ts`。见 `docs/architecture.md` §8。
+**职责。** `Selection` 的构造器、类型守卫和纯辅助函数。Selection 是编辑器状态的一部分,但*与*文档*分离*(§8)。此模块绝不触碰 DOM：原生选择同步位于 `view/domSelection.ts`。见 `docs/architecture.md` §8。
 
 **公共 API。**
 
@@ -574,13 +574,13 @@ class HistoryManager {
 
 **交互。** 依赖 `types.ts`、`Step.ts`、`Transaction.ts`(`createTransaction`)和 `invert.ts`(`invertSteps`)。由 `Editor.ts` 拥有，它在 `dispatch` 内调用 `record`，并暴露 `undo()`/`redo()`/`canUndo()`/`canRedo()`。核心 `undo`/`redo` 命令(在 `Editor` 中注册)委托给它。
 
-**扩展点。** `historyGroup` 是控制粒度的 meta 键——未来一种"词边界"分组策略只改变命令如何设置 `historyGroup`。`limit` 和基于反转(而非基于快照)的方法让大文档的内存保持有界。协作层可以读取栈来调和远程/本地历史。
+**扩展点。** `historyGroup` 是控制粒度的 meta 键：未来一种"词边界"分组策略只改变命令如何设置 `historyGroup`。`limit` 和基于反转(而非基于快照)的方法让大文档的内存保持有界。协作层可以读取栈来调和远程/本地历史。
 
 ## 序列化
 
 ### `src/core/serialize/Serializer.ts`
 
-**职责。** 按块的 Markdown/HTML 序列化契约。规范 JSON 进/出由 `state/store.ts` 集中处理(`docFromData`/`docToData`)；这些 spec 让每个块类型都能贡献 Markdown(阶段二)和 HTML(阶段五)的往返，而无需核心改动。还定义按注册顺序尝试 Markdown 行解析器的 `DeserializerRegistry`，以及阶段 6 新增的 HTML 元素级 `fromHTML`(用于块级 HTML 粘贴——图片 `<figure>`/`<img>` 等)。
+**职责。** 按块的 Markdown/HTML 序列化契约。规范 JSON 进/出由 `state/store.ts` 集中处理(`docFromData`/`docToData`)；这些 spec 让每个块类型都能贡献 Markdown(阶段二)和 HTML(阶段五)的往返，而无需核心改动。还定义按注册顺序尝试 Markdown 行解析器的 `DeserializerRegistry`，以及阶段 6 新增的 HTML 元素级 `fromHTML`(用于块级 HTML 粘贴，如图片 `<figure>`/`<img>` 等)。
 
 **公共 API。**
 
@@ -607,7 +607,7 @@ class DeserializerRegistry {
 }
 ```
 
-对 `link` mark(行内级)：序列化/反序列化由 `inlineDom.ts`（HTML）和 `Editor.ts`（Markdown，直接集成在 `editor.toMarkdown` / `editor.setDocFromMarkdown` 中）各自直接处理，不需要块级 `SerializerSpec`——它们把行内的 `{type:'link', attrs:{href}}` 分别写成 `<a href>` 和 `[text](href)`。对 `image` 块：Image 扩展提供 `serialize.toMarkdown` → `![](src "title")`(带 alt/caption 变体)和 `toHTML` → `<figure><img src alt title><figcaption>caption</figcaption></figure>`；粘贴反序列化由 `fromHTML`(处理 `<figure>`/`<img>`)和 `fromMarkdown`(处理 `![]()`)贡献，并结合 `clipboard.ts` 中的文件粘贴(见 `view/clipboard.ts`)。
+对 `link` mark(行内级)：序列化/反序列化由 `inlineDom.ts`（HTML）和 `Editor.ts`（Markdown，直接集成在 `editor.toMarkdown` / `editor.setDocFromMarkdown` 中）各自直接处理，不需要块级 `SerializerSpec`：它们把行内的 `{type:'link', attrs:{href}}` 分别写成 `<a href>` 和 `[text](href)`。对 `image` 块：Image 扩展提供 `serialize.toMarkdown` → `![](src "title")`(带 alt/caption 变体)和 `toHTML` → `<figure><img src alt title><figcaption>caption</figcaption></figure>`；粘贴反序列化由 `fromHTML`(处理 `<figure>`/`<img>`)和 `fromMarkdown`(处理 `![]()`)贡献，并结合 `clipboard.ts` 中的文件粘贴(见 `view/clipboard.ts`)。
 
 **交互。** 依赖 `types.ts`。由 `Registry.ts` 构建(每个扩展的 `serialize`/`deserialize` 针对其块类型注册)。携带于 `EditorRegistries.serializers` / `deserializers`。被 `Editor.ts`（`toMarkdown` 行反序列化 + `setDocFromMarkdown` 解析）和 `view/clipboard.ts`(粘贴时调用 `deserializers.parseMarkdownLine` 与 `parseHtmlElement`)使用。
 
@@ -680,7 +680,7 @@ function hasBlock(editor: Editor, id: BlockId): boolean;  // 调试辅助
 
 ### `src/view/context.ts`
 
-**职责。** 视图层共享上下文和类型。通过 Vue 的 provide/inject(`editorKey` / `useEditor`)向子组件提供框架无关的 `Editor` 实例，并定义 `BlockRenderItem`——从 `BlockEditor` 传给 `BlockList` 的 DTO。编辑器作为非响应式值提供——需要对状态变化做出反应的组件通过 `editor.subscribe()` 订阅，让编辑器内部状态留在 Vue 响应式系统之外(避免大文档上的深度响应式开销)。见 `docs/architecture.md` §6.2。
+**职责。** 视图层共享上下文和类型。通过 Vue 的 provide/inject(`editorKey` / `useEditor`)向子组件提供框架无关的 `Editor` 实例，并定义 `BlockRenderItem`（从 `BlockEditor` 传给 `BlockList` 的 DTO）。编辑器作为非响应式值提供，需要对状态变化做出反应的组件通过 `editor.subscribe()` 订阅，让编辑器内部状态留在 Vue 响应式系统之外(避免大文档上的深度响应式开销)。见 `docs/architecture.md` §6.2。
 
 **公共 API。**
 
@@ -698,7 +698,7 @@ function useEditor(): Editor;  // 在 <BlockEditor> 树之外调用时抛出
 
 ### `src/view/BlockEditor.vue`
 
-**职责。** 公开的根编辑器组件。从扩展 + 初始文档构造 `Editor`，维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，emit `update:modelValue`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键——为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 对图片上传，仅把 `ImageExtension` 通过 `Editor.registerExtensionMethod('startImageUpload', …)` 注册的异步命令转发到原有的 `useBeginImageUpload()` Vue 注入口——所有上传编排、fileId 引用计数、`onFileCleanup` 触发现在都归 `extensions/Image.ts` 的 `image-upload` 插件负责。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
+**职责。** 公开的根编辑器组件。从扩展 + 初始文档构造 `Editor`，维护一个只在顶层触发 Vue 响应式的 `shallowRef<EditorState>`(无深度响应式)，向子组件提供编辑器，处理键盘事件(先同步 DOM 选择 → 状态，再分发键位映射命令)，应用状态选择变化 → DOM(在 `nextTick` 之后)，emit `update:modelValue`，并在挂载时聚焦第一个块。同时负责 i18n/主题：把 `locale`/`theme` props 标准化为响应式 ref，通过 `provideI18n()` 提供给子组件，并把主题 class 同步到 `<body>`，使通过 `<Teleport>` 渲染的弹出层能继承 CSS 变量。**阶段 6 新增职责：(1)** 显式处理 `Mod+K` 链接快捷键：为当前选区打开链接浮层的编辑模式，或若光标位于已有 link mark 内则打开查看模式；**(2)** 持有 `<LinkPopover>` 的挂载与状态(view/edit 模式、目标 link 范围、来自 `LinkClickEvent` 或原生选择矩形的锚点坐标)；**(3)** 对图片上传，仅把 `ImageExtension` 通过 `Editor.registerExtensionMethod('startImageUpload', …)` 注册的异步命令转发到原有的 `useBeginImageUpload()` Vue 注入口：所有上传编排、fileId 引用计数、`onFileCleanup` 触发现在都归 `extensions/Image.ts` 的 `image-upload` 插件负责。见 `docs/architecture.md` §6.1、§6.2、§14(阶段 6)。
 
 **公共 API(Props/Emits/Expose)。**
 
@@ -710,12 +710,12 @@ props: {
   placeholder?: string;                     // 默认 locale 感知（"输入文字，或按 '/' 获取命令…" / "Type '/' for commands…"）
   theme?: 'light' | 'dark';                 // 默认 'light'
   locale?: 'zh-CN' | 'en-US';               // 默认 'zh-CN'；任何非空非 'zh-CN' 值 ⇒ 'en-US'
-  // —— 尺寸约束(可选)：数字按 CSS 像素解析；字符串原样使用 ——
+  // 尺寸约束(可选)：数字按 CSS 像素解析；字符串原样使用
   width?: string | number;                  // 默认 undefined（填满容器）
   height?: string | number;                 // 默认 undefined（随内容生长，宿主页面滚动）
-  // —— 工具栏位置(FixedToolbar)：'auto' = 桌面端顶栏/移动端底栏。
+  // 工具栏位置(FixedToolbar)：'auto' = 桌面端顶栏/移动端底栏。
   //    'float'（仅桌面端）隐藏 FixedToolbar，改用跟随文本选区的浮动 HoverToolbar；
-  //    移动端回退为 'auto' ——
+  //    移动端回退为 'auto'。
   toolbarPosition?: 'auto' | 'top' | 'bottom' | 'float';    // 默认 'auto'
   // 注意：没有 `uploadImage` prop。把 `createImageExtension({ upload, onFileCleanup })`
   // 放到 `:extensions` 中 `BuiltinExtensions` 之后即可替换默认 mock 上传 +
@@ -730,15 +730,15 @@ emits: {
 expose: { editor: Editor }
 ```
 
-`suppressSelectionSync` 标志防止反馈循环：当 DOM 选择被读取并分发到状态时，订阅回调绝不能把它写回 DOM。`renderItems` 是一个把 `doc.root` → `BlockRenderItem[]` 映射的 `computed`。`onKeyDown` 调用 `syncSelectionFromDom()`(把原生选择读入状态，带 `addToHistory: false`)，然后 `dispatchKeymap`；若已处理，则 `preventDefault()`。`Mod+K` 在 `BlockEditor.vue` 自身内部处理(而不走 keymap 注册表)，因为它需要桥接选择状态、link mark 和浮动 UI——纯 keymap 命令无法打开浮层。
+`suppressSelectionSync` 标志防止反馈循环：当 DOM 选择被读取并分发到状态时，订阅回调绝不能把它写回 DOM。`renderItems` 是一个把 `doc.root` → `BlockRenderItem[]` 映射的 `computed`。`onKeyDown` 调用 `syncSelectionFromDom()`(把原生选择读入状态，带 `addToHistory: false`)，然后 `dispatchKeymap`；若已处理，则 `preventDefault()`。`Mod+K` 在 `BlockEditor.vue` 自身内部处理(而不走 keymap 注册表)，因为它需要桥接选择状态、link mark 和浮动 UI，纯 keymap 命令无法打开浮层。
 
-**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、`view/imageUpload`(瞬时态响应式订阅 / 取消订阅、占位 URL 注册)、`view/urlUtils`(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`)。**`<BlockEditor>` 不再持有 fileId 引用计数，也不再发出 `cleanup:image-file` 事件**——这两件事都由 `ImageExtension` 自带的 `image-upload` 插件在 `applyTransaction` 钩子里完成：当 fileId 引用归零时它通过 `createImageExtension({ onFileCleanup })` 注入的回调通知宿主；本组件只负责在挂载时查询扩展方法 `startImageUpload` 并 forward 到原有的 `useBeginImageUpload()` Vue 注入口（slash / paste / drop / 文件选择都通过这条路径下发），卸载时取消订阅、撤销未完成的临时对象 URL、调用 `editor.destroy()`。
+**交互。** 导入 `vue`、`core/Editor`、`core/extension/Extension`、`core/types`、`core/state/EditorState`、`core/state/Transaction`、`view/context`(`editorKey`、`BlockRenderItem`)、`view/keymapHandler`(`dispatchKeymap`)、`view/domSelection`(`readDomSelection`、`applySelectionToDom`)、`view/inlineDom`、`view/clipboard`、`view/imageUpload`(瞬时态响应式订阅 / 取消订阅、占位 URL 注册)、`view/urlUtils`(`sanitizeUrl` 用于链接浮层保存路径的 href 校验)、`i18n`(`provideI18n`、`useI18n`、`normalizeLocale`、`normalizeTheme`)以及 `BlockList.vue` + 8 个弹出组件(`PlusMenu`、`BlockSettingsMenu`、`HoverToolbar`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`)。**`<BlockEditor>` 不再持有 fileId 引用计数，也不再发出 `cleanup:image-file` 事件**：这两件事都由 `ImageExtension` 自带的 `image-upload` 插件在 `applyTransaction` 钩子里完成：当 fileId 引用归零时它通过 `createImageExtension({ onFileCleanup })` 注入的回调通知宿主；本组件只负责在挂载时查询扩展方法 `startImageUpload` 并 forward 到原有的 `useBeginImageUpload()` Vue 注入口（slash / paste / drop / 文件选择都通过这条路径下发），卸载时取消订阅、撤销未完成的临时对象 URL、调用 `editor.destroy()`。
 
-**扩展点。** 此组件是唯一的响应式边界(设计的 `ViewBridge` 被并入其中——§13.1)。若视图层增长，可以在不改核心的情况下抽取桥接。虚拟化列表替换只替换 `BlockList`。`theme`/`locale` props 通过 provide/inject 流转，使所有子组件(包括通过 `<Teleport>` 渲染的弹出层)都能响应式地访问 `t(key)`。
+**扩展点。** 此组件是唯一的响应式边界(设计的 `ViewBridge` 被并入其中，见 §13.1)。若视图层增长，可以在不改核心的情况下抽取桥接。虚拟化列表替换只替换 `BlockList`。`theme`/`locale` props 通过 provide/inject 流转，使所有子组件(包括通过 `<Teleport>` 渲染的弹出层)都能响应式地访问 `t(key)`。
 
 ### `src/view/BlockList.vue`
 
-**职责。** **递归**渲染一个块列表：渲染每个块后再为它的 `children` 递归渲染自身（包在带独立缩进的 `.block-children` 容器里），使整棵嵌套树以正确的树状缩进显示。阶段一渲染一个扁平列表(`doc.root`)；权威的嵌套结构来自 `Block.children`(`DocState.parent`)，`attrs.indent` 只是其衍生镜像。当作为嵌套列表(`is-nested`)时，会禁用仅属于根列表的下拉指示器和首块占位符。使用 `:key="item.id"`，让 Vue 跨重渲染复用组件实例；因为 block 对象保持引用同一性(结构共享)，未变化的块不会触发 `BlockHost` 重渲染。这是**虚拟化接缝**——决定哪些块被挂载的唯一组件；虚拟化实现以后可以无缝替换，而不触碰块组件。见 `docs/architecture.md` §6.1、§12。
+**职责。** **递归**渲染一个块列表：渲染每个块后再为它的 `children` 递归渲染自身（包在带独立缩进的 `.block-children` 容器里），使整棵嵌套树以正确的树状缩进显示。阶段一渲染一个扁平列表(`doc.root`)；权威的嵌套结构来自 `Block.children`(`DocState.parent`)，`attrs.indent` 只是其衍生镜像。当作为嵌套列表(`is-nested`)时，会禁用仅属于根列表的下拉指示器和首块占位符。使用 `:key="item.id"`，让 Vue 跨重渲染复用组件实例；因为 block 对象保持引用同一性(结构共享)，未变化的块不会触发 `BlockHost` 重渲染。这是**虚拟化接缝**：决定哪些块被挂载的唯一组件；虚拟化实现以后可以无缝替换，而不触碰块组件。见 `docs/architecture.md` §6.1、§12。
 
 **公共 API(Props)。**
 
@@ -762,7 +762,7 @@ props: {
 
 **交互。** 导入 `BlockHost.vue` 和 `view/context`(`BlockRenderItem`)。由 `BlockEditor.vue` 渲染。把每个 `block`(以及第一个块的占位符)传给 `BlockHost`。
 
-**扩展点。** `VirtualizedBlockList` 可以替换此组件而不触碰 `BlockHost` 或块渲染器——块组件被保持无副作用且幂等，因此虚拟化是安全的(§12)，递归的嵌套列表复用同样的 `BlockRenderItem` 形状。
+**扩展点。** `VirtualizedBlockList` 可以替换此组件而不触碰 `BlockHost` 或块渲染器：块组件被保持无副作用且幂等，因此虚拟化是安全的(§12)，递归的嵌套列表复用同样的 `BlockRenderItem` 形状。
 
 ### `src/view/BlockHost.vue`
 
@@ -775,7 +775,7 @@ props: { block: Block; placeholder?: string };
 emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: number; clientRect: { left: number; top: number; right: number; bottom: number } }] };
 ```
 
-`resolvedComponent` 是一个 `computed`，它读取 `editor.registries.renderers.get(block.type)` 并把不透明的 `component` 转换为 Vue `Component`——视图层解释框架无关 spec 的唯一边界。宿主把渲染器包裹在一个带 `data-block-type` 的 `.block-host` div 中。
+`resolvedComponent` 是一个 `computed`，它读取 `editor.registries.renderers.get(block.type)` 并把不透明的 `component` 转换为 Vue `Component`，视图层解释框架无关 spec 的唯一边界。宿主把渲染器包裹在一个带 `data-block-type` 的 `.block-host` div 中。
 
 **交互。** 导入 `vue`(`computed`、`Component`)、`core/types`、`view/context`(`useEditor`)和 `BlockContent.vue`(回退)。由 `BlockList.vue` 渲染；渲染扩展提供的组件(例如 `ParagraphBlock`、`HeadingBlock`)，它转而又渲染 `BlockContent`。此处转发的 `linkClick` 事件由 `BlockEditor.vue` 消费，以把 `LinkPopover` 定位在被点击的 `<a>` 上方。
 
@@ -783,7 +783,7 @@ emits: { 'linkClick': [{ blockId: BlockId; href: string; from: number; to: numbe
 
 ### `src/view/BlockContent.vue`
 
-**职责。** 按块的 contenteditable 组件——视图层最精细的部分。拥有单个 `contenteditable` 元素，负责：把块的行内内容作为 DOM 文本*(含 mark spans,其中 link mark 走 <a>,且 href 已由 inlineDom.ts 净化)* 渲染(挂载时和外部状态变化时)，通过 `setText` 命令把用户输入同步回状态，正确处理 IME(CJK)组合(组合期间不同步；DOM 是唯一来源)，跟踪焦点，以及为空时显示占位符。**阶段 6 link 新增特性：** 检测点击行内 `<a>` 后代并 emit `linkClick`，使 `BlockEditor.vue` 能以精确的点击矩形锚定浮层；空格/分词触发 URL 自动链接(用户在看起来像 URL 的文本后打空格，把当前 seq 交给 `autoLinkInlineSeq` 处理再调用 `setText`)；选中文本区粘贴纯文本 URL 时走链接化的粘贴路径。关键不变量：用户在键入时，它绝不向 DOM 写文本(`skipDomWrite` 事务 meta + `textContent !== newText` 守卫保护光标)。见 `docs/architecture.md` §6.3 和阶段 6。
+**职责。** 按块的 contenteditable 组件，视图层最精细的部分。拥有单个 `contenteditable` 元素，负责：把块的行内内容作为 DOM 文本*(含 mark spans,其中 link mark 走 <a>,且 href 已由 inlineDom.ts 净化)* 渲染(挂载时和外部状态变化时)，通过 `setText` 命令把用户输入同步回状态，正确处理 IME(CJK)组合(组合期间不同步；DOM 是唯一来源)，跟踪焦点，以及为空时显示占位符。**阶段 6 link 新增特性：** 检测点击行内 `<a>` 后代并 emit `linkClick`，使 `BlockEditor.vue` 能以精确的点击矩形锚定浮层；空格/分词触发 URL 自动链接(用户在看起来像 URL 的文本后打空格，把当前 seq 交给 `autoLinkInlineSeq` 处理再调用 `setText`)；选中文本区粘贴纯文本 URL 时走链接化的粘贴路径。关键不变量：用户在键入时，它绝不向 DOM 写文本(`skipDomWrite` 事务 meta + `textContent !== newText` 守卫保护光标)。见 `docs/architecture.md` §6.3 和阶段 6。
 
 **公共 API(Props/事件)。**
 
@@ -794,7 +794,7 @@ props: { block: Block; placeholder?: string };
 // emits: 'linkClick' ({ blockId, href, from, to, clientRect })
 ```
 
-在 `input` 上(组合之外)它先把 `autoLinkInlineSeq(newSeq)` 应用到用户刚键入完的 URL，然后分发 `editor.commands.setText({ id, content: seq })`——`setText` 携带 `historyGroup('type')` 和 `skipDomWrite([id])`，因此视图桥接不会写回聚焦元素。在 `compositionend` 上它分发一次 `setText`。`onFocus`/`onBlur` 设置/清除 `editor.focusBlockId`。一个对 `props.block` 的 `watch` 只在文本不同且块未在组合时把新文本写入 DOM。点击：contenteditable 的 `onClick` 走 `event.target.closest('a')`；若找到则计算这个 `<a>` 在块当前行内序列中的模型偏移，并携带点击包围矩形 emit `linkClick`，以便浮层定位。
+在 `input` 上(组合之外)它先把 `autoLinkInlineSeq(newSeq)` 应用到用户刚键入完的 URL，然后分发 `editor.commands.setText({ id, content: seq })`；`setText` 携带 `historyGroup('type')` 和 `skipDomWrite([id])`，因此视图桥接不会写回聚焦元素。在 `compositionend` 上它分发一次 `setText`。`onFocus`/`onBlur` 设置/清除 `editor.focusBlockId`。一个对 `props.block` 的 `watch` 只在文本不同且块未在组合时把新文本写入 DOM。点击：contenteditable 的 `onClick` 走 `event.target.closest('a')`；若找到则计算这个 `<a>` 在块当前行内序列中的模型偏移，并携带点击包围矩形 emit `linkClick`，以便浮层定位。
 
 **交互。** 导入 `vue`、`core/types`(`inlineText`、`inlineFromString`)、**`view/urlUtils`(`autoLinkInlineSeq`)** 和 `view/context`(`useEditor`)。由 `BlockHost.vue` 渲染(并作为回退直接渲染)。读/写 `editor.focusBlockId`；调用 `editor.commands.setText`。`data-block-id` 属性是 `domSelection.ts` 用来把 DOM 节点映射到块 id 的。粘贴：规范路径由 `BlockEditor.vue` 通过 `clipboard.ts`(见对应模块条目)执行，可升级为 link mark 设置。
 
@@ -802,7 +802,7 @@ props: { block: Block; placeholder?: string };
 
 ### `src/view/domSelection.ts`
 
-**职责。** DOM 选择 ↔ 编辑器状态选择的同步。原生浏览器选择操作 DOM 节点/range；编辑器的模型操作块 id + 字符偏移。此模块弥合两者。阶段一策略(扁平块、仅文本内容)：每个 contenteditable 携带 `data-block-id`；字符偏移通过遍历文本节点计算；同步是**即时(just-in-time)**的(分发命令前读取，状态更新后写入)——它*不*监听 `selectionchange`(太嘈杂，会产生反馈循环)。见 `docs/architecture.md` §8.2。
+**职责。** DOM 选择 ↔ 编辑器状态选择的同步。原生浏览器选择操作 DOM 节点/range；编辑器的模型操作块 id + 字符偏移。此模块弥合两者。阶段一策略(扁平块、仅文本内容)：每个 contenteditable 携带 `data-block-id`；字符偏移通过遍历文本节点计算；同步是**即时(just-in-time)**的(分发命令前读取，状态更新后写入)；它*不*监听 `selectionchange`(太嘈杂，会产生反馈循环)。见 `docs/architecture.md` §8.2。
 
 **公共 API。**
 
@@ -820,7 +820,7 @@ function applySelectionToDom(root: HTMLElement, selection: Selection): void;
 
 ### `src/view/inlineDom.ts`
 
-**职责。** 在 `InlineSeq` 模型(带可选 marks 的文本运行)与 DOM 之间架桥。把行内序列转换为 HTML 以供渲染(通过 `inlineToHtml`)，并把 DOM 节点解析回行内序列(通过 `inlineFromDom`)。被 `BlockContent.vue` 用于渲染，也被 `clipboard.ts` 用于粘贴解析。**阶段 6(links)：** `inlineToHtml` 把 `link` mark 渲染为 `<a href="…">`——**href 始终由 `urlUtils.ts` 的 `sanitizeUrl()` 管道处理**，所以危险的协议(`javascript:`、`data:`、`vbscript:`)和混淆的 URL 绝不可能进入 DOM(它们渲染为无 href 的普通 `<span>`)。反之，`inlineFromDom` 收集 `<a href>` 属性并转换回 `{ type: 'link', attrs: { href: normalizeUrl(rawHref) } }` marks。
+**职责。** 在 `InlineSeq` 模型(带可选 marks 的文本运行)与 DOM 之间架桥。把行内序列转换为 HTML 以供渲染(通过 `inlineToHtml`)，并把 DOM 节点解析回行内序列(通过 `inlineFromDom`)。被 `BlockContent.vue` 用于渲染，也被 `clipboard.ts` 用于粘贴解析。**阶段 6(links)：** `inlineToHtml` 把 `link` mark 渲染为 `<a href="…">`：**href 始终由 `urlUtils.ts` 的 `sanitizeUrl()` 管道处理**，所以危险的协议(`javascript:`、`data:`、`vbscript:`)和混淆的 URL 绝不可能进入 DOM(它们渲染为无 href 的普通 `<span>`)。反之，`inlineFromDom` 收集 `<a href>` 属性并转换回 `{ type: 'link', attrs: { href: normalizeUrl(rawHref) } }` marks。
 
 **公共 API。**
 
@@ -835,7 +835,7 @@ function inlineFromDom(node: Node, opts?: { trim?: boolean }): InlineSeq;
 
 ### `src/view/clipboard.ts`
 
-**职责。** 用于复制/剪切/粘贴的剪贴板解析。把粘贴的 HTML 或纯文本转换为 `ParsedBlock[]`(块类型 + attrs + 行内内容)，并把编辑器块序列化为干净的 HTML/纯文本以供剪贴板。剥离仅含空白的文本节点、按块修剪前导/尾随空白(非 code)、避免多余换行。**阶段 6 新增：**(1)若粘贴的 `clipboardData.files` 含图片类型(`image/png`、`image/jpeg` …)→ 返回一个特殊的 `type='image'` 的 `ParsedBlock`，携带瞬时 `_pendingFile` 字段(绝不写入 attrs；交给 `imageUpload.ts` 上传)——`BlockEditor.vue` 中的粘贴路径会为每个文件插入一个新图片块并启动上传。(2)若粘贴的 HTML 包含 `<img>`(单独或在 `<figure>` 内)，返回带 `attrs.src` 的图片块。(3)用户有非空文本选择且粘贴看起来像 URL 的纯文本 → 返回结构化提示 `{ wrapSelectionInLink: true, href }`，然后 `BlockEditor.vue` 分发 `setLink` 而非粘贴文本。(4)包含 URL 的纯文本剪贴板段落会走一遍 `autoLinkInlineSeq`，因此粘贴"访问 https://example.com"会自动变成链接。
+**职责。** 用于复制/剪切/粘贴的剪贴板解析。把粘贴的 HTML 或纯文本转换为 `ParsedBlock[]`(块类型 + attrs + 行内内容)，并把编辑器块序列化为干净的 HTML/纯文本以供剪贴板。剥离仅含空白的文本节点、按块修剪前导/尾随空白(非 code)、避免多余换行。**阶段 6 新增：**(1)若粘贴的 `clipboardData.files` 含图片类型(`image/png`、`image/jpeg` …)→ 返回一个特殊的 `type='image'` 的 `ParsedBlock`，携带瞬时 `_pendingFile` 字段(绝不写入 attrs；交给 `imageUpload.ts` 上传)；`BlockEditor.vue` 中的粘贴路径会为每个文件插入一个新图片块并启动上传。(2)若粘贴的 HTML 包含 `<img>`(单独或在 `<figure>` 内)，返回带 `attrs.src` 的图片块。(3)用户有非空文本选择且粘贴看起来像 URL 的纯文本 → 返回结构化提示 `{ wrapSelectionInLink: true, href }`，然后 `BlockEditor.vue` 分发 `setLink` 而非粘贴文本。(4)包含 URL 的纯文本剪贴板段落会走一遍 `autoLinkInlineSeq`，因此粘贴"访问 https://example.com"会自动变成链接。
 
 **公共 API。**
 
@@ -844,7 +844,7 @@ interface ParsedBlock {
   type: BlockType;
   attrs?: Attrs;
   content: InlineSeq;
-  // —— 阶段 6 瞬时字段，绝不写入 DocState ——
+  // 阶段 6 瞬时字段，绝不写入 DocState
   readonly _pendingFile?: File;          // 剪贴板图片文件(走 imageUpload 管线上传)
 }
 interface PasteDecision {
@@ -894,7 +894,7 @@ export const imageUploadStore: ImageUploadStore;
 export function setUploadHook(hook: UploadImageHandler | null): void;
 ```
 
-默认行为使用内置 mock 上传器（**`<BlockEditor>` 上从未存在过 `uploadImage` prop**——上传函数通过 `createImageExtension({ upload })` 注入）：mock 等待 800–2500 ms，发出假进度 tick，约 30% 概率 reject——这样重试/错误 UI 可以在无后端的情况下开发测试。在 `beginUpload` 时创建 `tempSrc` 对象 URL 并推入状态，使 `Image.ts` 能立即显示；`resolve` 时调用者分发 `setAttrs` 以写入真实的 `src`/`fileId`，然后调用 `cancel(blockId)` 回收。`reject` 时保留错误字符串 + 缓存的 `File`，以便用户点击图片遮罩上的 **Retry** 按钮。
+默认行为使用内置 mock 上传器（**`<BlockEditor>` 上从未存在过 `uploadImage` prop**：上传函数通过 `createImageExtension({ upload })` 注入）：mock 等待 800–2500 ms，发出假进度 tick，约 30% 概率 reject，这样重试/错误 UI 可以在无后端的情况下开发测试。在 `beginUpload` 时创建 `tempSrc` 对象 URL 并推入状态，使 `Image.ts` 能立即显示；`resolve` 时调用者分发 `setAttrs` 以写入真实的 `src`/`fileId`，然后调用 `cancel(blockId)` 回收。`reject` 时保留错误字符串 + 缓存的 `File`，以便用户点击图片遮罩上的 **Retry** 按钮。
 
 **交互。** 只依赖 `core/types`(`BlockId` 品牌)。被 `extensions/Image.ts` 调用（其 `createImageUploadPlugin(...)` 在 `init` 中调用 `registerUploadHandler`，在 `onDestroy` 中通过返回值反注册，并通过 `Editor.registerExtensionMethod` 暴露异步 `startImageUpload` 编排器）。`extensions/Image.ts` 渲染器订阅 `state[blockId]` 以驱动进度条、错误横幅和重试按钮。`BlockEditor.vue` 不再涉及：它仅把该扩展方法转发到原有的 `useBeginImageUpload()` Vue 注入口，fileId 引用计数归零时由 `image-upload` 插件的 `applyTransaction` 钩子调用 `onFileCleanup(fileId)`（替代原 `@cleanup:image-file` Vue 事件）。
 
@@ -902,7 +902,7 @@ export function setUploadHook(hook: UploadImageHandler | null): void;
 
 ### `src/view/urlUtils.ts`
 
-**职责。** 每个与链接相关的路径都会调用的 URL 工具。提供三个相关但独立的关注点：(a)启发式检测("这段文本看起来像 URL 吗?")、(b)规范化(缺省时补 `https://`、修剪尾随标点)、(c)**安全净化**，对危险的 URL 返回空串——以便调用者安全地省略 `href` 而不是渲染带毒的锚点。还暴露 `autoLinkInlineSeq`，它扫描一个 `InlineSeq` 寻找看起来像 URL 的文本运行，并自动加上 `link` mark。典型调用点是 `BlockContent.vue`(键入空格触发自动链接)和 `clipboard.ts`(粘贴纯文本段落)。
+**职责。** 每个与链接相关的路径都会调用的 URL 工具。提供三个相关但独立的关注点：(a)启发式检测("这段文本看起来像 URL 吗?")、(b)规范化(缺省时补 `https://`、修剪尾随标点)、(c)**安全净化**，对危险的 URL 返回空串，以便调用者安全地省略 `href` 而不是渲染带毒的锚点。还暴露 `autoLinkInlineSeq`，它扫描一个 `InlineSeq` 寻找看起来像 URL 的文本运行，并自动加上 `link` mark。典型调用点是 `BlockContent.vue`(键入空格触发自动链接)和 `clipboard.ts`(粘贴纯文本段落)。
 
 **公共 API。**
 
@@ -917,13 +917,13 @@ function sanitizeUrl(raw: string): string;  // 不安全/缺失 scheme 返回 ""
 function autoLinkInlineSeq(seq: InlineSeq): InlineSeq;
 ```
 
-`looksLikeUrl` 匹配：绝对 schemes `https?://`、`mailto:`、`tel:`;裸 `www.` 前缀(→ 规范化为 `https://www.`);匹配 `user@domain.tld` 的邮箱(→ 规范化为 `mailto:user@domain.tld`)。它刻意避免在 `code` mark 内部匹配任何东西。`sanitizeUrl` 只把 `http https mailto tel` 加入白名单、移除 URL 中段的 `\t\n\r`、拒绝含有非 ASCII 字母的 scheme、去除空白——结果要么为空，要么保证拥有白名单 scheme 且没有显见的混淆。调用者守则:**如果 `sanitizeUrl` 返回 `""`，就当作链接没有 href**(不要写 `href` 到 DOM)。
+`looksLikeUrl` 匹配：绝对 schemes `https?://`、`mailto:`、`tel:`;裸 `www.` 前缀(→ 规范化为 `https://www.`);匹配 `user@domain.tld` 的邮箱(→ 规范化为 `mailto:user@domain.tld`)。它刻意避免在 `code` mark 内部匹配任何东西。`sanitizeUrl` 只把 `http https mailto tel` 加入白名单、移除 URL 中段的 `\t\n\r`、拒绝含有非 ASCII 字母的 scheme、去除空白，结果要么为空，要么保证拥有白名单 scheme 且没有显见的混淆。调用者守则:**如果 `sanitizeUrl` 返回 `""`，就当作链接没有 href**(不要写 `href` 到 DOM)。
 
 **交互。** 只依赖 `core/types`(`InlineSeq`、`InlineNode`、`Mark`)。被 `primitiveCommands.ts`(`setLink` 净化 href)、`inlineDom.ts`(渲染)、`clipboard.ts`(URL 粘贴检测 + 自动链接)、`BlockContent.vue`(空格触发的自动链接)、`LinkPopover.vue`(onSave 校验 href + 展示净化后的 URL)、`BlockEditor.vue`(Mod+K 保存路径) 使用。
 
 ### `src/view/ui/LinkPopover.vue`
 
-**职责。** 浮动浮层(`<Teleport>` 到 `<body>`)，让用户能查看/编辑/移除链接，类似 Notion/Google Docs。有两种模式：`view` 和 `edit`。显示时锚定到一个原生 DOM 矩形——要么是用户当前文本选择的 `getBoundingClientRect()`，要么是被点击的已有 `<a>` 元素的矩形。浮层由 `BlockEditor.vue` 命令式控制——持有 `mode`、`href`、`text`、`blockId`、`from`、`to`、`anchorRect` refs——此组件纯展示，emit `open-link`、`copy-link`、`edit`、`remove`、`save({ href, text })` 和 `cancel` 事件。
+**职责。** 浮动浮层(`<Teleport>` 到 `<body>`)，让用户能查看/编辑/移除链接，类似 Notion/Google Docs。有两种模式：`view` 和 `edit`。显示时锚定到一个原生 DOM 矩形：要么是用户当前文本选择的 `getBoundingClientRect()`，要么是被点击的已有 `<a>` 元素的矩形。浮层由 `BlockEditor.vue` 命令式控制，持有 `mode`、`href`、`text`、`blockId`、`from`、`to`、`anchorRect` refs；此组件纯展示，emit `open-link`、`copy-link`、`edit`、`remove`、`save({ href, text })` 和 `cancel` 事件。
 
 **公共 API(Props/Emits)。**
 
@@ -955,15 +955,15 @@ emits: {
 
 ### `src/view/ui/FixedToolbar.vue`
 
-**职责。** 在**桌面端和移动端**都常驻的操作栏——替代原先仅用于移动端的 `MobileToolbar`。通过 `toolbarPosition` prop 控制放置位置：
+**职责。** 在**桌面端和移动端**都常驻的操作栏，替代原先仅用于移动端的 `MobileToolbar`。通过 `toolbarPosition` prop 控制放置位置：
 - `'auto'`（默认）：桌面端顶栏、移动端底栏（通过 `visualViewport` API 始终显示在虚拟键盘之上；使用 `env(safe-area-inset-bottom)` 适配 iPhone 主屏指示条）。
 - `'top'`：强制顶栏。PlusMenu / BlockSettingsMenu 等菜单改为**向下**弹出。
 - `'bottom'`：强制底栏。菜单改为**向上**弹出。
-- `'float'`：**仅桌面端**——隐藏 FixedToolbar，改由 `BlockEditor.vue` 渲染一个独立的浮动 `HoverToolbar`（Teleport 到 `<body>`，跟随文本/表格选区）。在移动端（`(pointer: coarse)`）下 `'float'` 会回退为 `'auto'`。
+- `'float'`：**仅桌面端**，隐藏 FixedToolbar，改由 `BlockEditor.vue` 渲染一个独立的浮动 `HoverToolbar`（Teleport 到 `<body>`，跟随文本/表格选区）。在移动端（`(pointer: coarse)`）下 `'float'` 会回退为 `'auto'`。
 
 内嵌一个 **inline 的** `<HoverToolbar>` 实例（而不是作为浮动叠加层渲染），这样用户点击格式化按钮时可以**保留文本选区状态**。左侧：plus 按钮（打开 `PlusMenu`）和 grip 按钮（打开 `BlockSettingsMenu`）。右侧：完整的 `HoverToolbar` 按钮集（类型 / 对齐 / 标记 / 颜色 / 复制 / 表格操作 / 链接操作）。它对外提供两个注入键，供下游菜单决定弹出方向：
-- `fixedToolbarBottomKey: Ref<boolean>` — 当工具栏被钉在底部时为 `true`。
-- `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>` — 传递给内嵌的 HoverToolbar，告知当前需要展示哪个块类型/属性的动作。
+- `fixedToolbarBottomKey: Ref<boolean>`：当工具栏被钉在底部时为 `true`。
+- `fixedToolbarBridgeKey: Ref<FixedToolbarDescriptor | null>`：传递给内嵌的 HoverToolbar，告知当前需要展示哪个块类型/属性的动作。
 
 **交互。** 导入 `vue`、`HoverToolbar.vue`、`i18n`（`useI18n`）和 `view/context`（`useEditor`、`fixedToolbarBridgeKey`、`fixedToolbarBottomKey`）。**条件**渲染在 `BlockEditor.vue` 的 template 中：当桌面端 `toolbarPosition='float'` 时跳过该组件（改为渲染浮动 `HoverToolbar`；移动端 `'float'` 回退为 `'auto'`，仍渲染 FixedToolbar）。发出的事件由 `BlockEditor.vue` 连接到与桌面端 `BlockHandle.vue` 相同的 `onOpenPlusMenu` / `onOpenSettingsMenu` 处理器。当表格单元格获得焦点时，`TableBlock` 通过 `fixedToolbarBridgeKey` 注入键发布描述符，使内嵌的 `HoverToolbar` 反映单元格/表格状态而非文本块状态。
 
@@ -989,7 +989,7 @@ function dispatchKeymap(editor: Editor, event: KeyboardEvent): boolean;
 
 ### `src/extensions/Paragraph.ts`
 
-**职责。** Paragraph 块类型扩展——默认为文本块。注册 `"paragraph"` 块类型，带 `content: 'text'`、可嵌套的 schema(paragraph 可以做父，因此任何块都能缩进到它下面)，和一个简单的渲染器(`ParagraphBlock`)，它用一个 `block-paragraph` CSS 类包裹 `BlockContent`。Paragraph 是当用户在一个空块上按 Enter 或退出非文本块时使用的回退块类型。见 `docs/architecture.md` §11.2(默认块类型)。
+**职责。** Paragraph 块类型扩展，默认为文本块。注册 `"paragraph"` 块类型，带 `content: 'text'`、可嵌套的 schema(paragraph 可以做父，因此任何块都能缩进到它下面)，和一个简单的渲染器(`ParagraphBlock`)，它用一个 `block-paragraph` CSS 类包裹 `BlockContent`。Paragraph 是当用户在一个空块上按 Enter 或退出非文本块时使用的回退块类型。见 `docs/architecture.md` §11.2(默认块类型)。
 
 **公共 API。**
 
@@ -1090,7 +1090,7 @@ export const QuoteExtension: Extension;
 
 ### `src/extensions/CodeBlock.ts`
 
-**职责。** 代码块扩展。标记为**隔离块**：Enter 插入换行(而非新段落)，空代码块在 offset 0 处按 Backspace 会删除块而不合并。仅支持 `language` attr(使用 `CODE_BLOCK_ATTRS` — 无 align/color/bgColor/indent)。渲染器切换为 `white-space: pre; font-family: monospace`。
+**职责。** 代码块扩展。标记为**隔离块**：Enter 插入换行(而非新段落)，空代码块在 offset 0 处按 Backspace 会删除块而不合并。仅支持 `language` attr(使用 `CODE_BLOCK_ATTRS`，无 align/color/bgColor/indent)。渲染器切换为 `white-space: pre; font-family: monospace`。
 
 **公共 API。**
 
@@ -1107,7 +1107,7 @@ export const CodeBlockExtension: Extension;
 
 ### `src/extensions/Image.ts`
 
-**职责。** Image 块类型扩展(阶段 6 新增)。注册 `"image"` 块类型，`content: 'none'`(无行内文本)，带持久属性(`src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`)。瞬时上传状态(progress/error/tempSrc)存放在**侧信道** `view/imageUpload.ts`，绝不进入 attrs(避免把临时对象 URL 或错误消息序列化到 JSON/撤销)。图片渲染器订阅 `imageUploadStore[blockId]`，并据此显示本地 `tempSrc` 预览 + 线性进度条、错误横幅带 Retry，或完成后显示真实 `src`(若有 caption 则下方放 `BlockContent` caption 子块)。也注册 slash 命令 `/image`——插入占位图片块 + 打开文件选择器。
+**职责。** Image 块类型扩展(阶段 6 新增)。注册 `"image"` 块类型，`content: 'none'`(无行内文本)，带持久属性(`src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`)。瞬时上传状态(progress/error/tempSrc)存放在**侧信道** `view/imageUpload.ts`，绝不进入 attrs(避免把临时对象 URL 或错误消息序列化到 JSON/撤销)。图片渲染器订阅 `imageUploadStore[blockId]`，并据此显示本地 `tempSrc` 预览 + 线性进度条、错误横幅带 Retry，或完成后显示真实 `src`(若有 caption 则下方放 `BlockContent` caption 子块)。也注册 slash 命令 `/image`：插入占位图片块 + 打开文件选择器。
 
 **公共 API。**
 
@@ -1143,13 +1143,13 @@ export const ImageExtension: Extension;
 // slash: [{ name: 'image', label: t('slash.image'), icon: ICON_IMAGE, command: insertImageBlock }]
 ```
 
-Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位的遮罩(上传中/错误时可见)叠在 `<img>` 上方，进度条 100–0%，错误时红色重试按钮。`fileId` attr 是可选的**外部存储标识**(S3 key、OSS object id 等)——`fileId` 的引用计数与 `onFileCleanup` 触发**完全由 `createImageExtension({ onFileCleanup })` 自带的 `image-upload` 插件**通过 `Editor.applyTransaction` 钩子持有；当一个 block 从文档中被删除/替换(事务 diff)且该 `fileId` 的引用从 ≥1 降到 0 时调用 `onFileCleanup(fileId)`，以便宿主应用删除存储对象。`<BlockEditor>` 不再维护这个计数，也不再有 `cleanup:image-file` 事件。
+Image 渲染器(`ImageBlock`)渲染：一个 `<figure>`，内层是绝对定位的遮罩(上传中/错误时可见)叠在 `<img>` 上方，进度条 100–0%，错误时红色重试按钮。`fileId` attr 是可选的**外部存储标识**(S3 key、OSS object id 等)；`fileId` 的引用计数与 `onFileCleanup` 触发**完全由 `createImageExtension({ onFileCleanup })` 自带的 `image-upload` 插件**通过 `Editor.applyTransaction` 钩子持有；当一个 block 从文档中被删除/替换(事务 diff)且该 `fileId` 的引用从 ≥1 降到 0 时调用 `onFileCleanup(fileId)`，以便宿主应用删除存储对象。`<BlockEditor>` 不再维护这个计数，也不再有 `cleanup:image-file` 事件。
 
 **交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/context`(`useEditor`)、`view/BlockContent.vue`(用于可选 caption)、`view/imageUpload`(订阅瞬时状态 `imageUploadStore`)、`view/ui/icons`(`ICON_IMAGE`)和 `extensions/_commonAttrs`(`IMAGE_ATTRS`)。捆绑于 `builtin.ts`；默认 `BuiltinExtensions` 为 14 个扩展。上传路径：剪贴板文件 → 触发扩展方法 `Editor.getExtensionMethod('startImageUpload')`（由 `ImageExtension` 的 `image-upload` 插件 `init` 阶段注册）→ 流程：插入占位 `image` 块 → 创建 `tempSrc` → 进度 tick → resolve 写入真实 `src`/`fileId`/`alt` 或 reject 保留 `tempSrc` + 缓存 `File` 支持重试。
 
 ### `src/extensions/Table.ts`
 
-**职责。** Table 块类型扩展——使用 **attrs storage** 模式的 `content: 'none'` 块：**所有表格数据**（网格 `cells`、`colWidths`、`rows/cols`、`headerRow`、合并覆盖状态）作为 `attrs` 字段存储，`Block.children` 保持 `[]`，因此核心从不触碰表格内容，事务/撤销/重做通过 `setAttrs` 正常工作。渲染器是自包含 Vue 组件（行选择条、列选择条、角部全选手柄、浮动操作栏、行/列间插入点），直接读取 `block.attrs` 计算 `TableAttrs`；全部 UI 交互通过 editor `commands` 代理（`tableInsert*` / `tableRemove*` / `tableMergeRect` / `tableSplitCellsInRect` / `tableSetColWidth` / **`tableToggleHeaderRow`** / `tableSetCellAttrs` / `tableSetCellMark` / `tableToggleCellMark` / `tableInsert`）路由到 `tableModel.ts` 纯函数 → `editor.commands.setAttrs({ id, attrs: next })`。代码块单元格 Enter 直接插入换行（记录 caret offset、DOM 插入 `\n`、`syncCellContent` 同步 attrs、`nextTick` 后按 offset+1 重置光标）。
+**职责。** Table 块类型扩展，使用 **attrs storage** 模式的 `content: 'none'` 块：**所有表格数据**（网格 `cells`、`colWidths`、`rows/cols`、`headerRow`、合并覆盖状态）作为 `attrs` 字段存储，`Block.children` 保持 `[]`，因此核心从不触碰表格内容，事务/撤销/重做通过 `setAttrs` 正常工作。渲染器是自包含 Vue 组件（行选择条、列选择条、角部全选手柄、浮动操作栏、行/列间插入点），直接读取 `block.attrs` 计算 `TableAttrs`；全部 UI 交互通过 editor `commands` 代理（`tableInsert*` / `tableRemove*` / `tableMergeRect` / `tableSplitCellsInRect` / `tableSetColWidth` / **`tableToggleHeaderRow`** / `tableSetCellAttrs` / `tableSetCellMark` / `tableToggleCellMark` / `tableInsert`）路由到 `tableModel.ts` 纯函数 → `editor.commands.setAttrs({ id, attrs: next })`。代码块单元格 Enter 直接插入换行（记录 caret offset、DOM 插入 `\n`、`syncCellContent` 同步 attrs、`nextTick` 后按 offset+1 重置光标）。
 
 **公共 API。**
 
@@ -1193,9 +1193,9 @@ export function createTableCommands(editor: Editor): {
 
 ### `src/extensions/Equation.ts`
 
-**职责。** 公式（LaTeX 数学公式）块类型扩展——一个 `content: 'none'`、**isolated** 块，只保存 `attrs.expression`（原始 LaTeX 源码）。渲染器是独立的 Vue 组件 `EquationBlock`；**默认走零依赖的内置数学渲染器** `src/extensions/math/`（tokenizer → parser → Math AST → render tree → DOM），支持轻量 LaTeX 数学子集：数字/标识符、运算符（`\pm \times \div \cdot \le \ge \neq` 等）、上下标（合并为单一 `scripts` 节点）、`\frac`、`\sqrt` / `\sqrt[n]`、希腊字母、函数名（`\sin \cos \tan \log \ln \exp \lim \min \max`）、大型运算符（`\sum \prod \int` 在 display 模式上限位于符号上下方）、`\begin{matrix}` 和 `\begin{aligned}`（CSS Grid 布局）。未知命令降级为字面量 `\foo` 节点，语法错误显示 ⚠ 徽章和带位置的 `diagnostics`——**解析永不抛错，只把错误信号传给视图层**。查看态即时计算居中展示公式（输出永不持久化，只序列化 `attrs.expression`）；编辑态显示绑定 `attrs.expression` 的 textarea 并带**内置实时预览**，外加浮动 ✎ 按钮用于（重新）打开编辑器。空块在插入时自动进入编辑态。选中与嵌套遵循编辑器的通用非文本块约定：根元素携带 `block-focus-root`，因此块手柄 / 选中环完全由 `focusedBlockId` 驱动（组件内不做 `isSelected` 订阅）；`classesFromAttrs(attrs)` 注入 `be-indent-N` 类，使块作为子块嵌套时按深度正确缩进（`attrs.indent` 即为深度镜像）。Markdown 导出序列化为 `$$$ … $$$` 围栏块；HTML 导出输出 `<div class="equation-block-rendered">`。非法 LaTeX 渲染为 `math-error-block` 兜底而非抛错。**渲染器完全可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 等替代实现——`<BlockEditor>` 不再暴露 `equationRenderer` prop。
+**职责。** 公式（LaTeX 数学公式）块类型扩展，一个 `content: 'none'`、**isolated** 块，只保存 `attrs.expression`（原始 LaTeX 源码）。渲染器是独立的 Vue 组件 `EquationBlock`；**默认走零依赖的内置数学渲染器** `src/extensions/math/`（tokenizer → parser → Math AST → render tree → DOM），支持轻量 LaTeX 数学子集：数字/标识符、运算符（`\pm \times \div \cdot \le \ge \neq` 等）、上下标（合并为单一 `scripts` 节点）、`\frac`、`\sqrt` / `\sqrt[n]`、希腊字母、函数名（`\sin \cos \tan \log \ln \exp \lim \min \max`）、大型运算符（`\sum \prod \int` 在 display 模式上限位于符号上下方）、`\begin{matrix}` 和 `\begin{aligned}`（CSS Grid 布局）。未知命令降级为字面量 `\foo` 节点，语法错误显示 ⚠ 徽章和带位置的 `diagnostics`：**解析永不抛错，只把错误信号传给视图层**。查看态即时计算居中展示公式（输出永不持久化，只序列化 `attrs.expression`）；编辑态显示绑定 `attrs.expression` 的 textarea 并带**内置实时预览**，外加浮动 ✎ 按钮用于（重新）打开编辑器。空块在插入时自动进入编辑态。选中与嵌套遵循编辑器的通用非文本块约定：根元素携带 `block-focus-root`，因此块手柄 / 选中环完全由 `focusedBlockId` 驱动（组件内不做 `isSelected` 订阅）；`classesFromAttrs(attrs)` 注入 `be-indent-N` 类，使块作为子块嵌套时按深度正确缩进（`attrs.indent` 即为深度镜像）。Markdown 导出序列化为 `$$$ … $$$` 围栏块；HTML 导出输出 `<div class="equation-block-rendered">`。非法 LaTeX 渲染为 `math-error-block` 兜底而非抛错。**渲染器完全可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 等替代实现；`<BlockEditor>` 不再暴露 `equationRenderer` prop。
 
-**交互。** 导入 `vue`（`h` 仅用于 VNode 后端）、`core/types`、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/ui/SafeHtml.vue`、`view/ui/icons`（`ICON_EQUATION`、`ICON_EDIT`）、`extensions/_commonAttrs`（`COMMON_ATTRS`、`classesFromAttrs`）、`view/context`（`useEditor` / `useEditable`）、`i18n`（`useI18n`）。**不导入任何第三方数学库**（无 KaTeX/MathJax 依赖）。`extensions/math/`（`ast.ts`、`tokens.ts`、`symbols.ts`、`parser.ts`、`renderTree.ts`、`renderVNode.ts`、`renderHtml.ts`）是自洽的引擎，只依赖 `vue` 的 `h`（仅 VNode 后端用到）。默认通过 `EquationExtension = createEquationExtension()` 含在 `BuiltinExtensions` 中。与 Image/Table 一样，Equation 是 `content: 'none'` 的 attrs 存储块——零核心改动。空公式块按 Enter 退出到默认块类型；编辑按钮在进入编辑态前调用 `editor.commands.selectBlock({ id })`，确保编辑时块始终处于选中态。
+**交互。** 导入 `vue`（`h` 仅用于 VNode 后端）、`core/types`、`core/editor`（`Editor`）、`core/extension/Extension`（`defineExtension`）、`view/ui/SafeHtml.vue`、`view/ui/icons`（`ICON_EQUATION`、`ICON_EDIT`）、`extensions/_commonAttrs`（`COMMON_ATTRS`、`classesFromAttrs`）、`view/context`（`useEditor` / `useEditable`）、`i18n`（`useI18n`）。**不导入任何第三方数学库**（无 KaTeX/MathJax 依赖）。`extensions/math/`（`ast.ts`、`tokens.ts`、`symbols.ts`、`parser.ts`、`renderTree.ts`、`renderVNode.ts`、`renderHtml.ts`）是自洽的引擎，只依赖 `vue` 的 `h`（仅 VNode 后端用到）。默认通过 `EquationExtension = createEquationExtension()` 含在 `BuiltinExtensions` 中。与 Image/Table 一样，Equation 是 `content: 'none'` 的 attrs 存储块，零核心改动。空公式块按 Enter 退出到默认块类型；编辑按钮在进入编辑态前调用 `editor.commands.selectBlock({ id })`，确保编辑时块始终处于选中态。
 
 ### `src/extensions/tableModel.ts`
 
@@ -1244,11 +1244,11 @@ export type CellType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | '
 export interface TableSelectionRect { startRow: number; endRow: number; startCol: number; endCol: number }
 ```
 
-**交互。** 依赖 `core/types`（类型级别的 `Attrs` / `InlineNode` / `Mark` / `MarkType`）。**不依赖 Vue / core/Editor / 任何其他扩展**——纯函数。被 `Table.ts`（`createTableCommands` 的每个命令都对应一个 `tableModel.xxx` 调用、渲染器计算使用 `isRect` / `expandSelectionToFullRect` / `getColWidthsSum` 等）与 `validateTableAttrs` 内部使用（schema attr 默认值填充）。被 `tableToHtml` / `tableFromHtml` / `tableToMarkdown` / `tableFromMarkdown` 作为序列化出口，在 TableExtension 注册的 serializers/deserializers 中调用。
+**交互。** 依赖 `core/types`（类型级别的 `Attrs` / `InlineNode` / `Mark` / `MarkType`）。**不依赖 Vue / core/Editor / 任何其他扩展**，纯函数。被 `Table.ts`（`createTableCommands` 的每个命令都对应一个 `tableModel.xxx` 调用、渲染器计算使用 `isRect` / `expandSelectionToFullRect` / `getColWidthsSum` 等）与 `validateTableAttrs` 内部使用（schema attr 默认值填充）。被 `tableToHtml` / `tableFromHtml` / `tableToMarkdown` / `tableFromMarkdown` 作为序列化出口，在 TableExtension 注册的 serializers/deserializers 中调用。
 
 ### `src/extensions/Divider.ts`
 
-**职责。** Divider 块类型扩展——极简隔离型块，渲染 `<hr class="block-divider">`，`content: 'none'`，attrs 为空。输入规则 `---`、`***`、`___` 在空段落上触发时转换为 divider；加号菜单提供"分割线"条目（斜杠 `/divider`）。
+**职责。** Divider 块类型扩展，极简隔离型块，渲染 `<hr class="block-divider">`，`content: 'none'`，attrs 为空。输入规则 `---`、`***`、`___` 在空段落上触发时转换为 divider；加号菜单提供"分割线"条目（斜杠 `/divider`）。
 
 **公共 API。**
 
@@ -1265,7 +1265,7 @@ export const DividerExtension: Extension;
 
 ### `src/extensions/TableOfContents.ts`
 
-**职责。** 目录（TOC）块类型扩展——一种特殊的**不可编辑**块，渲染文档中所有标题的实时层级列表。它刻意不存储任何标题数据（`content: 'none'`、空 attrs）：列表是每次渲染时从当前编辑器状态计算的**动态视图**，因此始终与文档保持同步（标题的增删、文本/级别/顺序变化）。`content: 'none'` + `inlineMarks: false` + `renderer.editable: false` 使其构造上不可编辑——无光标、无行内文本。
+**职责。** 目录（TOC）块类型扩展，一种特殊的**不可编辑**块，渲染文档中所有标题的实时层级列表。它刻意不存储任何标题数据（`content: 'none'`、空 attrs）：列表是每次渲染时从当前编辑器状态计算的**动态视图**，因此始终与文档保持同步（标题的增删、文本/级别/顺序变化）。`content: 'none'` + `inlineMarks: false` + `renderer.editable: false` 使其构造上不可编辑：无光标、无行内文本。
 
 **公共 API。**
 
@@ -1292,15 +1292,15 @@ export const TableOfContentsExtension: Extension;
 // serialize: { toHTML: () => '', toMarkdown: () => '' }
 ```
 
-渲染器订阅编辑器状态更新（`editor.subscribe`）并在每次变更时重新计算标题集合，因此文档变化时目录会重新渲染。点击条目分发 `setSelection`（通过 `caretSelection(id, 0)` 将光标置于标题处），然后 `scrollIntoView({ block: 'center', behavior: 'smooth' })`——复用已有的 Selection / DOM 定位机制，而不改动文档结构。
+渲染器订阅编辑器状态更新（`editor.subscribe`）并在每次变更时重新计算标题集合，因此文档变化时目录会重新渲染。点击条目分发 `setSelection`（通过 `caretSelection(id, 0)` 将光标置于标题处），然后 `scrollIntoView({ block: 'center', behavior: 'smooth' })`，复用已有的 Selection / DOM 定位机制，而不改动文档结构。
 
 **交互。** 导入 `vue`（computed/defineComponent/h/nextTick/ref）、`core/types`（`Block`、`BlockId`、`DocState`、`inlineText`）、`core/state/store`（`flatten`）、`core/selection/Selection`（`caretSelection`）、`view/domSelection`（`findBlockEl`）、`view/context`（`useEditor`）、`i18n`（`useI18n`）、`view/ui/icons`（`ICON_TOC`）。`BuiltinExtensions` 默认包含。
 
-**扩展点。** HTML 与 Markdown 序列化均输出空字符串——生成的标题列表是视图而非编辑器内容，真正的标题已由各自块导出，因此目录不会在导出中被重复。标题收集是纯函数（`collectHeadings`），可复用或自定义（例如按级别过滤、添加编号）而无需触碰核心。
+**扩展点。** HTML 与 Markdown 序列化均输出空字符串：生成的标题列表是视图而非编辑器内容，真正的标题已由各自块导出，因此目录不会在导出中被重复。标题收集是纯函数（`collectHeadings`），可复用或自定义（例如按级别过滤、添加编号）而无需触碰核心。
 
 ### `src/extensions/_commonAttrs.ts`
 
-**职责。** 应用于每个文本承载块的共享 schema 属性规范。保持 align/color/bgColor/indent 在 Paragraph/Heading/List/Quote 间一致。同时定义 `BlockSettingsMenu` 和 `HoverToolbar` 使用的颜色预设表（`TEXT_COLOR_PRESETS`、`BG_COLOR_PRESETS`）。**阶段 6 新增** `IMAGE_ATTRS`(空)，作为 `image` 块类型 attr 规范的一致引用——image 块有意不带文本块属性(无 align/color/indent)，并保持 `content: 'none'`。
+**职责。** 应用于每个文本承载块的共享 schema 属性规范。保持 align/color/bgColor/indent 在 Paragraph/Heading/List/Quote 间一致。同时定义 `BlockSettingsMenu` 和 `HoverToolbar` 使用的颜色预设表（`TEXT_COLOR_PRESETS`、`BG_COLOR_PRESETS`）。**阶段 6 新增** `IMAGE_ATTRS`(空)，作为 `image` 块类型 attr 规范的一致引用：image 块有意不带文本块属性(无 align/color/indent)，并保持 `content: 'none'`。
 
 **公共 API。**
 
@@ -1364,7 +1364,7 @@ export const HistoryExtension: Extension;
 
 **交互。** 仅导入 `core/extension/Extension`。捆绑于 `builtin.ts`；它的绑定由 `Registry.ts` 注册，由 `keymapHandler.ts` 解析。`undo`/`redo` 命令由 `Editor.ts` 注册并委托给 `HistoryManager`。
 
-**扩展点。** 用户可以通过按名覆盖 `history-keymap` 扩展来禁用默认的撤销/重做快捷键，或通过直接分发 `editor.commands.undo()` 添加替代绑定（例如一个工具栏按钮）。`HistoryManager`（引擎）与此扩展（仅键位映射）的分离是刻意的——见 §13.1。
+**扩展点。** 用户可以通过按名覆盖 `history-keymap` 扩展来禁用默认的撤销/重做快捷键，或通过直接分发 `editor.commands.undo()` 添加替代绑定（例如一个工具栏按钮）。`HistoryManager`（引擎）与此扩展（仅键位映射）的分离是刻意的，见 §13.1。
 
 ### `src/extensions/builtin.ts`
 
@@ -1402,15 +1402,15 @@ export { HistoryExtension } from './History';
 
 ### HTML 序列化（view 层，无独立 `core/html.ts`）
 
-**职责。** 顶层 HTML 序列化/反序列化**不在核心层**——不存在 `core/html.ts`，也没有 `blocksToHtml`/`htmlToBlocks`。行内序列化在 `view/inlineDom.ts`（`inlineToHtml`），块级复制/粘贴在 `view/clipboard.ts`（`parseHtml`），每块类型贡献 `serialize.toHTML`（`core/serialize/Serializer.ts`），元素级解串由扩展的 `fromHTML` 提供（例如 Image 为 `<figure>`/`<img>`）。
+**职责。** 顶层 HTML 序列化/反序列化**不在核心层**：不存在 `core/html.ts`，也没有 `blocksToHtml`/`htmlToBlocks`。行内序列化在 `view/inlineDom.ts`（`inlineToHtml`），块级复制/粘贴在 `view/clipboard.ts`（`parseHtml`），每块类型贡献 `serialize.toHTML`（`core/serialize/Serializer.ts`），元素级解串由扩展的 `fromHTML` 提供（例如 Image 为 `<figure>`/`<img>`）。
 
-块级 HTML：`serializers.htmlFor(block)` 未命中时回退到 `<div class="be-block be-block-${type}">` + 行内内容的通用序列化。行内 HTML：`inlineToHtml` 把 `InlineSeq` 渲染为语义标签——marks 对应 `<b>`/`<i>`/`<u>`/`<s>`/`<code>`，`link` mark 渲染为 `<a href="sanitizeUrl(attrs.href)" target="_blank" rel="noopener noreferrer">`，颜色/背景色 marks 渲染为 `<span class="be-color-…">`。HTML 解析：`clipboard.ts` 的 `parseHtml` 用 `DOMParser` 遍历 `<body>` 子节点，先尝 `deserializers.parseHtmlElement(node, inlines)`，未命中则走内置标签映射（heading level、list item wrapper、code language detection），文本节点按空行分段为默认类型（通常是 paragraph）块。
+块级 HTML：`serializers.htmlFor(block)` 未命中时回退到 `<div class="be-block be-block-${type}">` + 行内内容的通用序列化。行内 HTML：`inlineToHtml` 把 `InlineSeq` 渲染为语义标签：marks 对应 `<b>`/`<i>`/`<u>`/`<s>`/`<code>`，`link` mark 渲染为 `<a href="sanitizeUrl(attrs.href)" target="_blank" rel="noopener noreferrer">`，颜色/背景色 marks 渲染为 `<span class="be-color-…">`。HTML 解析：`clipboard.ts` 的 `parseHtml` 用 `DOMParser` 遍历 `<body>` 子节点，先尝 `deserializers.parseHtmlElement(node, inlines)`，未命中则走内置标签映射（heading level、list item wrapper、code language detection），文本节点按空行分段为默认类型（通常是 paragraph）块。
 
 **交互。** 依赖 `view/inlineDom.ts`、`view/urlUtils.ts`（`sanitizeUrl`）、`view/clipboard.ts`。被 `BlockEditor.vue` 的 copy/cut（序列化选中块为 HTML 写入剪贴板）与 paste（用 `parseHtml` 得到块）使用。
 
 ### 文档 ↔ JSON（`types.ts` + `state/store.ts`，无独立 `core/json.ts`）
 
-**职责。** 文档 ↔ JSON 往返由 `types.ts` 的 `DocumentData`/`BlockData` 契约与 `state/store.ts` 的 `docFromData`/`docToData` 承担——不存在 `core/json.ts`，也没有 `validateDocumentData`。
+**职责。** 文档 ↔ JSON 往返由 `types.ts` 的 `DocumentData`/`BlockData` 契约与 `state/store.ts` 的 `docFromData`/`docToData` 承担：不存在 `core/json.ts`，也没有 `validateDocumentData`。
 
 **契约（`types.ts`）。**
 
@@ -1428,7 +1428,7 @@ export interface DocumentData {
 }
 ```
 
-**`docFromData`（`store.ts`）。** 从嵌套 JSON 构建规范化的 `DocState`：按 `children` 递归摄入、必要时重新生成唯一 id、构建 `parent` 映射；随后做**旧式迁移**——若所有块都是根同级且存在 `attrs.indent > 0`，用缩进栈重建 `parent/children` 树（非 nestable 块被钳制到根级且不能有子）；最后把每个块的 `attrs.indent` 规范化为 `depthOf`（0..10 钳制）。
+**`docFromData`（`store.ts`）。** 从嵌套 JSON 构建规范化的 `DocState`：按 `children` 递归摄入、必要时重新生成唯一 id、构建 `parent` 映射；随后做**旧式迁移**：若所有块都是根同级且存在 `attrs.indent > 0`，用缩进栈重建 `parent/children` 树（非 nestable 块被钳制到根级且不能有子）；最后把每个块的 `attrs.indent` 规范化为 `depthOf`（0..10 钳制）。
 
 **`docToData`（`store.ts`）。** 深度优先文档序序列化 `DocState` 回 `DocumentData`：深拷贝 `InlineSeq`（避免与活动状态共享对象引用），递归携带 `children`，只写 schema 白名单 attrs。
 
@@ -1438,7 +1438,7 @@ export interface DocumentData {
 
 ### 文档 ↔ Markdown 转换（原生集成于 `Editor`）
 
-**职责。** 文档 ↔ Markdown 往返。**没有独立的 `core/markdown.ts` 模块**——解析与序列化逻辑直接内嵌在 `src/core/Editor.ts` 中，作为 `Editor` 的原生方法（`toMarkdown` / `setDocFromMarkdown`），不经过任何中间 `DocumentData` 表示。针对 Notion/Typora 风格的 CommonMark 子集进行稳定序列化/解析——保证 `doc → markdown → doc` 的往返保留文本块内容、link marks 和 image 块，并尽量保留标题级别、列表深度、引用、代码语言。行内 marks(b/i/u/s/code + link + color)按优先级渲染：link 优先包装，因为 Markdown 的 `[text](url)` 语法天然把格式化包含在方括号内。
+**职责。** 文档 ↔ Markdown 往返。**没有独立的 `core/markdown.ts` 模块**：解析与序列化逻辑直接内嵌在 `src/core/Editor.ts` 中，作为 `Editor` 的原生方法（`toMarkdown` / `setDocFromMarkdown`），不经过任何中间 `DocumentData` 表示。针对 Notion/Typora 风格的 CommonMark 子集进行稳定序列化/解析，保证 `doc → markdown → doc` 的往返保留文本块内容、link marks 和 image 块，并尽量保留标题级别、列表深度、引用、代码语言。行内 marks(b/i/u/s/code + link + color)按优先级渲染：link 优先包装，因为 Markdown 的 `[text](url)` 语法天然把格式化包含在方括号内。
 
 **公共 API**（`Editor` 方法，见上文 `src/core/Editor.ts`）：
 
@@ -1447,9 +1447,9 @@ toMarkdown(): string;                       // 导出：doc → markdown
 setDocFromMarkdown(markdown: string): void; // 导入：markdown → doc（重置历史）
 ```
 
-**序列化（toMarkdown）。** 对每个块调用 `serializers.markdownFor(block)`;回退是按块类型的通用格式。**阶段 6 的块级：** 图片块序列化为 `![alt](src "title")` 后跟可选的 caption 行。**阶段 6 的行内：** 行内级 `link` mark 序列化为 `[格式化文本](href)`——`href` 经 `normalizeUrl` 确保不丢失 scheme，而方括号内的文本**保留内部 marks 的 markdown 语法**(例如 `[**粗体链接**](https://…)`);`code` mark 内部**不套 link**(与编辑器内的 mark 互斥规则一致)。**支持嵌套：** 顶层块之间用恰好一个空行分隔；同一父级下同种类型的连续列表块(ul/ol/todo)之间不加空行，嵌套(不同缩进层级)的父子列表之间也不加空行；缩进前缀由 `depthOf` 计算，有序列表编号按**同一父级的兄弟列表**隔离。行内 code 块用反引号包裹；多个空行会被折叠为单个空行。
+**序列化（toMarkdown）。** 对每个块调用 `serializers.markdownFor(block)`;回退是按块类型的通用格式。**阶段 6 的块级：** 图片块序列化为 `![alt](src "title")` 后跟可选的 caption 行。**阶段 6 的行内：** 行内级 `link` mark 序列化为 `[格式化文本](href)`；`href` 经 `normalizeUrl` 确保不丢失 scheme，而方括号内的文本**保留内部 marks 的 markdown 语法**(例如 `[**粗体链接**](https://…)`);`code` mark 内部**不套 link**(与编辑器内的 mark 互斥规则一致)。**支持嵌套：** 顶层块之间用恰好一个空行分隔；同一父级下同种类型的连续列表块(ul/ol/todo)之间不加空行，嵌套(不同缩进层级)的父子列表之间也不加空行；缩进前缀由 `depthOf` 计算，有序列表编号按**同一父级的兄弟列表**隔离。行内 code 块用反引号包裹；多个空行会被折叠为单个空行。
 
-**解析（setDocFromMarkdown）。** 按段落块(空行分隔)扫行：每个段落先尝 `deserializers.parseMarkdownLine(line)`(所有块类型的 Markdown 快捷规则)，如未命中则用**正则 + 逐字解析行内**匹配 heading(`#` 前缀)、ul(`-|*|+ `)、ol(`1. `)、todo(`[ ] `、`[x] `)、quote(`> `)、code fence(```` ``` ```` + 可选语言 + 结束 fence)。**阶段 6：** 段落行扫描行内 `![alt](url "title")`(匹配成功则产出 Image 块，而非留在段落内)以及 `[text](url)`(产出带 `link` mark 的行内节点，`attrs.href = sanitizeUrl(url)`)。通过**缩进栈**把前导空格解析为块层级——更深缩进压栈成为父块，更浅缩进弹栈回到祖先，从而构建 `children`/`parent` 嵌套树；对突然的大幅缩进做溢出保护，挂到最近的有效祖先上。空/纯空白输入回退为默认段落块。
+**解析（setDocFromMarkdown）。** 按段落块(空行分隔)扫行：每个段落先尝 `deserializers.parseMarkdownLine(line)`(所有块类型的 Markdown 快捷规则)，如未命中则用**正则 + 逐字解析行内**匹配 heading(`#` 前缀)、ul(`-|*|+ `)、ol(`1. `)、todo(`[ ] `、`[x] `)、quote(`> `)、code fence(```` ``` ```` + 可选语言 + 结束 fence)。**阶段 6：** 段落行扫描行内 `![alt](url "title")`(匹配成功则产出 Image 块，而非留在段落内)以及 `[text](url)`(产出带 `link` mark 的行内节点，`attrs.href = sanitizeUrl(url)`)。通过**缩进栈**把前导空格解析为块层级：更深缩进压栈成为父块，更浅缩进弹栈回到祖先，从而构建 `children`/`parent` 嵌套树；对突然的大幅缩进做溢出保护，挂到最近的有效祖先上。空/纯空白输入回退为默认段落块。
 
 ## 国际化与主题
 
@@ -1472,7 +1472,7 @@ export function provideI18n(locale: Ref<Locale>, theme: Ref<Theme>): void;
 export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 ```
 
-`provideI18n` 直接提供原始的 locale/theme ref（不包装在对象中），使每个使用者的 `t()` 函数读取 `localeRef.value` —— 一个普通的 ref 读取，Vue 响应式系统能可靠地跨 `<Teleport>` 边界追踪。`useI18n()` 注入 ref 并构建新的 `t()`，在当前 locale 的字典中查找 key，找不到时回退到原始 key。
+`provideI18n` 直接提供原始的 locale/theme ref（不包装在对象中），使每个使用者的 `t()` 函数读取 `localeRef.value`：一个普通的 ref 读取，Vue 响应式系统能可靠地跨 `<Teleport>` 边界追踪。`useI18n()` 注入 ref 并构建新的 `t()`，在当前 locale 的字典中查找 key，找不到时回退到原始 key。
 
 **交互。** 导入 `vue`（`InjectionKey`、`Ref`、`inject`、`provide`、`ref`）。`BlockEditor.vue` 在 `setup()` 中调用 `provideI18n()`，通过 `watch(normalizedLocale, …)` 更新 ref。所有 UI 组件（`BlockHandle`、`BlockSettingsMenu`、`HoverToolbar`、`PlusMenu`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`）调用 `useI18n()` 获取 `t()`。
 
@@ -1480,7 +1480,7 @@ export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 
 ### `src/style.css`
 
-**职责。** 编辑器自包含的样式表。所有设计 token 都是 CSS 变量，定义在 `:root`（浅色）和 `.block-editor.theme-dark` / `body.theme-dark`（深色）下。`.block-editor` 元素刻意不设置 `background` —— 由宿主页控制编辑器背景。
+**职责。** 编辑器自包含的样式表。所有设计 token 都是 CSS 变量，定义在 `:root`（浅色）和 `.block-editor.theme-dark` / `body.theme-dark`（深色）下。`.block-editor` 元素刻意不设置 `background`：由宿主页控制编辑器背景。
 
 **关键 CSS 变量。**
 
@@ -1508,7 +1508,7 @@ export function useI18n(): I18nBundle;    // { locale, theme, t(key) }
 **公共 API。**
 
 ```ts
-// 核心引擎(框架无关)— 再导出 core/index.ts
+// 核心引擎(框架无关)，再导出 core/index.ts
 export * from './core/index';
 
 // Vue 组件

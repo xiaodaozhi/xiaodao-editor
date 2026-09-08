@@ -14,23 +14,23 @@
 
 ## 功能特性
 
-- **12 种内置块类型** — 段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**公式**（LaTeX 数学公式）、**分割线**、**表格**、**目录**（共 **14 个扩展**，另含 Keymap 与 History 两个行为扩展）
-- **公式（LaTeX 数学）块** — 通过**内置零依赖数学渲染器**渲染居中的展示型公式（轻量 LaTeX 数学子集：分数、根号、上下标、希腊字母、常用函数、大型运算符、矩阵、aligned 多行对齐）。文档中**只保存原始 `expression` 字符串**——渲染输出在渲染时即时计算、永不持久化，因此序列化保持精简。渲染器**可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可注入 KaTeX、MathJax 或任何自定义引擎获得完整 LaTeX 支持；**`<BlockEditor>` 没有 `equationRenderer` 这个 prop**。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
-- **表格块** — 基于 `attrs` 的 N×M 网格；新建表格默认列宽 120 px、默认启用标题行；行/列选择条 + 左上角角部全选手柄；行/列之间插入点；浮动操作栏提供合并/拆分单元格、**切换标题行**（设置 `attrs.headerRow`）、删除行/列/整个表；单元格使用独立的 `contenteditable`，支持段落/标题/代码块类型、富行内标记、单元格背景色与对齐；Tab 在单元格间导航，Enter 退出编辑（代码块单元格按 Enter 插入换行），Escape 失焦；仿 Arco Design 的内部水平滚动条；矩形选区遇到合并单元格时会自动扩展以保证永远不会只选中合并单元格的一半。
-- **行内样式标记** — 粗体、斜体、下划线、删除线、行内代码、**链接**（`Mod-K` 快捷键、粘贴 URL、自动识别、浮层查看/编辑/复制/删除、href 净化阻断 `javascript:` / XSS），以及按选区设置的文字颜色与背景色
-- **块级属性** — 对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
-- **斜杠菜单** — 输入 `/` 打开可搜索的命令面板；输入规则（`# `、`> `、`[] `、```` ``` ````）可即时转换块类型；`/image` 打开文件选择器
-- **块操作** — 拖拽手柄、悬浮工具栏、`+` 插入按钮，含「复制 / 剪切 / 上移 / 下移 / 删除」的操作菜单；**真实嵌套**（Tab / Shift-Tab 缩进/反缩进构建父子树；拖拽支持兄弟节点的上/下插入 + **"拖入块内"** 模式 — 在块中心停顿一下即可作为第一个子块嵌套进去）；复制会克隆整个子树；图片额外提供替换 / 删除、角部等比缩放手柄、可编辑 caption
-- **固定工具栏（FixedToolbar）** — 常驻操作栏，在工具栏内部内嵌了上下文相关的 **HoverToolbar**（点击格式化按钮时可以保持文本选区不丢失）。通过 `toolbarPosition` prop 控制四种位置：`'auto'`（默认，桌面端顶、移动端底）、`'top'`（强制顶部）、`'bottom'`（强制底部），或 `'float'`（仅桌面端——隐藏 FixedToolbar，改用跟随文本选区浮现的浮动工具栏；移动端自动回退为 FixedToolbar）。工具栏在顶部时，PlusMenu / 手柄菜单会改为向下弹出。
-- **尺寸控制与内部滚动** — 通过 `width` 和 `height` prop 约束编辑器（数字按 px 解析）。内容区域会**在编辑器内部纵向滚动**，而不是无限向下生长，外部布局无需自行管理 overflow。
-- **剪贴板** — HTML 与纯文本的干净复制 / 剪切 / 粘贴；多块选区覆盖层；**粘贴 HTML `<img>` / 图片文件 + 拖拽文件到编辑器内会自动创建图片块并发起上传**；选中文本后粘贴 URL 会包裹为链接
-- **移动端支持** — 长按后开始选中文本，然后拖动手指即可**跨多个独立 `contenteditable` 块**进行选择（通过 hit-testing + overlay 实现，因为原生 Selection API 不支持跨块边界）。固定工具栏会自动落到屏幕底部，位于虚拟键盘之上。
-- **历史记录** — 按输入分组的撤销 / 重做（`Mod-Z` / `Mod-Shift-Z`）；撤销只会恢复块本身，不会"复活"临时的上传状态
-- **国际化 i18n** — 通过 `locale` prop 切换 `zh-CN`（默认）与 `en-US`；零依赖翻译模块（不需要 `vue-i18n`）
-- **主题** — 通过 `theme` prop 切换 `light`（默认）与 `dark`；所有设计令牌均以 CSS 变量暴露
-- **可访问性** — 全程键盘导航，菜单具备 ARIA 角色
-- **目录（Table of Contents）** — 不可编辑的动态块，实时渲染文档中所有标题的层级列表；标题增删改时自动同步；点击条目可跳转到对应标题；通过斜杠菜单 `/目录` 插入
-- **Markdown 原生导入 / 导出** — `Editor` 实例暴露了 `toMarkdown()` 和 `setDocFromMarkdown(string)` 方法。往返转换直接基于实时 `DocState`（不经过中间的 `BlockData` 或外部转换器），标题/列表的嵌套层级、行内代码标记、块间空行分隔均能稳定保持。
+- **12 种内置块类型**：段落、h1–h6（标题）、无序列表、有序列表、待办事项、引用、代码块、**图片**、**公式**（LaTeX 数学公式）、**分割线**、**表格**、**目录**（共 **14 个扩展**，另含 Keymap 与 History 两个行为扩展）
+- **公式（LaTeX 数学）块**：通过**内置零依赖数学渲染器**渲染居中的展示型公式（轻量 LaTeX 数学子集：分数、根号、上下标、希腊字母、常用函数、大型运算符、矩阵、aligned 多行对齐）。文档中**只保存原始 `expression` 字符串**：渲染输出在渲染时即时计算、永不持久化，因此序列化保持精简。渲染器**可插拔**：通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可注入 KaTeX、MathJax 或任何自定义引擎获得完整 LaTeX 支持；**`<BlockEditor>` 没有 `equationRenderer` 这个 prop**。通过 `/公式` 斜杠命令或 `+` 菜单插入；空块会直接进入编辑态。点击块即可选中；右上角的浮动 ✎ 按钮（或点击空块）打开源码编辑器并带实时预览。支持块级选中，也**可作为子块嵌套**（按嵌套深度自动缩进）。Markdown 导出使用 `$$$ … $$$` 围栏块。
+- **表格块**：基于 `attrs` 的 N×M 网格；新建表格默认列宽 120 px、默认启用标题行；行/列选择条 + 左上角角部全选手柄；行/列之间插入点；浮动操作栏提供合并/拆分单元格、**切换标题行**（设置 `attrs.headerRow`）、删除行/列/整个表；单元格使用独立的 `contenteditable`，支持段落/标题/代码块类型、富行内标记、单元格背景色与对齐；Tab 在单元格间导航，Enter 退出编辑（代码块单元格按 Enter 插入换行），Escape 失焦；仿 Arco Design 的内部水平滚动条；矩形选区遇到合并单元格时会自动扩展以保证永远不会只选中合并单元格的一半。
+- **行内样式标记**：粗体、斜体、下划线、删除线、行内代码、**链接**（`Mod-K` 快捷键、粘贴 URL、自动识别、浮层查看/编辑/复制/删除、href 净化阻断 `javascript:` / XSS），以及按选区设置的文字颜色与背景色
+- **块级属性**：对齐方式（左/中/右/两端）、文字颜色、背景色、缩进（0–10 级）；图片额外携带 `src`、`alt`、`title`、`width`、`height`、`caption`、`fileId`
+- **斜杠菜单**：输入 `/` 打开可搜索的命令面板；输入规则（`# `、`> `、`[] `、```` ``` ````）可即时转换块类型；`/image` 打开文件选择器
+- **块操作**：拖拽手柄、悬浮工具栏、`+` 插入按钮，含「复制 / 剪切 / 上移 / 下移 / 删除」的操作菜单；**真实嵌套**（Tab / Shift-Tab 缩进/反缩进构建父子树；拖拽支持兄弟节点的上/下插入 + **"拖入块内"** 模式：在块中心停顿一下即可作为第一个子块嵌套进去）；复制会克隆整个子树；图片额外提供替换 / 删除、角部等比缩放手柄、可编辑 caption
+- **固定工具栏（FixedToolbar）**：常驻操作栏，在工具栏内部内嵌了上下文相关的 **HoverToolbar**（点击格式化按钮时可以保持文本选区不丢失）。通过 `toolbarPosition` prop 控制四种位置：`'auto'`（默认，桌面端顶、移动端底）、`'top'`（强制顶部）、`'bottom'`（强制底部），或 `'float'`（仅桌面端：隐藏 FixedToolbar，改用跟随文本选区浮现的浮动工具栏；移动端自动回退为 FixedToolbar）。工具栏在顶部时，PlusMenu / 手柄菜单会改为向下弹出。
+- **尺寸控制与内部滚动**：通过 `width` 和 `height` prop 约束编辑器（数字按 px 解析）。内容区域会**在编辑器内部纵向滚动**，而不是无限向下生长，外部布局无需自行管理 overflow。
+- **剪贴板**：HTML 与纯文本的干净复制 / 剪切 / 粘贴；多块选区覆盖层；**粘贴 HTML `<img>` / 图片文件 + 拖拽文件到编辑器内会自动创建图片块并发起上传**；选中文本后粘贴 URL 会包裹为链接
+- **移动端支持**：长按后开始选中文本，然后拖动手指即可**跨多个独立 `contenteditable` 块**进行选择（通过 hit-testing + overlay 实现，因为原生 Selection API 不支持跨块边界）。固定工具栏会自动落到屏幕底部，位于虚拟键盘之上。
+- **历史记录**：按输入分组的撤销 / 重做（`Mod-Z` / `Mod-Shift-Z`）；撤销只会恢复块本身，不会"复活"临时的上传状态
+- **国际化 i18n**：通过 `locale` prop 切换 `zh-CN`（默认）与 `en-US`；零依赖翻译模块（不需要 `vue-i18n`）
+- **主题**：通过 `theme` prop 切换 `light`（默认）与 `dark`；所有设计令牌均以 CSS 变量暴露
+- **可访问性**：全程键盘导航，菜单具备 ARIA 角色
+- **目录（Table of Contents）**：不可编辑的动态块，实时渲染文档中所有标题的层级列表；标题增删改时自动同步；点击条目可跳转到对应标题；通过斜杠菜单 `/目录` 插入
+- **Markdown 原生导入 / 导出**：`Editor` 实例暴露了 `toMarkdown()` 和 `setDocFromMarkdown(string)` 方法。往返转换直接基于实时 `DocState`（不经过中间的 `BlockData` 或外部转换器），标题/列表的嵌套层级、行内代码标记、块间空行分隔均能稳定保持。
 
 ## 快速开始
 
@@ -54,7 +54,7 @@ const doc = ref<DocumentData>({ blocks: [] });
 </template>
 ```
 
-编辑器默认内置全部 14 种扩展 — 除非你需要自定义集合，否则无需传入 `extensions`。
+编辑器默认内置全部 14 种扩展：除非你需要自定义集合，否则无需传入 `extensions`。
 
 ## 可插拔公式渲染器
 
@@ -66,7 +66,7 @@ interface EquationRenderer {
 }
 
 interface EquationRenderResult {
-  /** 安全 HTML 字符串 —— 始终可用（导出 / SSR / 非 Vue 消费方）。 */
+  /** 安全 HTML 字符串，始终可用（导出 / SSR / 非 Vue 消费方）。 */
   html: string;
   /** 可选的 Vue VNode 树；存在时视图直接渲染它（不走 innerHTML）。 */
   vnode: VNode | VNode[] | null;
@@ -76,23 +76,23 @@ interface EquationRenderResult {
 }
 ```
 
-默认使用**内置数学渲染器** —— 零第三方依赖的轻量 LaTeX 数学子集实现
+默认使用**内置数学渲染器**，即零第三方依赖的轻量 LaTeX 数学子集实现
 （tokenizer → parser → AST → DOM）：数字/标识符、运算符（`\pm \times \div \cdot \le \ge \neq` 等）、
 上下标、`\frac`、`\sqrt` / `\sqrt[n]`、希腊字母、`\sin \cos \tan \log \ln \exp \lim \min \max`、
 大型运算符（`\sum \prod \int`，display 模式下上下标置于符号上下方）、
 `\begin{matrix}` 与 `\begin{aligned}`。未知命令会优雅降级（原样显示），
-语法错误显示内联警告而不会让编辑器崩溃——源码始终保留，修复后自动重新解析。
+语法错误显示内联警告而不会让编辑器崩溃：源码始终保留，修复后自动重新解析。
 它**不是**完整 TeX 引擎；需要完整支持时注入外部渲染器：
 
 ```vue
 <script setup lang="ts">
-// KaTeX 本身不是 xiaodao-editor 的依赖 —— 自行安装：
+// KaTeX 本身不是 xiaodao-editor 的依赖，需自行安装：
 //   pnpm add katex
 import katex from 'katex';
 // ★ KaTeX 的 CSS 必须显式引入 ★
 //   KaTeX 渲染出的是平铺的 HTML 树，「上下标、积分限、分式、∫ 上下限」等
 //   一切排版都由 .katex / .strut / <sup> / <sub> 等类名驱动。没引 CSS 时，
-//   所有 span 会按行内文本平铺——「∫ab」「αx3」「e−λx」之类错位就是这症状。
+//   所有 span 会按行内文本平铺，「∫ab」「αx3」「e−λx」之类错位就是这症状。
 //   在 app 入口加载一次即可；这里引入只是让 demo 自洽。
 import 'katex/dist/katex.min.css';
 import { createEquationExtension, BuiltinExtensions, type EquationRenderer } from 'xiaodao-editor';
@@ -106,12 +106,12 @@ const katexRenderer: EquationRenderer = {
       // 也可以，但会丢掉 MathML 分支。
       const html = katex.renderToString(src, {
         displayMode: options?.displayMode ?? true,
-        throwOnError: false,   // 不抛错 —— 出错片段包成 <span class="katex-error">…</span>
+        throwOnError: false,   // 不抛错：出错片段包成 <span class="katex-error">…</span>
         trust: false,          // 必选：trust: true 会放开 \href / \url 的原始 HTML 注入（XSS）
         strict: false,         // 宽松：未知命令不报警
         output: 'htmlAndMathml',
       });
-      // KaTeX 标记错误的 class 是 `katex-error`（不是 merror —— merror 是更新版）。
+      // KaTeX 标记错误的 class 是 `katex-error`（不是 merror；merror 是更新版）。
       // 命中后让 Equation 块显示 ⚠ 徽章。
       const error = /class="katex-error"/.test(html);
       return { html, vnode: null, error, diagnostics: [] };
@@ -123,7 +123,7 @@ const katexRenderer: EquationRenderer = {
 
 // 把带自定义渲染器的扩展 append 到 BuiltinExtensions 之后，
 // 注册器按 name 去重（后写赢），所以最终生效的是这个。
-// 不要并列塞两个 createEquationExtension —— 二选一。
+// 不要并列塞两个 createEquationExtension，二选一。
 const extensions = [
   ...BuiltinExtensions,
   createEquationExtension({ renderer: katexRenderer }),
@@ -135,7 +135,7 @@ const extensions = [
 </template>
 ```
 
-`createEquationExtension({ renderer })` 把带自定义渲染器的公式扩展追加到 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可覆盖内置版本——`<BlockEditor>` 没有 `equationRenderer` prop。也可以从 `xiaodao-editor` 导入内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
+`createEquationExtension({ renderer })` 把带自定义渲染器的公式扩展追加到 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可覆盖内置版本；`<BlockEditor>` 没有 `equationRenderer` prop。也可以从 `xiaodao-editor` 导入内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
 
 ## Props 属性
 
@@ -205,7 +205,7 @@ const extensions = [
 
 | 成员名   | 类型     | 说明                                                                                                                                                                                                  |
 | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `editor` | `Editor` | 与框架无关的 `Editor` 实例。常用方法：<br>`toData(): DocumentData` — 导出 JSON。<br>`setDocument(json: DocumentData)` — 用新 JSON 替换整个文档。<br>`toMarkdown(): string` — 原生导出 Markdown。<br>`setDocFromMarkdown(md: string)` — 原生导入 Markdown（会重置历史）。 |
+| `editor` | `Editor` | 与框架无关的 `Editor` 实例。常用方法：<br>`toData(): DocumentData`：导出 JSON。<br>`setDocument(json: DocumentData)`：用新 JSON 替换整个文档。<br>`toMarkdown(): string`：原生导出 Markdown。<br>`setDocFromMarkdown(md: string)`：原生导入 Markdown（会重置历史）。 |
 
 ## 主题化
 
@@ -219,7 +219,7 @@ const extensions = [
 }
 ```
 
-`.block-editor` 元素**故意不设置背景** — 由宿主页面控制编辑器的背景，以便自然融入周围 UI。如需显式设置：
+`.block-editor` 元素**故意不设置背景**：由宿主页面控制编辑器的背景，以便自然融入周围 UI。如需显式设置：
 
 ```css
 .block-editor {
@@ -239,14 +239,14 @@ const extensions = [
 | `OrderedListExtension` | `orderedList`  | 自动编号；可通过 `attrs.startNumber` 显式覆盖起始序号。                  |
 | `TodoListExtension`    | `todoList`     | 通过 `attrs.checked` 控制复选框状态。                                  |
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
-| `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式 — Enter 插入换行。                 |
+| `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式：Enter 插入换行。                 |
 | `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传侧信道，详见「可插拔图片上传」。`BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（`blob:` URL 无法跨刷新存活），不会触发任何 `onFileCleanup` 回调。 |
-| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块——只保存 `attrs.expression`（原始 LaTeX）。**默认使用零依赖的内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 即可覆盖。**`<BlockEditor>` 没有 `equationRenderer` prop**。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
+| `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块：只保存 `attrs.expression`（原始 LaTeX）。**默认使用零依赖的内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 即可覆盖。**`<BlockEditor>` 没有 `equationRenderer` prop**。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |
 | `DividerExtension`     | `divider`      | 隔离型水平分割线。                                                     |
-| `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`；空 attrs — 标题列表是每次渲染时从编辑器状态计算的**动态视图**。不可编辑块（`editable: false`）；按文档顺序收集所有 `heading` 块（表格单元格内的标题自动排除）；点击条目滚动到对应标题。序列化输出空字符串（真正的标题由各自的块导出）。 |
-| `KeymapExtension`      | —              | 绑定 Enter / Backspace / ↑ / ↓。                                      |
-| `HistoryExtension`     | —              | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` 撤销 / 重做快捷键。                  |
+| `TableOfContentsExtension` | `tableOfContents` | `content: 'none'`；空 attrs：标题列表是每次渲染时从编辑器状态计算的**动态视图**。不可编辑块（`editable: false`）；按文档顺序收集所有 `heading` 块（表格单元格内的标题自动排除）；点击条目滚动到对应标题。序列化输出空字符串（真正的标题由各自的块导出）。 |
+| `KeymapExtension`      | 无             | 绑定 Enter / Backspace / ↑ / ↓。                                      |
+| `HistoryExtension`     | 无             | `Mod-Z` / `Mod-Shift-Z` / `Mod-Y` 撤销 / 重做快捷键。                  |
 
 要使用**自定义子集**，请显式传入 `extensions`：
 
@@ -270,7 +270,7 @@ interface Block {
   type: BlockType;
   attrs: Attrs;             // 例如 { level: 2, align: 'center', color: 'red' }
   content: InlineSeq;       // 带可选标记的文本片段
-  children: BlockId[];      // 子块 id — 真实嵌套：paragraph/heading +
+  children: BlockId[];      // 子块 id，真实嵌套：paragraph/heading +
                             // 3 种列表块可以做父；任何块类型都能做子。`attrs.indent`
                             // 是嵌套深度的衍生镜像。
 }
@@ -297,7 +297,7 @@ const doc: DocumentData = {
     { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'const x = 1' }] },
     { type: 'image', attrs: {
         src: 'https://cdn.example.com/hero.png', alt: '主图',
-        width: 1200, height: 630, caption: '图 1 — 架构总览', fileId: 42,
+        width: 1200, height: 630, caption: '图 1：架构总览', fileId: 42,
       }, content: [] },
     { type: 'divider' },
     { type: 'table', attrs: {
@@ -363,11 +363,11 @@ const extensions = [...BuiltinExtensions, CalloutExtension];
 
 ## 架构
 
-- **`src/core/`** — 与框架无关的引擎（零 Vue 导入，由 ESLint 强制约束）。负责文档模型、事务、历史记录、命令、schema、扩展注册表，以及 **Markdown 原生导入/导出**
-  （`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()` — 直接操作 `DocState`，不经过中间的 `BlockData`）。
-- **`src/view/`** — Vue 桥接层：`BlockEditor.vue`（根组件）、`BlockList`、`BlockHost`、`BlockContent`（每个块的 `contenteditable`），以及 UI 组件（`BlockHandle`、`BlockSettingsMenu`、`HoverToolbar`、`PlusMenu`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`、`FixedToolbar`）。
-- **`src/extensions/`** — 14 种内置扩展，以及 `_commonAttrs.ts`（共享的 align / color / bgColor / indent 规格与颜色预设，`ImageExtension` 还在此层实现了上传侧信道的渲染逻辑）。**表格** 位于 `Table.ts`（Vue 渲染器 + 命令注册）与 `tableModel.ts`（纯函数式结构操作：插入/删除行/列、合并/拆分单元格、合并选区完整矩形扩展、切换标题行、列宽辅助、HTML/Markdown 序列化、attrs 校验/规整）。**分割线** 位于 `Divider.ts`。**目录** 位于 `TableOfContents.ts`（不可编辑的动态块，实时渲染文档标题列表）。**公式** 位于 `Equation.ts`（LaTeX 数学块；只保存 `attrs.expression`，渲染居中展示公式；`attrs.indent` 镜像嵌套深度，作为子块时随深度缩进）。内置数学引擎位于 `extensions/math/`（tokenizer → parser → AST → 渲染树 → DOM/HTML），零第三方依赖。
-- **`src/i18n.ts`** — locale + 主题模块；通过 Vue 的 provide/inject 提供 `t(key)`，让 `<Teleport>` 渲染的浮层也保持响应式。
+- **`src/core/`**：与框架无关的引擎（零 Vue 导入，由 ESLint 强制约束）。负责文档模型、事务、历史记录、命令、schema、扩展注册表，以及 **Markdown 原生导入/导出**
+  （`Editor.toMarkdown()` / `Editor.setDocFromMarkdown()`，直接操作 `DocState`，不经过中间的 `BlockData`）。
+- **`src/view/`**：Vue 桥接层：`BlockEditor.vue`（根组件）、`BlockList`、`BlockHost`、`BlockContent`（每个块的 `contenteditable`），以及 UI 组件（`BlockHandle`、`BlockSettingsMenu`、`HoverToolbar`、`PlusMenu`、`OrderedListMenu`、`NumberPicker`、`CodeLangPicker`、`LinkPopover`、`FixedToolbar`）。
+- **`src/extensions/`**：14 种内置扩展，以及 `_commonAttrs.ts`（共享的 align / color / bgColor / indent 规格与颜色预设，`ImageExtension` 还在此层实现了上传侧信道的渲染逻辑）。**表格** 位于 `Table.ts`（Vue 渲染器 + 命令注册）与 `tableModel.ts`（纯函数式结构操作：插入/删除行/列、合并/拆分单元格、合并选区完整矩形扩展、切换标题行、列宽辅助、HTML/Markdown 序列化、attrs 校验/规整）。**分割线** 位于 `Divider.ts`。**目录** 位于 `TableOfContents.ts`（不可编辑的动态块，实时渲染文档标题列表）。**公式** 位于 `Equation.ts`（LaTeX 数学块；只保存 `attrs.expression`，渲染居中展示公式；`attrs.indent` 镜像嵌套深度，作为子块时随深度缩进）。内置数学引擎位于 `extensions/math/`（tokenizer → parser → AST → 渲染树 → DOM/HTML），零第三方依赖。
+- **`src/i18n.ts`**：locale + 主题模块；通过 Vue 的 provide/inject 提供 `t(key)`，让 `<Teleport>` 渲染的浮层也保持响应式。
 
 ## 开发
 

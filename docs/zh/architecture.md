@@ -51,7 +51,7 @@ ProseMirror 是一个**文档编辑器工具包**，而不是块编辑器。它�
 Tiptap 是 ProseMirror 之上的一个**无头（headless）**封装，提供干净的扩展/composable API 和框架绑定（Vue、React）。它让 ProseMirror 更易用，并通过 `NodeViewWrapper` 提供 Vue 渲染器。
 
 - 优势：ProseMirror 之上最优秀的开发体验；无头（样式自由）；通过 Yjs 支持协作编辑。
-- 劣势：继承了 ProseMirror 全部"散文优先"的约束。动态块注册仍然与 schema 冲突。Vue node-view 桥接是一种妥协——ProseMirror 仍然拥有文档 DOM，因此按块划分的 Vue 组件生活在它控制的 contenteditable 内部。
+- 劣势：继承了 ProseMirror 全部"散文优先"的约束。动态块注册仍然与 schema 冲突。Vue node-view 桥接是一种妥协：ProseMirror 仍然拥有文档 DOM，因此按块划分的 Vue 组件生活在它控制的 contenteditable 内部。
 
 ### 2.3 BlockNote
 
@@ -65,7 +65,7 @@ BlockNote 是构建在 Tiptap/ProseMirror 之上的一个 **Notion 风格**编�
 Lexical（Meta）是一个**基于节点（node-based）**的编辑器，带有 React 风格的 reconciler。状态是一个节点树；更新产生新状态，Lexical 对 DOM 做 diff/reconcile。节点是带有生命周期钩子的类。
 
 - 优势：细粒度更新、性能好、架构现代、为并发/协作而设计。
-- 劣势：**React 优先**；Vue 的支持是非官方/薄弱的。仍然是**文本优先**——块是节点的组合，而不是一等公民单元。采用它意味着接受 Meta 的节点范式，并自己把它绑定到 Vue。
+- 劣势：**React 优先**；Vue 的支持是非官方/薄弱的。仍然是**文本优先**：块是节点的组合，而不是一等公民单元。采用它意味着接受 Meta 的节点范式，并自己把它绑定到 Vue。
 
 ### 2.5 Slate
 
@@ -108,7 +108,7 @@ Notion 的编辑器是自定义的。一切都是块；块拥有 `id`、`type`�
 
 - **IME / 中日韩输入**：限制在单个块的 `contenteditable` 内。浏览器处理 `compositionstart…compositionend`。在组合期间我们**绝不**变更 DOM 或分发事务；我们在 `compositionend` 上进行调和。这是标准的正确做法，而且比在文档级 contenteditable 中做要简单得多。
 - **块内光标/选择**：原生处理。浏览器放置光标。
-- **跨块选择与块操作**：由我们的核心负责，操作作用于 JSON 树（而非 DOM range）——因为它们是结构性的，所以可控。
+- **跨块选择与块操作**：由我们的核心负责，操作作用于 JSON 树（而非 DOM range）；因为它们是结构性的，所以可控。
 - **撤销/重做**：基于事务的历史插件（状态快照/差异），与 ProseMirror 的 `prosemirror-history` 是同一套被证明的模式。
 - **剪贴板**：在阶段五（Pi階段 5）中按块处理，把 selection → JSON 片段 → HTML/文本用于复制，反向用于粘贴。
 
@@ -218,14 +218,14 @@ interface Extension {
 | `RendererRegistry` | `BlockType` | Vue 组件 |
 | `CommandRegistry` | 命令名 | `Command` |
 | `KeymapRegistry` | 优先级 + 键 | 命令绑定 |
-| `InputRuleRegistry` | — | 有序的 `InputRule[]` |
+| `InputRuleRegistry` | 无 | 有序的 `InputRule[]` |
 | `SlashCommandRegistry` | 命令 id | `SlashCommand` |
 | `ToolbarRegistry` | 块类型 | `ToolbarAction[]` |
 | `SerializerRegistry` | `BlockType` | `Serializer` |
 | `DeserializerRegistry` | 来源种类 | `Deserializer` |
-| `PluginRegistry` | — | `Plugin[]` |
+| `PluginRegistry` | 无 | `Plugin[]` |
 
-注册表在**构造后不可变**（冻结）。重新配置编辑器意味着重建它——这保证分发和渲染无分支。
+注册表在**构造后不可变**（冻结）。重新配置编辑器意味着重建它，这保证分发和渲染无分支。
 
 ### 5.3 块 schema
 
@@ -245,7 +245,7 @@ schema 让核心无需知道类型就能回答结构性问题："块 A 能包含
 
 ### 5.4 自动发现
 
-编辑器接受 `extensions: Extension[]`。它摊平 `uses` 图（按 `name` 去重），把每个贡献处理进注册表，然后冻结它们。内置扩展（`Paragraph`、`Heading`、`BulletList`、`OrderedList`、`TodoList`、`Quote`、`CodeBlock`、**`Image`**、**`Table`**、**`Divider`**、**`TableOfContents`**、`Keymap`、`History`，共 13 个）通过 `BuiltinExtensions` 默认包含，可以通过传入同名（`name`）扩展来覆盖。新增一个块类型就是"创建一个文件，传给编辑器"——零核心改动。
+编辑器接受 `extensions: Extension[]`。它摊平 `uses` 图（按 `name` 去重），把每个贡献处理进注册表，然后冻结它们。内置扩展（`Paragraph`、`Heading`、`BulletList`、`OrderedList`、`TodoList`、`Quote`、`CodeBlock`、**`Image`**、**`Table`**、**`Divider`**、**`TableOfContents`**、`Keymap`、`History`，共 13 个）通过 `BuiltinExtensions` 默认包含，可以通过传入同名（`name`）扩展来覆盖。新增一个块类型就是"创建一个文件，传给编辑器"，零核心改动。
 
 ---
 
@@ -253,10 +253,10 @@ schema 让核心无需知道类型就能回答结构性问题："块 A 能包含
 
 ### 6.1 组件
 
-- **`<BlockEditor>`** — 公开的根组件。Props:`modelValue`（文档 JSON）、`extensions`（默认 `BuiltinExtensions`）、`editable`、`placeholder`（locale 感知默认值）、`theme`（`'light' | 'dark'`）、`locale`（`'zh-CN' | 'en-US'`）。通过 `provide` 暴露 `useEditor()` 和 i18n 上下文。
-- **`<BlockList>`** — 渲染有序的块 id 列表（根或某个父节点的子块）。**虚拟化接缝**：此组件是唯一决定*哪些*块被挂载的地方；虚拟化实现以后可以无缝替换，而无需触碰块组件。
-- **`<BlockHost>`** — 通过注册表把 `block.type` 解析为渲染器并挂载它。提供按块上下文（`blockId`、编辑器 API、选择状态）。使用 `key=blockId` 让 Vue 跨重排复用 DOM。
-- **块渲染器组件** — 普通的 Vue 组件。对内容块，它们渲染绑定到各自块内容的 `contenteditable`。它们通过 `useBlock(blockId)` 读取状态，通过 `useEditor()` 分发。
+- **`<BlockEditor>`**：公开的根组件。Props:`modelValue`（文档 JSON）、`extensions`（默认 `BuiltinExtensions`）、`editable`、`placeholder`（locale 感知默认值）、`theme`（`'light' | 'dark'`）、`locale`（`'zh-CN' | 'en-US'`）。通过 `provide` 暴露 `useEditor()` 和 i18n 上下文。
+- **`<BlockList>`**：渲染有序的块 id 列表（根或某个父节点的子块）。**虚拟化接缝**：此组件是唯一决定*哪些*块被挂载的地方；虚拟化实现以后可以无缝替换，而无需触碰块组件。
+- **`<BlockHost>`**：通过注册表把 `block.type` 解析为渲染器并挂载它。提供按块上下文（`blockId`、编辑器 API、选择状态）。使用 `key=blockId` 让 Vue 跨重排复用 DOM。
+- **块渲染器组件**：普通的 Vue 组件。对内容块，它们渲染绑定到各自块内容的 `contenteditable`。它们通过 `useBlock(blockId)` 读取状态，通过 `useEditor()` 分发。
 
 ### 6.2 视图桥接（状态 → Vue）
 
@@ -303,7 +303,7 @@ interface Transaction {
 }
 ```
 
-`Step` 是一个很小的、可序列化的结构性操作：`insertBlock`、`removeBlock`、`replaceBlock`、`moveBlock`、`setText`、`setAttrs`、`setSelection`。应用一个事务产生一个**新的 `EditorState`**（不可变）和一个哪些块发生了变化的**diff**。没有其他方式可以变更状态——这正是让历史、持久化以及（未来的）协作成为可能的原因。
+`Step` 是一个很小的、可序列化的结构性操作：`insertBlock`、`removeBlock`、`replaceBlock`、`moveBlock`、`setText`、`setAttrs`、`setSelection`。应用一个事务产生一个**新的 `EditorState`**（不可变）和一个哪些块发生了变化的**diff**。没有其他方式可以变更状态，这正是让历史、持久化以及（未来的）协作成为可能的原因。
 
 ### 7.3 核心提供的原语命令（块类型无感知）
 
@@ -359,11 +359,11 @@ interface Plugin {
 
 内置插件（由内置扩展贡献）:
 
-- **History** — 撤销/重做的事务栈，带分组和 `addToHistory` meta。通过重放步骤进行时间旅行。
-- **Keymap** — 有序的快捷键解析；返回 `true` 以消费。
-- **InputRules** — 对文本输入做模式匹配（例如 `# ` → heading）。
-- **SelectionSync** — 原生 ↔ 模型选择同步，包括 IME 防护。
-- **Placeholder** — 推导某块是否为空，并通知渲染器。
+- **History**：撤销/重做的事务栈，带分组和 `addToHistory` meta。通过重放步骤进行时间旅行。
+- **Keymap**：有序的快捷键解析；返回 `true` 以消费。
+- **InputRules**：对文本输入做模式匹配（例如 `# ` → heading）。
+- **SelectionSync**：原生 ↔ 模型选择同步，包括 IME 防护。
+- **Placeholder**：推导某块是否为空，并通知渲染器。
 
 插件状态存储在 `EditorState` 中，以插件名为键，因此它是不可变、带版本的状态的一部分（支持跨插件效果的正确撤销）。
 
@@ -386,7 +386,7 @@ interface EditorState {
 
 ### 10.2 store
 
-规范化的 `Map<BlockId, Block>` **不是**深度响应式的。它是状态对象内部的一个普通 map。视图桥接（§6.2）是唯一通过浅层 ref 向 Vue 暴露切片的使用者。这刻意避免了 Vue 对数千个块做深度响应式——正是简报中点名的显式性能隐患。
+规范化的 `Map<BlockId, Block>` **不是**深度响应式的。它是状态对象内部的一个普通 map。视图桥接（§6.2）是唯一通过浅层 ref 向 Vue 暴露切片的使用者。这刻意避免了 Vue 对数千个块做深度响应式，这正是简报中点名的显式性能隐患。
 
 ### 10.3 更新流程
 
@@ -432,7 +432,7 @@ interface EditorState {
 - **Enter**：从原生选择读取光标偏移，然后：若块的 schema 说是 `content: 'text'` 且光标位于文本中间 → 在偏移处 `splitBlock`（由于输入同步 §6.3，模型文本已经最新）。若位于末尾且块按 schema 判定为"空" → 在它后面 `insertBlock` 一个**默认块类型**（Notion 的"空 Enter 退出"一个带样式块）。若块是 `isolating` 且光标在末尾 → 在它后面插入默认块。行为完全由 schema 谓词驱动，绝不依据 `type`。
 - **Backspace**：在偏移 0 且非 `blocks` 选择时 → 与上一个兄弟 `mergeBlock`（尊重 `isolating`：代码块不并入正文）。文本中间 → 原生删除（contenteditable）；随后 `input` 事件通过每次输入的 `setText` 路径（§6.3）同步模型，因此无需额外的同步。
 
-**默认块类型**在编辑器配置中声明（`defaultBlockType`，通常为 `"paragraph"`），并通过 schema 注册表解析——核心绝不硬编码类型名。
+**默认块类型**在编辑器配置中声明（`defaultBlockType`，通常为 `"paragraph"`），并通过 schema 注册表解析；核心绝不硬编码类型名。
 
 ### 11.3 方向键导航
 
@@ -454,7 +454,7 @@ interface EditorState {
 - **diff 驱动渲染**：桥接只更新事务 diff 中的块，加上选择。
 - **稳定键**：`key=blockId` 让重排移动 DOM，而非重建。
 - **虚拟化接缝**：`<BlockList>` 是唯一的挂载点；虚拟化变体可以替换它而不触碰块组件。我们让块组件无副作用且幂等，因此虚拟化是安全的。
-- **带历史分组的每次输入模型同步**（§6.3）：每次击键分发一个廉价的 `setText`，它只改变一个块（结构共享）并携带 `view: 'skip-dom-write'`，因此聚焦元素永远不会被重写——无干扰光标的回流，无每次按键的 DOM 调和。
+- **带历史分组的每次输入模型同步**（§6.3）：每次击键分发一个廉价的 `setText`，它只改变一个块（结构共享）并携带 `view: 'skip-dom-write'`，因此聚焦元素永远不会被重写：无干扰光标的回流，无每次按键的 DOM 调和。
 - **不对整个文档做 `watch`**；简报明确禁止深度 watch，我们遵从。
 
 ---
@@ -556,7 +556,7 @@ src/
 |---|---|---|
 | `state/diff.ts` | 并入 `Step.ts`（`applySteps` 返回 `changed`/`removed`） | diff 是应用步骤的副产品；独立的模块增加了间接性而无价值。 |
 | `serialize/json.ts` | `serialize/Serializer.ts` | JSON 进/出由 `store.ts` 处理；此模块只负责按块的 Markdown/HTML spec。 |
-| `view/ViewBridge.ts` | 不存在—`BlockEditor.vue` 直接持有 `shallowRef<EditorState>` | 阶段一不需要单独的桥接类；根组件是唯一的响应式边界。若视图层增长可以抽取出来。 |
+| `view/ViewBridge.ts` | 不存在，`BlockEditor.vue` 直接持有 `shallowRef<EditorState>` | 阶段一不需要单独的桥接类；根组件是唯一的响应式边界。若视图层增长可以抽取出来。 |
 | `view/useEditor.ts` + `view/useBlock.ts` | `view/context.ts`（editorKey + useEditor + BlockRenderItem） | 阶段一不需要 `useBlock`（块接收 props，而非订阅）。 |
 | `view/dom/selectionSync.ts` + `view/dom/caret.ts` | `view/domSelection.ts` | 两个关注点紧密耦合；拆分增加了仪式感而无清晰度。 |
 | `view/contenteditable.ts` | `view/BlockContent.vue` | contenteditable 契约是一个组件，而非 composable。 |
@@ -565,7 +565,7 @@ src/
 | `history/` 作为一个插件 | `history/HistoryManager.ts`（由 Editor 持有）+ `extensions/History.ts`（仅键位映射） | 历史需要 Editor 的 dispatch 和 state；做成插件需要特权访问。键位映射是一个独立的扩展。 |
 | 设计中没有 `SchemaRegistry.ts` | 新增 | 设计描述了内联的 schema 查找；注册表集中了回退逻辑，让 `Editor.ts` 保持精简。 |
 | 设计中没有 `state/invert.ts` | 新增 | 步骤反转并不平凡，值得一个独立专注的模块。 |
-| 设计中没有图片上传侧信道 | `view/imageUpload.ts`(瞬时态) + `extensions/Image.ts` 工厂 `createImageExtension({ upload, onFileCleanup })` + 扩展方法 `Editor.registerExtensionMethod('startImageUpload', …)` | 图片上传中的瞬时状态（进行中/进度/错误）不得进入持久化的 block attrs；用侧信道管理并支持未完成时的临时对象 URL、失败重试与文件引用清理。`BlockEditor.vue` 不再携带 `uploadImage` prop 也不发出 `cleanup:image-file` 事件——上传编排与 fileId 引用计数全部由 `image-upload` 插件的 `applyTransaction` 完成。 |
+| 设计中没有图片上传侧信道 | `view/imageUpload.ts`(瞬时态) + `extensions/Image.ts` 工厂 `createImageExtension({ upload, onFileCleanup })` + 扩展方法 `Editor.registerExtensionMethod('startImageUpload', …)` | 图片上传中的瞬时状态（进行中/进度/错误）不得进入持久化的 block attrs；用侧信道管理并支持未完成时的临时对象 URL、失败重试与文件引用清理。`BlockEditor.vue` 不再携带 `uploadImage` prop 也不发出 `cleanup:image-file` 事件：上传编排与 fileId 引用计数全部由 `image-upload` 插件的 `applyTransaction` 完成。 |
 | 设计中没有 `view/urlUtils.ts` 与链接浮层 | `view/urlUtils.ts`（`sanitizeUrl` / `autoLinkInlineSeq`） + `view/ui/LinkPopover.vue` + `BlockEditor.vue` 编排 | 链接是"行内 mark + 属性（href）"，需要独立的安全净化层（阻止 `javascript:` 等）、自动识别（键入/粘贴 URL → 自动加链）、以及与选择浮层协作的编辑体验；这是一个 mark 级特性，不需要修改 `core/`。 |
 | 设计中 `mark` 未定义属性模型 | 在 `types.ts` 中 mark 为 `{ type, attrs? }`；`primitiveCommands.ts` 新增 `setLink` / `unsetLink` 命令；`inlineDom.ts` 在 `<a>` 序列化时强制经过 `sanitizeUrl` | 为了支持 link mark 保存 href、同时保持与 HTML/Markdown 的互操作性和 XSS 安全性，必须把 URL 作为 mark 属性并在所有出站路径上强制执行净化。 |
 | 设计中 **Table** 仅作为未来扩展提及 | `extensions/Table.ts` + `extensions/tableModel.ts`，并在 `BuiltinExtensions` 中注册 | 表格是高优先级内建特性；使用 `attrs` 存储网格（cells/colWidths/headerRow）的 "attrs storage" 模式与 Image 相同；渲染器为自包含 Vue 组件（行/列选择、浮动操作栏、合并/拆分、标题行、代码块单元格 Enter 插入换行），核心零修改。 |
@@ -583,29 +583,29 @@ src/
 
 ## 14. 分阶段路线图
 
-### 阶段一 — 基础 ✅
+### 阶段一：基础 ✅
 核心类型、规范化 store、不可变状态、事务 + diff、命令注册表 + 原语命令、选择、插件/扩展/注册表系统、视图桥接、`BlockEditor`/`BlockList`/`BlockHost`、按块 contenteditable 契约、SelectionSync（IME 防护）、History、Keymap、Placeholder。扩展：`Paragraph`、`Heading`。UX：光标、Enter、Backspace、方向键导航、占位符。
 
-### 阶段二 — 写作辅助 ✅
+### 阶段二：写作辅助 ✅
 斜杠菜单（`PlusMenu.vue`：搜索、键盘导航、命令面板）、输入规则 / markdown 快捷键（`# `、`## `、`> `、`[] `、```` ``` ````）通过 `inputRulesEngine.ts` 实现。
 
-### 阶段三 — 更多块类型 ✅
+### 阶段三：更多块类型 ✅
 Todo、Quote、Code Block、BulletList、OrderedList（每个都是自包含扩展；代码块是 `isolating`）。
 
-### 阶段四 — 块操作 UI ✅
+### 阶段四：块操作 UI ✅
 拖拽手柄（`BlockHandle.vue`）、悬停工具栏（`HoverToolbar.vue`）、插入按钮（`+`）、块移动（拖拽、键盘上移/下移）、缩进/反缩进、grip 菜单（`BlockSettingsMenu.vue`：转换、对齐、颜色、操作）。
 
-### 阶段五 — 剪贴板与多选 ✅
+### 阶段五：剪贴板与多选 ✅
 多块文本选择叠层、复制/剪切/粘贴（通过 `clipboard.ts` 做干净的 HTML/纯文本序列化）、重复、删除、从外部粘贴（HTML 反序列化）。**移动端跨块文本选择**：触屏设备上长按启动拖拽选择，通过 `domSelection.ts` 的 `positionFromPoint` 命中测试跨越多个块；触摸交互期间抑制合成的鼠标事件。
 
-### 阶段六 — 图片块 + 链接 Mark ✅
+### 阶段六：图片块 + 链接 Mark ✅
 
 **图片块（Image block）**
 - Schema：`content: 'none'`，`attrs: { src, alt?, title?, width?, height?, caption?, fileId? }`（均为持久化字段）。
 - 入口：斜杠菜单 `/image`（可选本地文件 / 粘贴 URL），粘贴图片文件（`clipboardData.files[i].type.startsWith("image/")`）→ 插入图片块，粘贴 HTML `<img src>` → 写入 `src`。
 - 渲染：顶层是 `<div class="block-image-wrapper" draggable>`，内含 `<img class="block-image-content" draggable="false" alt src title width height>`、可编辑 `contenteditable` 的 `.block-image-caption`（无聚焦时隐藏占位符）、hover 时显示的遮罩工具栏（**替换图片 / 删除图片**两个按钮）、四角拖拽缩放手柄（支持最小 64px 宽度）。
 - 上传管线：插入本地文件时，先写入**瞬时** `tempSrc = URL.createObjectURL(file)` 立即显示，并通过侧信道 `view/imageUpload.ts` 注册 `{ status: 'uploading', progress, error }`；成功后事务写入 `{ src, fileId }` 并 `revokeObjectURL`；失败保留 `tempSrc` 并显示重试按钮。
-  - `createImageExtension({ upload })` 工厂注入真实的 `UploadImageHandler`（签名 `(name, file, controller, onProgress) => Promise<ImageUploadResult>`，`onProgress` 接收 0–100 进度，支持 `AbortController` 取消）；未提供时走内置 mock 上传（随机延迟 30% 返回错误，便于测试重试 UI）。**`<BlockEditor>` 没有 `uploadImage` prop**——通过 `:extensions` 数组里把 `createImageExtension(...)` 放到 `BuiltinExtensions` 之后，由基于名字的去重策略赢出。
+  - `createImageExtension({ upload })` 工厂注入真实的 `UploadImageHandler`（签名 `(name, file, controller, onProgress) => Promise<ImageUploadResult>`，`onProgress` 接收 0–100 进度，支持 `AbortController` 取消）；未提供时走内置 mock 上传（随机延迟 30% 返回错误，便于测试重试 UI）。**`<BlockEditor>` 没有 `uploadImage` prop**：通过 `:extensions` 数组里把 `createImageExtension(...)` 放到 `BuiltinExtensions` 之后，由基于名字的去重策略赢出。
   - **持久化 vs 瞬时的硬边界**：`status/progress/error/tempSrc` **绝不**进入 `block.attrs`，因此 undo/redo 不会把上传中状态写进历史栈、不会被 JSON 持久化。所有瞬时状态只存在于 `imageUpload.ts` 的响应式 map。
 - fileId 引用计数与清理：`extensions/Image.ts` 的 `image-upload` 插件在每次 `applyTransaction` 之后扫描 `nextDoc.blocks` 中所有 `image` 块的 `fileId`，计算全文档的引用数。当某个 `fileId` 的计数从 >0 → 0 时调用 `createImageExtension({ onFileCleanup })` 提供的回调，宿主应用可据此删除对象存储。`BlockEditor.vue` 不再持有引用计数 map 也再不发出任何事件。
 - Serializer：
@@ -636,7 +636,7 @@ Todo、Quote、Code Block、BulletList、OrderedList（每个都是自包含扩�
 - **Link mark**：带 `href` 属性的行内 mark；`Mod+K` → 打开链接浮层；粘贴/键入 URL → 自动加链；支持修改链接文本；HTML/Markdown 序列化走 `<a>` / `[text](url)`；所有 `<a href>` 序列化强制经过 `sanitizeUrl` 安全协议白名单（http/https/mailto/tel，阻止 `javascript:` / `data:` / `vbscript:`）。
 - **图片上传管线**：斜杠 `/image` 或粘贴图片文件/HTML `<img>` 插入图片块；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传钩子（在 `:extensions` 数组里放到 `BuiltinExtensions` 之后覆盖默认 mock）；内置 mock 上传（`imageUpload.ts`）作为回退；fileId 引用计数归零时由 `image-upload` 插件的 `applyTransaction` 调用 `onFileCleanup(fileId)`，用于外部存储清理。
 
-### 阶段七 — 表格块 + 分割线 ✅
+### 阶段七：表格块 + 分割线 ✅
 **表格块（Table block）**
 - Schema：`content: 'none'`，使用 **attrs storage** 模式（与 Image 相同）：`attrs` 包含 `rows`、`cols`、`cells[r][c] = { content, rowspan, colspan, covered, cellType?, align?, bgColor? }`、`colWidths[col]`、`headerRow`。`rows/cols/colWidths/headerRow` 有 schema 默认值 + 校验，`cells` 由 `validateTableAttrs` 做整体校验。
 - 入口：加号菜单点击表格图标 → `insertTableCommand`（默认 3×3、默认列宽 120 px、**默认 `headerRow: true`**）。
@@ -648,18 +648,18 @@ Todo、Quote、Code Block、BulletList、OrderedList（每个都是自包含扩�
 **分割线块（Divider block）**
 - 极简隔离块：`<hr class="block-divider">`。Schema 为空 attrs；输入规则 `---`、`***`、`___` 触发转换为 divider。
 
-### 阶段八 — 目录块（Table of Contents）✅
+### 阶段八：目录块（Table of Contents）✅
 
 **目录块（TOC block）**
-- Schema：`content: 'none'`，`inlineMarks: false`，空 `attrs`，`nestable: false`，`empty: () => false`（目录始终渲染其面板）。渲染器 `editable: false` — 构造上不可编辑（无光标、无行内文本）。
+- Schema：`content: 'none'`，`inlineMarks: false`，空 `attrs`，`nestable: false`，`empty: () => false`（目录始终渲染其面板）。渲染器 `editable: false`：构造上不可编辑（无光标、无行内文本）。
 - 标题收集：`collectHeadings(doc)` 通过 `flatten` 遍历块树，过滤 `type === 'heading'`，对每个有非空文本的标题返回 `{ id, level, text }`。表格单元格内的标题自动排除（因为表格单元格内容存在 `Block.attrs` 中，不在块树内）。
 - 渲染：Vue 组件订阅编辑器状态更新（`editor.subscribe`），在每次文档变更时重新计算标题列表，因此目录始终是**实时视图**。每个条目是一个 `<button>`，带 `data-toc-target` 属性和基于 `level` 的 `paddingLeft` 缩进。点击条目分发 `setSelection`（光标置于标题处），然后 `scrollIntoView({ block: 'center', behavior: 'smooth' })`。
 - 入口：斜杠菜单 `/目录`（关键词：`toc`、`contents`、`outline`、`目录`、`标题`、`大纲`）。分发 `convertBlock` 将当前块转换为目录。
-- 序列化：`toHTML` 和 `toMarkdown` 均输出空字符串 — 生成的标题列表是视图而非编辑器内容，真正的标题已由各自块导出。这防止目录在 HTML / Markdown 导出中被重复。
+- 序列化：`toHTML` 和 `toMarkdown` 均输出空字符串：生成的标题列表是视图而非编辑器内容，真正的标题已由各自块导出。这防止目录在 HTML / Markdown 导出中被重复。
 - i18n：`toc.title`（"目录" / "Table of Contents"），`toc.empty`（"暂无标题" / "No headings"）。
 
 ### 未来（架构已支持）
-Callout、Toggle、Columns、Database、Mention、Math、Mermaid、MindMap、Attachment、Embed、AI —— 每个都作为一个扩展到达（schema + renderer + serialize + 或许 nodeView），**无需核心改动**。
+Callout、Toggle、Columns、Database、Mention、Math、Mermaid、MindMap、Attachment、Embed、AI：每个都作为一个扩展到达（schema + renderer + serialize + 或许 nodeView），**无需核心改动**。
 
 ---
 
@@ -713,7 +713,7 @@ Callout、Toggle、Columns、Database、Mention、Math、Mermaid、MindMap、Att
 - [x] 模块小而单一职责；无 `utils.ts`。
 - [x] 未来特性（Table、Database、Columns、AI……）无需核心改动。
 - [x] **阶段一至五已实现**：7 个内置块类型、行内标记、块级属性、slash 菜单、输入规则、悬停工具栏、拖拽手柄、剪贴板、国际化、主题。
-- [x] **阶段六已实现**：ImageExtension（含 `content: none` schema、替换/删除遮罩、caption、拖拽缩放、HTML/MD 序列化、图片上传流水线——`createImageExtension({ upload, onFileCleanup })` 在 `:extensions` 中后写注入）+ 链接 mark（`setLink` / `unsetLink` 命令、`Mod+K`、链接浮层查看 / 编辑 / 复制 / 删除、粘贴 / 键入 URL 自动加链、HTML/MD 兼容、Undo / Redo、选区 / mark 继承校验）。
+- [x] **阶段六已实现**：ImageExtension（含 `content: none` schema、替换/删除遮罩、caption、拖拽缩放、HTML/MD 序列化、图片上传流水线：`createImageExtension({ upload, onFileCleanup })` 在 `:extensions` 中后写注入）+ 链接 mark（`setLink` / `unsetLink` 命令、`Mod+K`、链接浮层查看 / 编辑 / 复制 / 删除、粘贴 / 键入 URL 自动加链、HTML/MD 兼容、Undo / Redo、选区 / mark 继承校验）。
 - [x] **阶段七已实现**：TableExtension（`attrs` storage 网格、行/列选择条 + 角部全选手柄、浮动操作栏合并/拆分/切换标题行、插入点、完整矩形选区扩展、代码块单元格 Enter 插入换行、HTML/MD 序列化）+ DividerExtension（`---`/`***`/`___` 输入规则）。
 - [x] **阶段八已实现**：TableOfContentsExtension（不可编辑的 `content: 'none'` 动态视图块，实时收集所有 `heading` 块并渲染层级列表；点击条目跳转到标题；序列化输出空字符串；斜杠 `/目录` 入口）。
 - [x] **安全不变量**：所有 `<a href>` 的生成路径必须经过 `sanitizeUrl`（协议白名单 + 净化），禁止把未净化的用户字符串写入 `href`；禁止 mark 属性携带非字符串标量。
