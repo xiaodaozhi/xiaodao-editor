@@ -187,6 +187,11 @@ export class Editor {
     return docToMarkdown(this.state.doc);
   }
 
+  /** Replace the whole document (e.g. on external `v-model` change). Resets history. */
+  setDocument(json: DocumentData): void {
+    this.adoptDoc(docFromData(json).doc);
+  }
+
   /**
    * Replace the whole document by parsing a Markdown string. Resets history.
    * The Markdown is parsed natively by the editor (see `markdownToDoc` below)
@@ -195,11 +200,6 @@ export class Editor {
    */
   setDocFromMarkdown(markdown: string): void {
     this.adoptDoc(markdownToDoc(markdown));
-  }
-
-  /** Replace the whole document (e.g. on external `v-model` change). Resets history. */
-  setDocument(json: DocumentData): void {
-    this.adoptDoc(docFromData(json).doc);
   }
 
   /** Take ownership of a normalized document and reset the editor state. */
