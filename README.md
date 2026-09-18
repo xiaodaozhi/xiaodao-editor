@@ -231,13 +231,84 @@ take effect. You can also import the built-in engine pieces (`parseMath`,
 `renderMathToHtml`, …) from `xiaodao-editor` to build custom renderers on
 top of the AST.
 
+## Pluggable code highlighter
+
+The code block stores ONLY the raw source string in `block.content`. How that
+source is colored is up to a pluggable highlighter:
+
+```ts
+interface CodeHighlighter {
+  /** Return highlighted, HTML-escaped markup for `text` in `language`. */
+  highlightCode(text: string, language: string): string;
+}
+```
+
+By default the editor uses the **built-in code highlighter**, a zero-dependency
+implementation: a single-pass tokenizer that recognizes comments, strings,
+numbers, keywords and a few structural rules for the common languages (JS/TS,
+Java, C/C++/C#, Go, Rust, Swift, Kotlin, PHP, Python, Ruby, Lua, Shell, SQL,
+XML/HTML, CSS, JSON, YAML, Markdown, and more). It emits the same `hljs-*` token
+class names as highlight.js, so the existing stylesheet keeps working unchanged
+and an external highlighter produces visually identical output. Unknown
+languages degrade gracefully to escaped plain text (no crash, no unescaped
+input).
+
+`highlight.js` is NOT a dependency of xiaodao-editor. If you need its full
+grammar coverage, install it yourself and inject an adapter:
+
+```vue
+<script setup lang="ts">
+// highlight.js is NOT a dependency of xiaodao-editor, install it yourself:
+//   pnpm add highlight.js
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+// register only the grammars you need; see highlight.js docs for the full list.
+hljs.registerLanguage('javascript', javascript);
+import { createCodeBlockExtension, BuiltinExtensions, type CodeHighlighter } from 'xiaodao-editor';
+
+const hljsHighlighter: CodeHighlighter = {
+  highlightCode(text, language) {
+    if (!language || !hljs.getLanguage(language)) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    try {
+      return hljs.highlight(text, { language, ignoreIllegals: true }).value;
+    } catch {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  },
+};
+
+// Append your highlighter-bearing extension AFTER `BuiltinExtensions`. The
+// extension registry is name-based deduplicated (last entry wins), so the
+// appended `createCodeBlockExtension({ highlighter })` replaces the built-in's
+// `CodeBlockExtension`. Do NOT add both; pick one.
+const extensions = [
+  ...BuiltinExtensions,
+  createCodeBlockExtension({ highlighter: hljsHighlighter }),
+];
+</script>
+
+<template>
+  <BlockEditor :extensions="extensions" />
+</template>
+```
+
+`createCodeBlockExtension({ highlighter })` is the only supported way to override
+the code highlighter; there is no component-level prop for this. The registry
+deduplicates by extension `name` so the override extension must appear **after**
+`BuiltinExtensions` (or anywhere later in the array) to take effect. You can also
+import the built-in engine (`builtinCodeHighlighter`) from `xiaodao-editor` to
+build custom renderers on top of it. The same highlighter drives both the live
+view and HTML export (`serialize.toHTML`).
+
 ## Props
 
 | Prop              | Type                                     | Default            | Description                                                                   |
 | ----------------- | ---------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
 | `editor`         | `Editor`                                 | `undefined`        | A pre-built instance from `createEditor()`. When set, `extensions` and `initialData` are ignored and the instance is NOT destroyed on unmount. See *External editor instance* below. |
 | `initialData`     | `DocumentData \| string`                 | `{ blocks: [] }`   | The initial document. Pass a `DocumentData` object (JSON) or a Markdown `string` (parsed natively at construction). Used only at construction: changing it later does NOT reload the document (no two-way binding). Ignored when `editor` is passed. |
-| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`| Extensions to register. Override to add custom blocks, replace the equation renderer (`createEquationExtension({ renderer })`), or replace the image upload pipeline (`createImageExtension({ upload, onFileCleanup })`). Ignored when `editor` is passed. |
+| `extensions`      | `readonly Extension[]`                   | `BuiltinExtensions`| Extensions to register. Override to add custom blocks, replace the equation renderer (`createEquationExtension({ renderer })`), the code highlighter (`createCodeBlockExtension({ highlighter })`), or replace the image upload pipeline (`createImageExtension({ upload, onFileCleanup })`). Ignored when `editor` is passed. |
 | `editable`        | `boolean`                                | `true`             | Read-only mode when `false`.                                                  |
 | `placeholder`     | `string`                                 | locale-aware       | Placeholder for the first empty block. Defaults to a localized string.        |
 | `theme`           | `'light' \| 'dark'`                      | `'light'`          | Color theme. The class is applied to `.block-editor` and synced to `<body>`.  |
@@ -398,7 +469,7 @@ Set it explicitly if needed:
 | `OrderedListExtension`| `orderedList`   | Auto-numbered; `attrs.startNumber` for explicit override.        |
 | `TodoListExtension`   | `todoList`      | Checkbox via `attrs.checked`.                                    |
 | `QuoteExtension`      | `quote`         | Blockquote. No inline italic (disabled by schema).               |
-| `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating: Enter inserts a newline.           |
+| `CodeBlockExtension`  | `codeBlock`     | `attrs.language`; isolating: Enter inserts a newline. A pluggable highlighter colors the code on the fly (output never persisted); the default is the built-in **zero-dependency code highlighter** (lightweight tokenizer, see *Pluggable code highlighter*), and highlight.js / Shiki / Prism can be injected via `createCodeBlockExtension({ highlighter })` composed after `BuiltinExtensions`. Markdown export fences the source with a language info string. |
 | `ImageExtension`      | `image`         | `content: 'none'`; attrs `src/alt/title/width/height/caption/fileId`; serialize → HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`; replace + drag-resize handle + editable caption; upload side-channel via `createImageExtension({ upload, onFileCleanup })` (see *Pluggable image upload*). The default `ImageExtension` bundled with `BuiltinExtensions` uses an in-memory mock upload (object URLs that don't survive reload) and never invokes an `onFileCleanup` callback. |
 | `EquationExtension`   | `equation`      | `content: 'none'`; isolated block that stores only `attrs.expression` (raw LaTeX). A pluggable renderer produces the centered display formula on the fly (output never persisted); the default is the built-in **zero-dependency math renderer** (lightweight LaTeX subset, see the *Pluggable equation renderer* section), and KaTeX/MathJax can be injected via `createEquationExtension({ renderer })` composed after `BuiltinExtensions`. Insert via `/equation` or `+`; empty block auto-opens in edit mode; floating ✎ button edits the source with live preview. Supports block selection and nesting (indents as a child; `attrs.indent` mirrors depth). Markdown export uses `$$$ … $$$` fenced blocks. |
 | `TableExtension`      | `table`         | `content: 'none'`; attrs `rows/cols/cells/colWidths/headerRow`; cell InlineSeq per cell with cellType/align/bgColor/rowspan/colspan; row/col selection strips + corner handle; floating toolbar with merge/split, **toggle header row**, delete row/col/table; row/col insert dots; full-rect selection expansion for merged cells. Default column width 120 px; new tables default to `headerRow: true`. |

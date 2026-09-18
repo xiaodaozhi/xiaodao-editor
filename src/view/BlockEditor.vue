@@ -211,7 +211,7 @@ import { editorKey, editableKey, mobileKey, fixedToolbarBridgeKey, fixedToolbarB
 import type { FixedToolbarDescriptor, BlockRenderItem, BeginImageUploadFn } from './context';
 
 import { dispatchKeymap } from './keymapHandler';
-import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText } from './domSelection';
+import { readDomSelection, applySelectionToDom, findBlockEl, positionFromPoint, crossBlockSelectionRects, isCrossBlockText, unionRects } from './domSelection';
 import { caretSelection, isBlocks, textSelection } from '../core/selection/Selection';
 import BlockList from './BlockList.vue';
 import PlusMenu from './ui/PlusMenu.vue';
@@ -225,7 +225,8 @@ import LinkPopover from './ui/LinkPopover.vue';
 import type { SlashCommand } from '../core/command/SlashCommand';
 import { blockBefore, flatten as flattenDoc, indexOf as blockIndexOf, parentOf } from '../core/state/store';
 import { orderedListNumber } from '../extensions/OrderedList';
-import { inlineToHtml } from './inlineDom';
+import { serializeCrossBlockSelection } from './clipboard';
+import { collectImageFilesFromDataTransfer } from './imageUpload';
 import { BuiltinExtensions } from '../extensions/builtin';
 import '../style.css';
 import { provideI18n, useI18n, normalizeLocale, normalizeTheme, type Theme, type Locale } from '../i18n';
@@ -1260,7 +1261,7 @@ function onKeyDown(event: KeyboardEvent): void {
     if (mod && modKey === 'c') {
       const sel = editor.getState().selection;
       if (sel.kind === 'text' && isCrossBlockText(sel)) {
-        const data = serializeCrossBlockSelection(sel);
+        const data = serializeCrossBlockSelection(editor.getState().doc, sel);
         if (data) {
           event.preventDefault();
           const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
@@ -1354,7 +1355,7 @@ function onKeyDown(event: KeyboardEvent): void {
     // The browser won't fire copy/cut events because the native selection
     // is empty during cross-block mode, so we must handle them here.
     if ((event.ctrlKey || event.metaKey) && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
-      const data = serializeCrossBlockSelection(preSel);
+      const data = serializeCrossBlockSelection(editor.getState().doc, preSel);
       if (data) {
         event.preventDefault();
         // Use the async Clipboard API to write text/html.
@@ -2001,38 +2002,6 @@ function onMoveBlock(blockId: BlockId, targetBlockId: BlockId | null, position: 
 
 const fileDragActive = ref(false);
 
-function collectImageFilesFromDataTransfer(data: DataTransfer): File[] {
-  const files: File[] = [];
-  if (!data || !data.types) return files;
-  if (!Array.from(data.types).includes('Files')) return files;
-
-  const seen = new Set<string>();
-  if (data.items && data.items.length > 0) {
-    for (let i = 0; i < data.items.length; i++) {
-      const item = data.items[i]!;
-      if (item.kind !== 'file') continue;
-      const f = item.getAsFile();
-      if (!f || !f.type.startsWith('image/')) continue;
-      const key = `${f.name || ''}:${f.size}:${f.type}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      files.push(f);
-    }
-  }
-
-  if (data.files && data.files.length > 0) {
-    for (let i = 0; i < data.files.length; i++) {
-      const f = data.files[i]!;
-      if (!f.type.startsWith('image/')) continue;
-      const key = `${f.name || ''}:${f.size}:${f.type}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      files.push(f);
-    }
-  }
-  return files;
-}
-
 function onFileDragOver(e: DragEvent): void {
   // Ignore internal block drags (those go through grip handlers).
   if (draggingBlockId.value) return;
@@ -2612,22 +2581,6 @@ function refreshHoverToolbarRect(): void {
   hoverToolbar.selectionRect = rect;
 }
 
-/** Compute the bounding box of an array of rects. */
-function unionRects(rects: DOMRect[]): DOMRect {
-  if (rects.length === 0) return new DOMRect(0, 0, 0, 0);
-  let left = Infinity;
-  let top = Infinity;
-  let right = -Infinity;
-  let bottom = -Infinity;
-  for (const r of rects) {
-    left = Math.min(left, r.left);
-    top = Math.min(top, r.top);
-    right = Math.max(right, r.right);
-    bottom = Math.max(bottom, r.bottom);
-  }
-  return new DOMRect(left, top, right - left, bottom - top);
-}
-
 /** Show the HoverToolbar for a cross-block text selection. */
 function showHoverToolbarForCrossBlock(sel: Extract<EditorSelection, { kind: 'text' }>): void {
   // Read-only: never show the hover toolbar on cross-block selection.
@@ -2937,44 +2890,10 @@ function onTouchEnd(): void {
 
 // --- Cross-block copy / cut ---------------------------------------------
 
-/** Extract the text + html representation of a cross-block text selection. */
-function serializeCrossBlockSelection(
-  sel: Extract<EditorSelection, { kind: 'text' }>,
-): { text: string; html: string } | null {
-  const doc = editor.getState().doc;
-  const flat = flattenDoc(doc);
-  const ia = flat.indexOf(sel.anchor.blockId);
-  const ib = flat.indexOf(sel.focus.blockId);
-  if (ia === -1 || ib === -1) return null;
-  const [startId, endId] = ia <= ib ? [sel.anchor, sel.focus] : [sel.focus, sel.anchor];
-  const startIdx = flat.indexOf(startId.blockId);
-  const endIdx = flat.indexOf(endId.blockId);
-  if (startIdx === -1 || endIdx === -1) return null;
-
-  const textParts: string[] = [];
-  const htmlParts: string[] = [];
-  for (let i = startIdx; i <= endIdx; i++) {
-    const id = flat[i]!;
-    const block = doc.blocks.get(id);
-    if (!block) continue;
-    const textLen = inlineText(block.content).length;
-    let lo = 0;
-    let hi = textLen;
-    if (i === startIdx) lo = Math.min(startId.offset, textLen);
-    if (i === endIdx) hi = Math.min(endId.offset, textLen);
-    if (lo > hi) [lo, hi] = [hi, lo];
-    const [, rest1] = splitInline(block.content, lo);
-    const [selected] = splitInline(rest1, hi - lo);
-    textParts.push(inlineText(selected));
-    htmlParts.push(inlineToHtml(selected));
-  }
-  return { text: textParts.join('\n'), html: htmlParts.join('<br>') };
-}
-
 function onCopy(e: ClipboardEvent): void {
   const sel = editor.getState().selection;
   if (sel.kind !== 'text' || !isCrossBlockText(sel)) return;
-  const data = serializeCrossBlockSelection(sel);
+  const data = serializeCrossBlockSelection(editor.getState().doc, sel);
   if (!data) return;
   e.preventDefault();
   e.clipboardData?.setData('text/plain', data.text);
@@ -2989,7 +2908,7 @@ function onCut(e: ClipboardEvent): void {
   }
   const sel = editor.getState().selection;
   if (sel.kind !== 'text' || !isCrossBlockText(sel)) return;
-  const data = serializeCrossBlockSelection(sel);
+  const data = serializeCrossBlockSelection(editor.getState().doc, sel);
   if (!data) return;
   e.preventDefault();
   e.clipboardData?.setData('text/plain', data.text);

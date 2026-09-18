@@ -140,6 +140,60 @@ const extensions = [
 
 `createEquationExtension({ renderer })` 把带自定义渲染器的公式扩展追加到 `BuiltinExtensions` 之后（name-based 去重，后排赢出）即可覆盖内置版本；`<BlockEditor>` 没有 `equationRenderer` prop。也可以从 `xiaodao-editor` 导入内置引擎的基础件（`parseMath`、`SUPPORTED_COMMANDS` 等），在 AST 之上构建自定义渲染器。
 
+## 可插拔代码高亮器
+
+代码块只在 `block.content` 里保存原始源码字符串。源码如何上色，由可插拔的高亮器决定：
+
+```ts
+interface CodeHighlighter {
+  /** 返回 `text` 在 `language` 下、已做 HTML 转义的高亮标记。 */
+  highlightCode(text: string, language: string): string;
+}
+```
+
+默认编辑器使用**内置代码高亮器**，一个零依赖实现：单遍 tokenizer，识别注释、字符串、数字、关键字，以及对常用语言（JS/TS、Java、C/C++/C#、Go、Rust、Swift、Kotlin、PHP、Python、Ruby、Lua、Shell、SQL、XML/HTML、CSS、JSON、YAML、Markdown 等）的几条结构规则。它输出与 highlight.js 同名的 `hljs-*` token class，因此现有样式表零改动继续生效，外部高亮器也能产出视觉一致的产物。未知语言会优雅降级为转义纯文本（不崩、不输出未转义内容）。
+
+`highlight.js` 不是 xiaodao-editor 的依赖。如果需要它的完整语法覆盖，自行安装并注入适配器：
+
+```vue
+<script setup lang="ts">
+// highlight.js 不是 xiaodao-editor 的依赖，请自行安装：
+//   pnpm add highlight.js
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+// 只注册你需要的语法；完整列表见 highlight.js 文档。
+hljs.registerLanguage('javascript', javascript);
+import { createCodeBlockExtension, BuiltinExtensions, type CodeHighlighter } from 'xiaodao-editor';
+
+const hljsHighlighter: CodeHighlighter = {
+  highlightCode(text, language) {
+    if (!language || !hljs.getLanguage(language)) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    try {
+      return hljs.highlight(text, { language, ignoreIllegals: true }).value;
+    } catch {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  },
+};
+
+// 把携带高亮器的扩展追加在 `BuiltinExtensions` 之后。扩展注册表按 name 去重（后排赢出），
+// 因此追加的 `createCodeBlockExtension({ highlighter })` 会替换内置的 `CodeBlockExtension`。
+// 不要两个都加，二选一。
+const extensions = [
+  ...BuiltinExtensions,
+  createCodeBlockExtension({ highlighter: hljsHighlighter }),
+];
+</script>
+
+<template>
+  <BlockEditor :extensions="extensions" />
+</template>
+```
+
+`createCodeBlockExtension({ highlighter })` 是覆盖代码高亮器的唯一入口，没有组件级 prop。`<BlockEditor>` 没有 `highlightCode` prop；边界在扩展层。注册表按扩展 `name` 去重，所以覆盖扩展必须出现在 `BuiltinExtensions` **之后**（或数组里更靠后的位置）才生效。你也可以从 `xiaodao-editor` 导入内置引擎（`builtinCodeHighlighter`），在它之上构建自定义渲染器。同一个高亮器同时驱动实时视图与 HTML 导出（`serialize.toHTML`）。
+
 ## Props 属性
 
 | 属性名            | 类型                                     | 默认值                 | 说明                                                                          |
@@ -301,7 +355,7 @@ onBeforeUnmount(() => {
 | `OrderedListExtension` | `orderedList`  | 自动编号；可通过 `attrs.startNumber` 显式覆盖起始序号。                  |
 | `TodoListExtension`    | `todoList`     | 通过 `attrs.checked` 控制复选框状态。                                  |
 | `QuoteExtension`       | `quote`        | 引用块。schema 禁用了行内斜体。                                        |
-| `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式：Enter 插入换行。                 |
+| `CodeBlockExtension`   | `codeBlock`    | `attrs.language` 设置语言；隔离模式：Enter 插入换行。可插拔高亮器在运行时为代码上色（产物不持久化）；默认是零依赖的内置代码高亮器（轻量 tokenizer，见「可插拔代码高亮器」），通过 `createCodeBlockExtension({ highlighter })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 highlight.js / Shiki / Prism 即可覆盖。Markdown 导出用语言 info string 围栏源码。 |
 | `ImageExtension`       | `image`        | `content: 'none'`；属性：`src/alt/title/width/height/caption/fileId`；序列化：HTML `<figure>`/`<img>` + Markdown `![alt](url "title")`；提供替换 / 删除 / 等比缩放手柄 + 可编辑 caption；通过 `createImageExtension({ upload, onFileCleanup })` 注入上传侧信道，详见「可插拔图片上传」。`BuiltinExtensions` 默认携带的 `ImageExtension` 使用内存内 mock 上传（`blob:` URL 无法跨刷新存活），不会触发任何 `onFileCleanup` 回调。 |
 | `EquationExtension`    | `equation`     | `content: 'none'`；隔离型块：只保存 `attrs.expression`（原始 LaTeX）。**默认使用零依赖的内置数学渲染器**（轻量 LaTeX 子集，见「可插拔公式渲染器」），通过 `createEquationExtension({ renderer })` 追加在 `BuiltinExtensions` 之后（name-based 去重，后排赢出）注入 KaTeX/MathJax 即可覆盖。**`<BlockEditor>` 没有 `equationRenderer` prop**。通过 `/公式` 或 `+` 插入；空块自动进入编辑态；浮动 ✎ 按钮打开带实时预览的源码编辑器。支持块级选中与嵌套（作为子块时随深度缩进，`attrs.indent` 即为深度镜像）。Markdown 导出使用 `$$$ … $$$` 围栏块。 |
 | `TableExtension`       | `table`        | `content: 'none'`；属性：`rows/cols/cells/colWidths/headerRow`；单元格 InlineSeq 含 cellType/align/bgColor/rowspan/colspan；行/列选择条 + 角部全选手柄；浮动操作栏提供合并/拆分、**切换标题行**、删除行/列/表格；行/列插入点；合并单元格选区自动扩展为完整矩形。默认列宽 120 px；新建表格默认 `headerRow: true`。 |

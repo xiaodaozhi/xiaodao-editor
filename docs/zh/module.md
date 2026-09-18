@@ -1142,22 +1142,31 @@ export const QuoteExtension: Extension;
 
 **交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/BlockContent.vue` 和 `extensions/_commonAttrs`(`COMMON_ATTRS_NO_INDENT`、`classesFromAttrs`)。Markdown 快捷键 `> ` 把段落转为引用。
 
-### `src/extensions/CodeBlock.ts`
+### `src/extensions/CodeBlock.ts` 与 `src/extensions/code/highlight.ts`
 
-**职责。** 代码块扩展。标记为**隔离块**：Enter 插入换行(而非新段落)，空代码块在 offset 0 处按 Backspace 会删除块而不合并。仅支持 `language` attr(使用 `CODE_BLOCK_ATTRS`，无 align/color/bgColor/indent)。渲染器切换为 `white-space: pre; font-family: monospace`。
+**职责。** 代码块扩展。标记为**隔离块**：Enter 插入换行(而非新段落)，空代码块在 offset 0 处按 Backspace 会删除块而不合并。支持 `language` attr(以及来自 `CODE_BLOCK_ATTRS` 的 `indent`：无 align/color/bgColor)。渲染器切换为 `white-space: pre; font-family: monospace`。
+
+语法高亮已**解耦**。块渲染为双层栈(装饰性的 `aria-hidden` 高亮层在可编辑文本层之下)，token 永不进入 contenteditable。上色由可插拔的 `CodeHighlighter`(`highlightCode(text, language): string`)提供；默认是 `src/extensions/code/highlight.ts` 里的 `builtinCodeHighlighter`，一个零依赖单遍 tokenizer，为常用语言输出 `hljs-*` token class，未知语言降级为转义纯文本。外部引擎(highlight.js / Shiki / Prism)通过 `createCodeBlockExtension({ highlighter })` 注入，追加在 `BuiltinExtensions` 之后(name-based 去重：后排赢出)。`BlockEditor` 没有 `highlightCode` prop；边界在扩展层。
 
 **公共 API。**
 
 ```ts
-export const CodeBlockExtension: Extension;
+export interface CodeHighlighter {
+  highlightCode(text: string, language: string): string;
+}
+export const builtinCodeHighlighter: CodeHighlighter;
+export function createCodeBlock(highlighter: CodeHighlighter): Component;
+export function createCodeBlockExtension(options?: { highlighter?: CodeHighlighter }): Extension;
+export const CodeBlockExtension: Extension; // = createCodeBlockExtension()
 // schema: { type: 'codeBlock', content: 'text', isolating: true,
 //   attrs: { language: { default: 'plain', validate: v => typeof v === 'string' } } }
-// renderer: { component: CodeBlock, editable: true }
+// renderer: { component: createCodeBlock(highlighter) }
+// serialize: { toHTML: (b) => '<pre class="block-code-highlight"><code class="hljs">…</code></pre>' }
 ```
 
-`CodeBlock` 渲染一个 `.block-code-wrapper`，包含可点击的 `.block-code-lang` 标签(大写语言标记)和带 `block-code` 类的 `BlockContent`。点击语言标签打开 `CodeLangPicker`。
+`CodeBlock`(由 `createCodeBlock` 构建)渲染一个 `.block-code-wrapper`，包含可点击的 `.block-code-lang` 标签(大写语言标记)和带 `block-code` 类的 `BlockContent`。点击语言标签打开 `CodeLangPicker`。同一个 `highlighter` 同时驱动实时视图与 `serialize.toHTML`。
 
-**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/BlockContent.vue`、`view/ui/icons`(`ICON_CODE`)和 `extensions/_commonAttrs`(`classesFromAttrs`、`CODE_BLOCK_ATTRS`)。Markdown 快捷键 ```` ``` ````（可选后跟语言）把段落转为代码块。
+**交互。** 导入 `vue`、`core/extension/Extension`、`core/types`、`view/BlockContent.vue`、`view/ui/icons`(`ICON_CODE`)、`extensions/_commonAttrs`(`classesFromAttrs`、`CODE_BLOCK_ATTRS`)和 `extensions/code/highlight`(`builtinCodeHighlighter`、`CodeHighlighter`)。Markdown 快捷键 ```` ``` ````（可选后跟语言）把段落转为代码块。
 
 ### `src/extensions/Image.ts`
 
@@ -1362,7 +1371,7 @@ export const TableOfContentsExtension: Extension;
 export const COMMON_ATTRS: BlockSchemaSpec['attrs'];             // align + color + bgColor + indent
 export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs'];   // align + color + bgColor(quote)
 export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs']; // color + bgColor
-export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // {}(codeBlock：无属性)
+export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // { indent }(codeBlock：language + indent)
 export const IMAGE_ATTRS: BlockSchemaSpec['attrs'];              // {}(image： 持久化 attrs 由 Image.schema 定义，不含文本/缩进/颜色)
 export const INDENT_TYPES: readonly string[];                     // 支持缩进的块类型
 export const MAX_INDENT = 10;
@@ -1586,6 +1595,8 @@ export { OrderedListExtension } from './extensions/OrderedList';
 export { TodoListExtension } from './extensions/TodoList';
 export { QuoteExtension } from './extensions/Quote';
 export { CodeBlockExtension } from './extensions/CodeBlock';
+export { createCodeBlockExtension, builtinCodeHighlighter } from './extensions/CodeBlock';
+export type { CodeHighlighter, CodeBlockExtensionOptions } from './extensions/CodeBlock';
 export { ImageExtension } from './extensions/Image';
 export { TableExtension, createTableCommands } from './extensions/Table';
 export { DividerExtension } from './extensions/Divider';

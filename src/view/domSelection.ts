@@ -21,6 +21,24 @@ import { caretSelection, isCaret, isText } from '../core/selection/Selection';
 import { inlineText } from '../core/types';
 import { flatten as flattenDoc } from '../core/state/store';
 
+/** Compute one viewport-relative bounding box for a group of DOM rects. */
+export function unionRects(rects: readonly DOMRect[]): DOMRect {
+  if (rects.length === 0) return new DOMRect(0, 0, 0, 0);
+
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const rect of rects) {
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 // ---------------------------------------------------------------------------
 // DOM helpers
 // ---------------------------------------------------------------------------

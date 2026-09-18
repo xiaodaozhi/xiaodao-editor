@@ -1149,22 +1149,31 @@ export const QuoteExtension: Extension;
 
 **Interactions.** Imports `vue`, `core/extension/Extension`, `core/types`, `view/BlockContent.vue`, and `extensions/_commonAttrs` (`COMMON_ATTRS_NO_INDENT`, `classesFromAttrs`). Markdown shortcut `> ` converts a paragraph into a quote.
 
-### `src/extensions/CodeBlock.ts`
+### `src/extensions/CodeBlock.ts` and `src/extensions/code/highlight.ts`
 
-**Responsibility.** The code block extension. Marked as **isolating**: Enter inserts a newline (not a new paragraph), Backspace at offset 0 on an empty code block removes it without merging. Supports only `language` attr (uses `CODE_BLOCK_ATTRS`: no align/color/bgColor/indent). The renderer switches to `white-space: pre; font-family: monospace`.
+**Responsibility.** The code block extension. Marked as **isolating**: Enter inserts a newline (not a new paragraph), Backspace at offset 0 on an empty code block removes it without merging. Supports `language` attr (plus `indent` from `CODE_BLOCK_ATTRS`: no align/color/bgColor). The renderer switches to `white-space: pre; font-family: monospace`.
+
+Syntax highlighting is **decoupled**. The block renders as a two-layer stack (a decorative `aria-hidden` highlight layer under the editable text layer) so tokens never enter the contenteditable. Coloring is provided by a pluggable `CodeHighlighter` (`highlightCode(text, language): string`); the default is `builtinCodeHighlighter` in `src/extensions/code/highlight.ts`, a zero-dependency single-pass tokenizer that emits `hljs-*` token class names for the common languages and degrades to escaped plain text for unknown ones. External engines (highlight.js / Shiki / Prism) are injected via `createCodeBlockExtension({ highlighter })`, composed after `BuiltinExtensions` (name-based deduplication: later wins). `BlockEditor` has no `highlightCode` prop; the boundary is at the extension layer.
 
 **Public API.**
 
 ```ts
-export const CodeBlockExtension: Extension;
+export interface CodeHighlighter {
+  highlightCode(text: string, language: string): string;
+}
+export const builtinCodeHighlighter: CodeHighlighter;
+export function createCodeBlock(highlighter: CodeHighlighter): Component;
+export function createCodeBlockExtension(options?: { highlighter?: CodeHighlighter }): Extension;
+export const CodeBlockExtension: Extension; // = createCodeBlockExtension()
 // schema: { type: 'codeBlock', content: 'text', isolating: true,
 //   attrs: { language: { default: 'plain', validate: v => typeof v === 'string' } } }
-// renderer: { component: CodeBlock, editable: true }
+// renderer: { component: createCodeBlock(highlighter) }
+// serialize: { toHTML: (b) => '<pre class="block-code-highlight"><code class="hljs">…</code></pre>' }
 ```
 
-`CodeBlock` renders a `.block-code-wrapper` with a clickable `.block-code-lang` label (uppercase language tag) and `BlockContent` with `block-code` class. Clicking the lang label opens `CodeLangPicker`.
+`CodeBlock` (built by `createCodeBlock`) renders a `.block-code-wrapper` with a clickable `.block-code-lang` label (uppercase language tag) and `BlockContent` with `block-code` class. Clicking the lang label opens `CodeLangPicker`. The same `highlighter` drives both the live view and `serialize.toHTML`.
 
-**Interactions.** Imports `vue`, `core/extension/Extension`, `core/types`, `view/BlockContent.vue`, `view/ui/icons` (`ICON_CODE`), and `extensions/_commonAttrs` (`classesFromAttrs`, `CODE_BLOCK_ATTRS`). Markdown shortcut ```` ``` ```` (optionally followed by a language) converts a paragraph into a code block.
+**Interactions.** Imports `vue`, `core/extension/Extension`, `core/types`, `view/BlockContent.vue`, `view/ui/icons` (`ICON_CODE`), `extensions/_commonAttrs` (`classesFromAttrs`, `CODE_BLOCK_ATTRS`), and `extensions/code/highlight` (`builtinCodeHighlighter`, `CodeHighlighter`). Markdown shortcut ```` ``` ```` (optionally followed by a language) converts a paragraph into a code block.
 
 ### `src/extensions/_commonAttrs.ts`
 
@@ -1176,7 +1185,7 @@ export const CodeBlockExtension: Extension;
 export const COMMON_ATTRS: BlockSchemaSpec['attrs'];             // align + color + bgColor + indent
 export const COMMON_ATTRS_NO_INDENT: BlockSchemaSpec['attrs'];   // align + color + bgColor (quote)
 export const COMMON_ATTRS_NO_INDENT_NO_ALIGN: BlockSchemaSpec['attrs']; // color + bgColor
-export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // {} (codeBlock: no attrs)
+export const CODE_BLOCK_ATTRS: BlockSchemaSpec['attrs'];         // { indent } (codeBlock: language + indent)
 export const INDENT_TYPES: readonly string[];                     // block types that support indent
 export const MAX_INDENT = 10;
 export function classesFromAttrs(attrs: Attrs): string[];         // → ['be-align-center', 'be-color-red', …]
@@ -1545,6 +1554,8 @@ export { OrderedListExtension } from './extensions/OrderedList';
 export { TodoListExtension } from './extensions/TodoList';
 export { QuoteExtension } from './extensions/Quote';
 export { CodeBlockExtension } from './extensions/CodeBlock';
+export { createCodeBlockExtension, builtinCodeHighlighter } from './extensions/CodeBlock';
+export type { CodeHighlighter, CodeBlockExtensionOptions } from './extensions/CodeBlock';
 export { ImageExtension } from './extensions/Image';
 export { TableExtension, createTableCommands } from './extensions/Table';
 export { DividerExtension } from './extensions/Divider';

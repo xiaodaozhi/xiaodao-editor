@@ -6,15 +6,57 @@
  * is stripped. Multi-line text automatically produces multiple blocks.
  */
 
-import type { Attrs, BlockType, InlineSeq } from '../core/types';
-import { inlineFromString } from '../core/types';
-import { inlineFromDom } from './inlineDom';
+import type { Attrs, BlockType, DocState, InlineSeq, Selection } from '../core/types';
+import { inlineFromString, inlineText, splitInline } from '../core/types';
+import { flatten as flattenDoc } from '../core/state/store';
+import { inlineFromDom, inlineToHtml } from './inlineDom';
 import { parseHtmlTable } from '../extensions/tableModel';
 
 export interface ParsedBlock {
   readonly type: BlockType;
   readonly attrs: Attrs;
   readonly content: InlineSeq;
+}
+
+/** Serialize a text selection spanning multiple blocks for clipboard writes. */
+export function serializeCrossBlockSelection(
+  doc: DocState,
+  sel: Extract<Selection, { kind: 'text' }>,
+): { text: string; html: string } | null {
+  const flat = flattenDoc(doc);
+  const anchorIndex = flat.indexOf(sel.anchor.blockId);
+  const focusIndex = flat.indexOf(sel.focus.blockId);
+  if (anchorIndex === -1 || focusIndex === -1) return null;
+
+  const [start, end] = anchorIndex <= focusIndex
+    ? [sel.anchor, sel.focus]
+    : [sel.focus, sel.anchor];
+  const startIndex = flat.indexOf(start.blockId);
+  const endIndex = flat.indexOf(end.blockId);
+  if (startIndex === -1 || endIndex === -1) return null;
+
+  const textParts: string[] = [];
+  const htmlParts: string[] = [];
+  for (let index = startIndex; index <= endIndex; index++) {
+    const blockId = flat[index]!;
+    const block = doc.blocks.get(blockId);
+    if (!block) continue;
+
+    const textLength = inlineText(block.content).length;
+    let from = index === startIndex ? Math.min(start.offset, textLength) : 0;
+    let to = index === endIndex ? Math.min(end.offset, textLength) : textLength;
+    if (from > to) [from, to] = [to, from];
+
+    const [, afterStart] = splitInline(block.content, from);
+    const [selected] = splitInline(afterStart, to - from);
+    textParts.push(inlineText(selected));
+    htmlParts.push(inlineToHtml(selected));
+  }
+
+  return {
+    text: textParts.join('\n'),
+    html: htmlParts.join('<br>'),
+  };
 }
 
 const TRUE_BLOCK_TAGS = new Set([
