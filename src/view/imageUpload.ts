@@ -55,6 +55,28 @@ export interface UploadState {
   readonly controller?: AbortController;
 }
 
+/** Read unique image files from an OS drag/paste data transfer. */
+export function collectImageFilesFromDataTransfer(data: DataTransfer): File[] {
+  if (!Array.from(data.types ?? []).includes('Files')) return [];
+
+  const files: File[] = [];
+  const seen = new Set<string>();
+  const append = (file: File | null): void => {
+    if (!file?.type.startsWith('image/')) return;
+    const key = `${file.name}:${file.size}:${file.type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    files.push(file);
+  };
+
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind === 'file') append(item.getAsFile());
+  }
+  for (const file of Array.from(data.files ?? [])) append(file);
+
+  return files;
+}
+
 /** UploadResult: the final outcome handed back from the upload handler
  *  (either an external `UploadImageHandler` injected via
  *  `createImageExtension({ upload })`, or the internal `mockUpload`). */
