@@ -56,6 +56,8 @@ export type {
 // Built-in math engine (advanced usage: custom renderers, tooling)
 export { parseMath, SUPPORTED_COMMANDS } from './extensions/math';
 export type { MathNode, ParseResult as MathParseResult } from './extensions/math';
+export { CodeBlockExtension, createCodeBlockExtension, builtinCodeHighlighter } from './extensions/CodeBlock';
+export type { CodeHighlighter, CodeBlockExtensionOptions } from './extensions/CodeBlock';
 export { TableExtension } from './extensions/Table';
 export type { TableAttrs, TableCellData } from './extensions/tableModel';
 export { DividerExtension } from './extensions/Divider';
