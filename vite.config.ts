@@ -33,6 +33,7 @@ export default defineConfig(({ command, mode }) => {
             entry: resolve(__dirname, 'src/index.ts'),
             name: 'BlockEditor',
             fileName: 'block-editor',
+            cssFileName: 'style',
             formats: ['es', 'umd'],
           },
           rollupOptions: {
