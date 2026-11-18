@@ -122,6 +122,18 @@ export function parseClipboard(html: string | null, plainText: string | null): P
   return [];
 }
 
+/** Keep pasted code together and preserve whitespace from the plain-text clipboard. */
+export function parseCodeClipboard(html: string, plainText: string): ParsedBlock[] {
+  let text = plainText;
+  if (!text) {
+    const blocks = parseClipboard(html || null, null);
+    if (blocks.some((block) => block.type === 'image')) return blocks;
+    text = blocks.map((block) => inlineText(block.content)).join('\n');
+  }
+  if (!text) return [];
+  return [{ type: 'codeBlock', attrs: {}, content: inlineFromString(text.replace(/\r\n?/g, '\n')) }];
+}
+
 /**
  * Detect and parse the custom "blockeditor:" HTML comment payload that
  * BlockSettingsMenu.copyBlock writes. Format:
