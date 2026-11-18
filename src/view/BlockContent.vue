@@ -60,7 +60,7 @@ import {
   contentSignature,
   MARK_SELECTOR,
 } from './inlineDom';
-import { parseClipboard } from './clipboard';
+import { parseClipboard, parseCodeClipboard } from './clipboard';
 import { srcToFile } from './imageUpload';
 import { autoLinkInlineSeq, looksLikeUrl, normalizeUrl, sanitizeUrl } from './urlUtils';
 
@@ -533,7 +533,9 @@ async function onPaste(event: ClipboardEvent): Promise<void> {
 
   const html = data.getData('text/html');
   const plainText = data.getData('text/plain');
-  const blocks = parseClipboard(html || null, plainText || null);
+  const blocks = props.block.type === 'codeBlock'
+    ? parseCodeClipboard(html, plainText)
+    : parseClipboard(html || null, plainText || null);
   if (blocks.length === 0) return;
 
   // Check whether the parsed content contains any image blocks (from
