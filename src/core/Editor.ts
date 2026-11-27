@@ -202,6 +202,8 @@ export class Editor {
    * Export the current document as a Markdown string. Serializes the editor's
    * own live document state directly (see `docToMarkdown` below); no external
    * converter or intermediate re-serialization is involved.
+   * Empty paragraphs use a blank line between the usual block separators so
+   * the editor can restore them on import.
    */
   toMarkdown(): string {
     return docToMarkdown(this.state.doc);
@@ -217,6 +219,8 @@ export class Editor {
    * The Markdown is parsed natively by the editor (see `markdownToDoc` below)
    * straight into its document state; no external converter and no
    * intermediate `DocumentData` round-trip is involved.
+   * Between blocks, each full pair of line breaks after the first pair
+   * restores one empty paragraph.
    */
   setDocFromMarkdown(markdown: string): void {
     this.adoptDoc(markdownToDoc(markdown));
@@ -816,13 +820,13 @@ function docToMarkdown(doc: DocState): string {
   };
 
   for (const chunk of chunks) {
-    // Empty paragraphs add lines independently of the usual block separators.
+    if (previous && !shouldKeepAdjacent(previous, chunk)) out.push('');
     if (chunk.lines.length === 0) {
-      out.push('');
-      continue;
+      // Keep the empty paragraph's indentation for the Markdown parser.
+      out.push(' '.repeat(chunk.level * 2));
+    } else {
+      for (const line of chunk.lines) appendMarkdownLine(line);
     }
-    if (previous && !shouldKeepAdjacent(previous, chunk)) appendMarkdownLine('');
-    for (const line of chunk.lines) appendMarkdownLine(line);
     previous = chunk;
   }
   return out.join('\n');
@@ -833,6 +837,7 @@ function docToMarkdown(doc: DocState): string {
  * blank line between them).
  *
  * Rule (user-spec):
+ *  - Empty paragraphs always use the full separator ("\n\n") on both sides.
  *  - First "ignore chunks with indentation" (i.e. different levels) entirely:
  *    level-different chunk pairs are always kept adjacent. Blank lines are
  *    only ever inserted between same-level peers.
@@ -842,6 +847,7 @@ function docToMarkdown(doc: DocState): string {
  *    separate blocks: insert a blank line.
  */
 function shouldKeepAdjacent(a: MdChunk, b: MdChunk): boolean {
+  if (a.lines.length === 0 || b.lines.length === 0) return false;
   if (a.level !== b.level) return true; // 跳过（忽略）有缩进/跨层级的边界
   return isListType(a.type) && isListType(b.type) && a.type === b.type;
 }
@@ -993,9 +999,24 @@ function unescapeMdCell(s: string): string {
 /** Parse a Markdown string straight into a normalized document state. */
 function markdownToDoc(md: string): DocState {
   const items: { indent: number; block: ParsedBlock }[] = [];
-  const logical = splitBlocks(md);
+  const blankLines: string[] = [];
 
-  for (const group of logical) {
+  const appendEmptyParagraphs = (hasNextBlock: boolean): void => {
+    const hasPreviousBlock = items.length > 0;
+    // A blank run alternates between separator lines and empty paragraphs.
+    // At the document edges, only the separator toward a neighbor is present.
+    const start = hasPreviousBlock ? 1 : 0;
+    const end = blankLines.length - (hasNextBlock ? 1 : 0);
+    // A blank document with no full separator uses the editor's default block.
+    if (!hasPreviousBlock && !hasNextBlock && end < 3) return;
+    for (let i = start; i < end; i += 2) {
+      items.push({ indent: blankLines[i]!.length, block: { type: 'paragraph' } });
+    }
+    blankLines.length = 0;
+  };
+
+  for (const group of splitBlocks(md)) {
+    if (group.kind !== 'lines') appendEmptyParagraphs(true);
     if (group.kind === 'fence') {
       items.push({
         indent: 0,
@@ -1022,38 +1043,30 @@ function markdownToDoc(md: string): DocState {
       });
       continue;
     }
-    // Parse lines, tracking whether a blank line preceded each one so we
-    // can merge consecutive quote / paragraph lines into a single block.
-    const parsed: { indent: number; block: ParsedBlock; blankBefore: boolean }[] = [];
-    let blankBefore = false;
+    // Keep blank runs across groups. Fenced and table bodies are separate
+    // logical blocks, so their internal lines never contribute to these runs.
     for (const line of group.lines) {
       if (line.trim().length === 0) {
-        blankBefore = true;
+        blankLines.push(line);
         continue;
       }
       const indent = line.length - line.trimStart().length;
       const block = parseLine(line.trim());
-      if (!block) {
-        blankBefore = false;
-        continue;
-      }
-      parsed.push({ indent, block, blankBefore });
-      blankBefore = false;
-    }
+      if (!block) continue;
+      const blankBefore = blankLines.length > 0;
+      appendEmptyParagraphs(true);
 
-    // Merge consecutive quote / paragraph lines (same indent, no blank line
-    // between them) into one block, using "\n" as the line separator.
-    for (const pl of parsed) {
+      // Merge consecutive quote or paragraph lines of the same indent.
       const last = items[items.length - 1];
       if (
         last
-        && !pl.blankBefore
-        && last.indent === pl.indent
-        && last.block.type === pl.block.type
-        && (pl.block.type === 'quote' || pl.block.type === 'paragraph')
+        && !blankBefore
+        && last.indent === indent
+        && last.block.type === block.type
+        && (block.type === 'quote' || block.type === 'paragraph')
       ) {
         const prevContent = last.block.content ?? [];
-        const newContent = pl.block.content ?? [];
+        const newContent = block.content ?? [];
         items[items.length - 1] = {
           indent: last.indent,
           block: {
@@ -1063,10 +1076,11 @@ function markdownToDoc(md: string): DocState {
           },
         };
       } else {
-        items.push({ indent: pl.indent, block: pl.block });
+        items.push({ indent, block });
       }
     }
   }
+  appendEmptyParagraphs(false);
 
   // build an actual parent/children tree from the
   // per-block indent levels using the standard indent-stack algorithm. The
