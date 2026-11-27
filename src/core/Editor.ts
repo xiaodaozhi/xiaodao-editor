@@ -687,9 +687,9 @@ function escapeMdCell(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
 }
 
-/** Tag for each top-level "chunk" in the serializer output. */
+/** Markdown output for a block in document order. */
 interface MdChunk {
-  /** Markdown lines for this block (potentially multi-line, e.g. code fence). */
+  /** Markdown lines for this block. An empty array represents an empty paragraph. */
   readonly lines: readonly string[];
   /**
    * Logical indentation level used by the list-continuity rule. Nested list
@@ -705,14 +705,8 @@ function isListType(t: string): boolean {
   return t === 'bulletList' || t === 'orderedList' || t === 'todoList';
 }
 
-/** Serialize a single block to tagged chunks.
- *
- * Uses `attrs.indent` (the editor's REAL indent mechanism) instead of
- * `block.children`: the view layer does not render children at all, and
- * Tab/Shift+Tab manipulate `attrs.indent` as a number. So every block is
- * treated as a flat root item whose `level` comes directly from its
- * `attrs.indent`; `block.children` is intentionally ignored. */
-function blockToChunks(doc: DocState, id: BlockId, _level: number): MdChunk[] {
+/** Serialize a block and its descendants in depth-first order. */
+function blockToChunks(doc: DocState, id: BlockId): MdChunk[] {
   const block = doc.blocks.get(id);
   if (!block) return [];
   // authoritative level from parent-chain depth.
@@ -797,12 +791,10 @@ function blockToChunks(doc: DocState, id: BlockId, _level: number): MdChunk[] {
     }
   }
 
-  // emit the block's own chunk, then depth-first-walk its children
-  // (so that every descendant immediately follows its parent).
   const out: MdChunk[] = [];
-  if (lines.length > 0) out.push({ lines, level, type: block.type });
+  if (lines.length > 0 || block.type === 'paragraph') out.push({ lines, level, type: block.type });
   for (const childId of block.children) {
-    out.push(...blockToChunks(doc, childId, level + 1));
+    out.push(...blockToChunks(doc, childId));
   }
   return out;
 }
@@ -811,31 +803,29 @@ function blockToChunks(doc: DocState, id: BlockId, _level: number): MdChunk[] {
 function docToMarkdown(doc: DocState): string {
   const chunks: MdChunk[] = [];
   for (const rootId of doc.root) {
-    chunks.push(...blockToChunks(doc, rootId, 0));
+    chunks.push(...blockToChunks(doc, rootId));
   }
 
-  // Walk in output order. Between two adjacent chunks we emit a blank line
-  // UNLESS, for every (non-empty) indentation level that is present in the
-  // chunk pair, the "continuity" rule holds: same-level peers of the same
-  // list-kind stay together.
   const out: string[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const curr = chunks[i]!;
-    if (i > 0) {
-      const prev = chunks[i - 1]!;
-      const needBlank = !shouldKeepAdjacent(prev, curr);
-      if (needBlank) out.push('');
-    }
-    for (const l of curr.lines) out.push(l);
-  }
+  let previous: MdChunk | undefined;
+  let lastMarkdownLine: string | undefined;
+  const appendMarkdownLine = (line: string): void => {
+    if (line === '' && !lastMarkdownLine) return;
+    out.push(line);
+    lastMarkdownLine = line;
+  };
 
-  // Collapse leading / trailing / duplicated blank lines (purely cosmetic).
-  const trimmed: string[] = [];
-  for (const l of out) {
-    if (l === '' && (trimmed.length === 0 || trimmed[trimmed.length - 1] === '')) continue;
-    trimmed.push(l);
+  for (const chunk of chunks) {
+    // Empty paragraphs add lines independently of the usual block separators.
+    if (chunk.lines.length === 0) {
+      out.push('');
+      continue;
+    }
+    if (previous && !shouldKeepAdjacent(previous, chunk)) appendMarkdownLine('');
+    for (const line of chunk.lines) appendMarkdownLine(line);
+    previous = chunk;
   }
-  return trimmed.join('\n');
+  return out.join('\n');
 }
 
 /**
