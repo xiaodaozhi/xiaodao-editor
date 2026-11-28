@@ -1727,7 +1727,8 @@ body.theme-light {
   transition: background 0.1s ease;
 }
 
-.ht-btn:hover:not(.active):not(.open) {
+.ht-btn:hover:not(.active):not(.open),
+.ht-btn.open:not(.active) {
   background: rgba(255 255 255 / 0.12);
 }
 

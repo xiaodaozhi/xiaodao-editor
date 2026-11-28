@@ -526,7 +526,7 @@
 
 <script setup lang="ts">
 import { computed, ref, inject, shallowRef, reactive, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { placeBelow } from './popup';
+import { onPopupViewportChange, placeBelow, popupViewport } from './popup';
 import { useEditor, fixedToolbarBottomKey } from '../context';
 import { useMenuScroll } from './useMenuScroll';
 import { useMenuDismiss } from './useMenuDismiss';
@@ -596,6 +596,7 @@ const canScrollDown = ref(false);
 const MENU_WIDTH = 260;
 const MENU_MIN_HEIGHT = 80;
 const SCROLL_BTN_HEIGHT = 24;
+let stopViewportObserver: (() => void) | null = null;
 
 // Collapsible sections: all collapsed by default
 type SectionKey = 'alignIndent' | 'indent' | 'textColor' | 'bgColor';
@@ -1153,7 +1154,7 @@ const menuStyle = computed(() => {
     '--scroll-max-height': `${Math.max(MENU_MIN_HEIGHT, maxScrollAreaHeight)}px`,
   };
   if (above) {
-    const viewportH = document.documentElement.clientHeight;
+    const viewportH = popupViewport().bottom;
     base.bottom = `${Math.max(0, viewportH - position.value.bottom)}px`;
     base.top = 'auto';
   } else {
@@ -1222,11 +1223,17 @@ useMenuDismiss(
 );
 
 onMounted(() => {
+  stopViewportObserver = onPopupViewportChange(() => {
+    recomputePlacement();
+    updateScrollState();
+  });
   unsubscribe = editor.subscribe((update) => {
     latestState.value = update.state;
   });
 });
 onBeforeUnmount(() => {
+  stopViewportObserver?.();
+  stopViewportObserver = null;
   unsubscribe?.();
   unsubscribe = null;
 });

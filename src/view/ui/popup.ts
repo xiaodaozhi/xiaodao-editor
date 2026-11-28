@@ -32,6 +32,56 @@ export interface PopupPlacement {
   readonly topBaseline: number;
 }
 
+export interface PopupViewport {
+  readonly top: number;
+  readonly left: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Return the visible viewport in layout-viewport coordinates. On mobile,
+ * the on-screen keyboard changes the visual viewport without changing the
+ * layout viewport, so documentElement.clientHeight is not enough for a
+ * fixed popup that must remain above the keyboard.
+ */
+export function popupViewport(): PopupViewport {
+  const docEl = typeof document !== 'undefined' ? document.documentElement : null;
+  const layoutWidth = docEl?.clientWidth ?? 0;
+  const layoutHeight = docEl?.clientHeight ?? 0;
+  const visual = typeof window !== 'undefined' ? window.visualViewport : null;
+  const left = finiteOr(visual?.offsetLeft, 0);
+  const top = finiteOr(visual?.offsetTop, 0);
+  const width = positiveOr(visual?.width, layoutWidth);
+  const height = positiveOr(visual?.height, layoutHeight);
+
+  return {
+    top,
+    left,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+  };
+}
+
+/** Observe both browser resize and mobile visual-viewport changes. */
+export function onPopupViewportChange(handler: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const listener = () => handler();
+  window.addEventListener('resize', listener);
+  const visual = window.visualViewport;
+  visual?.addEventListener('resize', listener);
+  visual?.addEventListener('scroll', listener);
+  return () => {
+    window.removeEventListener('resize', listener);
+    visual?.removeEventListener('resize', listener);
+    visual?.removeEventListener('scroll', listener);
+  };
+}
+
 /**
  * Position a popup below an anchor element (or rect). If the anchor is close
  * to the container bottom **and** the viewport below is too cramped while
@@ -54,11 +104,9 @@ export function placeBelow(
 ): PopupPlacement {
   void root;
   const anchorRect = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
-
-  const viewportHeight = document.documentElement.clientHeight;
-  const vw = viewportWidth();
-  const spaceBelow = Math.max(0, viewportHeight - anchorRect.bottom - margin - bottomMargin);
-  const spaceAbove = Math.max(0, anchorRect.top - margin - topMargin);
+  const viewport = popupViewport();
+  const spaceBelow = Math.max(0, viewport.bottom - anchorRect.bottom - margin - bottomMargin);
+  const spaceAbove = Math.max(0, anchorRect.top - viewport.top - margin - topMargin);
 
   const fitsBelow = spaceBelow >= popupSize.height + margin;
   const fitsAbove = spaceAbove >= popupSize.height + margin;
@@ -78,7 +126,7 @@ export function placeBelow(
   const topBaseline = anchorRect.bottom + margin;
   const bottomBaseline = anchorRect.top - margin;
   if (above) {
-    top = Math.max(margin + topMargin, bottomBaseline - popupSize.height);
+    top = Math.max(viewport.top + margin + topMargin, bottomBaseline - popupSize.height);
     bottom = bottomBaseline;
     availableHeight = Math.max(120, spaceAbove);
   } else {
@@ -89,8 +137,9 @@ export function placeBelow(
   }
 
   // Clamp horizontally to the viewport.
-  const maxLeft = vw - popupSize.width - margin;
-  const left = Math.max(margin, Math.min(maxLeft, anchorRect.left));
+  const minLeft = viewport.left + margin;
+  const maxLeft = Math.max(minLeft, viewport.right - popupSize.width - margin);
+  const left = Math.max(minLeft, Math.min(maxLeft, anchorRect.left));
 
   return { top, left, above, availableHeight, bottom, topBaseline };
 }
@@ -107,19 +156,16 @@ export function placeBelowSelection(
   popupSize: { readonly width: number; readonly height: number },
   margin = 8,
 ): PopupPlacement {
-  // Use clientWidth/clientHeight: these are the VISIBLE viewport dimensions
-  // EXCLUDING scrollbars.  innerWidth includes the scrollbar (~15px), which
-  // makes the horizontal right-clamp too loose and the toolbar right edge
-  // ends up covered by the scrollbar or the very edge of the viewport.
-  const viewportHeight = document.documentElement.clientHeight;
-  const viewportW = document.documentElement.clientWidth;
+  const viewport = popupViewport();
 
   // Viewport-relative coordinates: no rootRect subtraction.
   const centerLeft = selectionRect.left + (selectionRect.width - popupSize.width) / 2;
-  const left = Math.max(margin, Math.min(viewportW - popupSize.width - margin, centerLeft));
+  const minLeft = viewport.left + margin;
+  const maxLeft = Math.max(minLeft, viewport.right - popupSize.width - margin);
+  const left = Math.max(minLeft, Math.min(maxLeft, centerLeft));
 
-  const spaceBelow = viewportHeight - selectionRect.bottom - margin;
-  const spaceAbove = selectionRect.top - margin;
+  const spaceBelow = viewport.bottom - selectionRect.bottom - margin;
+  const spaceAbove = selectionRect.top - viewport.top - margin;
   const fitsBelow = spaceBelow >= popupSize.height;
   const fitsAbove = spaceAbove >= popupSize.height;
   const above = !fitsBelow && (fitsAbove || spaceAbove > spaceBelow);
@@ -127,7 +173,7 @@ export function placeBelowSelection(
   const topBaseline = selectionRect.bottom + margin;
   const bottomBaseline = selectionRect.top - margin;
   const top = above
-    ? Math.max(margin, bottomBaseline - popupSize.height)
+    ? Math.max(viewport.top + margin, bottomBaseline - popupSize.height)
     : topBaseline;
   const bottom = above
     ? bottomBaseline
@@ -161,14 +207,15 @@ export function placePreferAbove(
   popupSize: { readonly width: number; readonly height: number },
   margin = 8,
 ): PopupPlacement {
-  const viewportHeight = document.documentElement.clientHeight;
-  const viewportW = document.documentElement.clientWidth;
+  const viewport = popupViewport();
 
   const centerLeft = selectionRect.left + (selectionRect.width - popupSize.width) / 2;
-  const left = Math.max(margin, Math.min(viewportW - popupSize.width - margin, centerLeft));
+  const minLeft = viewport.left + margin;
+  const maxLeft = Math.max(minLeft, viewport.right - popupSize.width - margin);
+  const left = Math.max(minLeft, Math.min(maxLeft, centerLeft));
 
-  const spaceAbove = selectionRect.top - margin;
-  const spaceBelow = viewportHeight - selectionRect.bottom - margin;
+  const spaceAbove = selectionRect.top - viewport.top - margin;
+  const spaceBelow = viewport.bottom - selectionRect.bottom - margin;
   const fitsAbove = spaceAbove >= popupSize.height;
   const fitsBelow = spaceBelow >= popupSize.height;
   // Prefer above; only go below if above doesn't fit AND below has more room.
@@ -177,7 +224,7 @@ export function placePreferAbove(
   const topBaseline = selectionRect.bottom + margin;
   const bottomBaseline = selectionRect.top - margin;
   const top = above
-    ? Math.max(margin, bottomBaseline - popupSize.height)
+    ? Math.max(viewport.top + margin, bottomBaseline - popupSize.height)
     : topBaseline;
   const bottom = above
     ? bottomBaseline
@@ -199,9 +246,10 @@ export function relativeRect(root: HTMLElement, el: HTMLElement): DOMRect {
   return new DOMRect(e.left - r.left, e.top - r.top, e.width, e.height);
 }
 
-function viewportWidth(): number {
-  // clientWidth excludes scrollbar width (unlike window.innerWidth which
-  // includes it), so clamped popups remain fully visible within the actual
-  // scrollbar-free viewport.
-  return document.documentElement.clientWidth;
+function finiteOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isFinite(value) ? value : fallback;
+}
+
+function positiveOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
 }
