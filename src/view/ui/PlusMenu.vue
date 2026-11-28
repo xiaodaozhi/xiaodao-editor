@@ -130,7 +130,7 @@
 import { computed, ref, inject, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import type { SlashCommand } from '../../core/command/SlashCommand';
 import { useEditor, fixedToolbarBottomKey } from '../context';
-import { placeBelow } from './popup';
+import { onPopupViewportChange, placeBelow, popupViewport } from './popup';
 import { useMenuScroll } from './useMenuScroll';
 import { useMenuDismiss } from './useMenuDismiss';
 import SafeHtml from './SafeHtml.vue';
@@ -185,6 +185,7 @@ const canScrollDown = ref(false);
 const MENU_WIDTH = 300;
 const MENU_MIN_HEIGHT = 80;
 const SCROLL_BTN_HEIGHT = 24;
+let stopViewportObserver: (() => void) | null = null;
 
 // --- Delayed unmount for fade-out animation ------------------------------
 // Keep the element in the DOM for 300ms after `visible` becomes false so
@@ -302,27 +303,29 @@ watch(
   },
 );
 
-watch(
-  [() => props.visible, () => props.anchorEl, menuEl, filtered, canScrollUp, canScrollDown],
-  async () => {
-    if (!props.visible || !props.anchorEl || !props.rootEl) return;
-    await nextTick();
+function recomputePlacement(): void {
+  if (!props.visible || !props.anchorEl || !props.rootEl) return;
+  void nextTick().then(() => {
     const el = menuEl.value;
-    if (!el) return;
+    if (!el || !props.anchorEl || !props.rootEl) return;
     const rect = el.getBoundingClientRect();
     const fromToolbar = !!props.anchorEl.closest('.fixed-toolbar');
     const forceDirection: 'auto' | 'down' | 'up' = fromToolbar
       ? (isFixedToolbarBottom.value ? 'up' : 'down')
       : 'auto';
     const viewportGap = fromToolbar ? 10 : 0;
-    const placement = placeBelow(props.rootEl, props.anchorEl, {
+    position.value = placeBelow(props.rootEl, props.anchorEl, {
       width: MENU_WIDTH,
       height: rect.height,
     }, 6, forceDirection, viewportGap, viewportGap);
-    position.value = placement;
     positioned.value = true;
     nextTick(updateScrollState);
-  },
+  });
+}
+
+watch(
+  [() => props.visible, () => props.anchorEl, menuEl, filtered, canScrollUp, canScrollDown],
+  recomputePlacement,
   { flush: 'post' },
 );
 
@@ -354,7 +357,7 @@ const menuStyle = computed(() => {
     // Anchor the menu's bottom edge to `position.bottom` so any change in
     // height (search narrowing, scroll buttons appearing/disappearing)
     // expands or shrinks the menu UPWARD instead of down.
-    const viewportH = document.documentElement.clientHeight;
+    const viewportH = popupViewport().bottom;
     base.bottom = `${Math.max(0, viewportH - position.value.bottom)}px`;
     base.top = 'auto';
   } else {
@@ -448,9 +451,13 @@ useMenuDismiss(
 );
 
 onMounted(() => {
-  window.addEventListener('resize', updateScrollState);
+  stopViewportObserver = onPopupViewportChange(() => {
+    recomputePlacement();
+    updateScrollState();
+  });
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateScrollState);
+  stopViewportObserver?.();
+  stopViewportObserver = null;
 });
 </script>
